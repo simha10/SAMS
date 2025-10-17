@@ -1,0 +1,45 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+# Ignore node_modules directory and its contents
+node_modules/
+
+# Ignore .env file in any directory
+.env
+
+# Ignore all .log files in any directory
+**/*.log
+
+# Ignore all .DS_Store files in any directory
+**/.DS_Store
+# Ignore node_modules directory in the backend directory
+backend/node_modules/
+backend/.env
+backend/
+backend/dist/
+backend/dist-ssr/
+backend/logs/
+backend/*.log

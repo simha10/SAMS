@@ -1,0 +1,369 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Loader2,
+  Users,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+} from "lucide-react";
+import { managerAPI } from "@/services/api";
+import { format } from "date-fns";
+import type { AttendanceRecord } from "@/types";
+
+interface TeamMember {
+  employee: {
+    id: string;
+    empId: string;
+    name: string;
+    email: string;
+  };
+  attendance: {
+    status: string;
+    checkInTime: string | null;
+    checkOutTime: string | null;
+    workingHours: number | null;
+    flagged: boolean;
+  };
+}
+
+interface TeamAttendanceData {
+  date: string;
+  team: TeamMember[];
+  summary: {
+    total: number;
+    present: number;
+    absent: number;
+    flagged: number;
+  };
+}
+
+export default function ManagerAttendance() {
+  // Default to today's date
+  const defaultDate = new Date().toISOString().split("T")[0];
+  const [selectedDate, setSelectedDate] = useState(defaultDate);
+  const [teamAttendance, setTeamAttendance] =
+    useState<TeamAttendanceData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState<
+    "all" | "present" | "absent" | "flagged"
+  >("all");
+
+  useEffect(() => {
+    fetchTeamAttendance();
+  }, [selectedDate]);
+
+  const fetchTeamAttendance = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      console.log("Fetching attendance for date:", selectedDate); // Debug log
+      console.log(
+        "Making API call to:",
+        `/manager/team/attendance?date=${selectedDate}`
+      ); // Debug log
+
+      const response = await managerAPI.getTeamAttendance(selectedDate);
+      console.log("API Response received:", response); // Debug log
+      if (response.success && response.data) {
+        console.log("Team data:", response.data.team); // Debug log
+        setTeamAttendance(response.data);
+      } else {
+        setError("No data received from server");
+      }
+    } catch (err: unknown) {
+      console.error("Failed to fetch team attendance:", err);
+      console.error("Error details:", (err as any).response?.data || err);
+      console.error("Error status:", (err as any).response?.status);
+      console.error("Error headers:", (err as any).response?.headers);
+      setError(
+        "Failed to fetch team attendance: " +
+          ((err as any).response?.data?.message || (err as Error).message)
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status: string, flagged: boolean) => {
+    if (flagged) {
+      return (
+        <Badge variant="destructive">
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          Flagged
+        </Badge>
+      );
+    }
+
+    switch (status) {
+      case "present":
+        return (
+          <Badge variant="default" className="bg-green-500">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Present
+          </Badge>
+        );
+      case "absent":
+        return (
+          <Badge variant="destructive">
+            <XCircle className="w-3 h-3 mr-1" />
+            Absent
+          </Badge>
+        );
+      case "outside-geo":
+        return <Badge variant="destructive">Outside Area</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const filteredTeam =
+    teamAttendance?.team.filter((member) => {
+      if (filter === "all") return true;
+      if (filter === "present") return member.attendance.status === "present";
+      if (filter === "absent") return member.attendance.status === "absent";
+      if (filter === "flagged") return member.attendance.flagged;
+      return true;
+    }) || [];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Team Attendance</h1>
+        <p className="text-muted-foreground">
+          View and manage your team's attendance records
+        </p>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Date and Filter Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Attendance Filters</CardTitle>
+          <CardDescription>
+            Select date and filter options to view attendance records
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="date">Date</Label>
+              <Input
+                id="date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="filter">Status Filter</Label>
+              <Select
+                value={filter}
+                onValueChange={(
+                  value: "all" | "present" | "absent" | "flagged"
+                ) => setFilter(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Records</SelectItem>
+                  <SelectItem value="present">Present Only</SelectItem>
+                  <SelectItem value="absent">Absent Only</SelectItem>
+                  <SelectItem value="flagged">Flagged Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button onClick={fetchTeamAttendance} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : null}
+                Refresh Data
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary Cards */}
+      {teamAttendance && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Team</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {teamAttendance.summary.total}
+              </div>
+              <div className="text-xs text-muted-foreground">Team members</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Present</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {teamAttendance.summary.present}
+              </div>
+              <div className="text-xs text-muted-foreground">Checked in</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Absent</CardTitle>
+              <XCircle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {teamAttendance.summary.absent}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Not checked in
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Flagged</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">
+                {teamAttendance.summary.flagged}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Issues detected
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Team Attendance Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Team Attendance - {format(new Date(selectedDate), "MMM d, yyyy")}
+          </CardTitle>
+          <CardDescription>
+            Detailed attendance records for your team members
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span className="ml-2">Loading attendance data...</span>
+            </div>
+          ) : filteredTeam.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">
+                No attendance records found for the selected date and filters.
+              </p>
+              <p className="text-sm text-gray-400 mt-2">
+                Try selecting a different date or filter.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Employee ID</TableHead>
+                    <TableHead>Check-in</TableHead>
+                    <TableHead>Check-out</TableHead>
+                    <TableHead>Working Hours</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTeam.map((member) => (
+                    <TableRow key={member.employee.id}>
+                      <TableCell className="font-medium">
+                        {member.employee.name}
+                        {member.employee.empId === "EMP001" && (
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            Alice
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>{member.employee.empId}</TableCell>
+                      <TableCell>
+                        {member.attendance.checkInTime
+                          ? format(
+                              new Date(member.attendance.checkInTime),
+                              "HH:mm"
+                            )
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {member.attendance.checkOutTime
+                          ? format(
+                              new Date(member.attendance.checkOutTime),
+                              "HH:mm"
+                            )
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {member.attendance.workingHours !== null
+                          ? `${member.attendance.workingHours.toFixed(2)} hrs`
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(
+                          member.attendance.status,
+                          member.attendance.flagged
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
