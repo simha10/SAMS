@@ -332,7 +332,7 @@ export default function AdminAttendanceLogs() {
                         </div>
 
                         <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
+                          <Calendar className="w-4 h-4 text-blue-200" />
                           <span>IP: {log.ipAddress}</span>
                         </div>
 

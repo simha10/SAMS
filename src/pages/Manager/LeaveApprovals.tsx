@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/sonner";
 
 export default function LeaveApprovals() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
@@ -45,13 +46,32 @@ export default function LeaveApprovals() {
     try {
       const response = await managerAPI.getTeamLeaveRequests();
       if (response.success && response.data) {
-        setLeaveRequests(response.data.leaveRequests);
+        // Filter out approved/rejected requests older than 24 hours
+        const filteredRequests = response.data.leaveRequests.filter(
+          (request: LeaveRequest) => {
+            // Always show pending requests
+            if (request.status === "pending") return true;
+
+            // For approved/rejected requests, check if they're within 24 hours
+            const createdAt = new Date(request.createdAt);
+            const now = new Date();
+            const hoursDifference =
+              (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+
+            // Show approved/rejected requests if they're less than 24 hours old
+            return hoursDifference < 24;
+          }
+        );
+        setLeaveRequests(filteredRequests);
       } else {
         // Set empty array if no data
         setLeaveRequests([]);
       }
     } catch (err: unknown) {
       setError("Failed to fetch leave requests. Showing N/A values.");
+      toast.error("Failed to fetch leave requests", {
+        description: "Could not load leave requests. Please try again.",
+      });
       // Set empty array on error
       setLeaveRequests([]);
     } finally {
@@ -72,12 +92,18 @@ export default function LeaveApprovals() {
       );
       if (response.success) {
         setMessage(`Leave request ${status} successfully`);
+        toast.success(`Leave request ${status}`, {
+          description: `Leave request has been ${status} successfully.`,
+        });
         fetchLeaveRequests();
         // Clear message after 3 seconds
         setTimeout(() => setMessage(""), 3000);
       }
     } catch (err: unknown) {
       setError("Failed to update leave request");
+      toast.error("Failed to update leave request", {
+        description: "Please try again.",
+      });
     }
   };
 
@@ -92,24 +118,35 @@ export default function LeaveApprovals() {
       setShowRejectDialog(false);
       setRejectionReason("");
       setSelectedRequestId(null);
+      toast.success("Leave request rejected", {
+        description: "Leave request has been rejected successfully.",
+      });
     }
   };
 
   const getLeaveTypeBadge = (type: string) => {
     switch (type) {
       case "sick":
-        return <Badge variant="destructive">Sick</Badge>;
+        return (
+          <Badge variant="default" className="bg-rose-500 text-rose-50">
+            Sick
+          </Badge>
+        );
       case "personal":
-        return <Badge variant="secondary">Personal</Badge>;
+        return (
+          <Badge variant="default" className="bg-sky-500 text-sky-50">
+            Personal
+          </Badge>
+        );
       case "vacation":
         return (
-          <Badge variant="default" className="bg-blue-500">
+          <Badge variant="default" className="bg-indigo-500 text-indigo-50">
             Vacation
           </Badge>
         );
       case "emergency":
         return (
-          <Badge variant="default" className="bg-red-500">
+          <Badge variant="default" className="bg-red-500 text-red-50">
             Emergency
           </Badge>
         );
@@ -118,30 +155,56 @@ export default function LeaveApprovals() {
     }
   };
 
+  // Function to get status badge with appropriate colors
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return (
+          <Badge variant="default" className="bg-amber-500 text-amber-50">
+            Pending
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge variant="default" className="bg-emerald-500 text-emerald-50">
+            Approved
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge variant="default" className="bg-rose-500 text-rose-50">
+            Rejected
+          </Badge>
+        );
+      default:
+        return <Badge variant="secondary">{status || "N/A"}</Badge>;
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-bold">Leave Approvals</h1>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Review and approve/reject leave requests from your team
         </p>
       </div>
 
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="alert-modern">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {message && (
-        <Alert>
-          <AlertDescription className="text-green-600">
+        <Alert className="alert-modern">
+          <AlertDescription className="text-green-500">
             {message}
           </AlertDescription>
         </Alert>
       )}
 
-      <Card>
+      <Card className="card-modern">
         <CardHeader>
           <CardTitle>Pending Leave Requests</CardTitle>
           <CardDescription>
@@ -156,20 +219,24 @@ export default function LeaveApprovals() {
             </div>
           ) : leaveRequests.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">No pending leave requests.</p>
+              <p className="text-muted-foreground">
+                No pending leave requests.
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
               {leaveRequests.map((request) => (
-                <div key={request._id} className="p-4 border rounded-lg">
+                <div
+                  key={request._id}
+                  className="p-4 border rounded-lg bg-secondary/50"
+                >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div className="flex-1">
                       <h3 className="font-medium">
                         {request.userId.name || "N/A"}
                       </h3>
-                      <p className="text-sm text-gray-600">
-                        {request.userId.empId || "N/A"} •{" "}
-                        {request.userId.email || "N/A"}
+                      <p className="text-sm text-muted-foreground">
+                        {request.userId.empId || "N/A"}
                       </p>
                       <div className="mt-2 space-y-1">
                         <p className="text-sm">
@@ -192,12 +259,12 @@ export default function LeaveApprovals() {
                         </p>
                         {request.status === "rejected" &&
                           request.rejectionReason && (
-                            <p className="text-sm text-red-600">
+                            <p className="text-sm text-red-500">
                               <strong>Rejection Reason:</strong>{" "}
                               {request.rejectionReason}
                             </p>
                           )}
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           Requested:{" "}
                           {request.createdAt
                             ? format(
@@ -209,9 +276,7 @@ export default function LeaveApprovals() {
                       </div>
                     </div>
                     <div className="flex flex-col items-start sm:items-end space-y-2">
-                      <Badge variant="secondary">
-                        {request.status || "N/A"}
-                      </Badge>
+                      {getStatusBadge(request.status)}
                       {request.status === "pending" && (
                         <div className="flex flex-col sm:flex-row gap-2">
                           <Button
@@ -219,6 +284,7 @@ export default function LeaveApprovals() {
                             onClick={() =>
                               handleLeaveAction(request._id, "approved")
                             }
+                            className="btn-primary"
                           >
                             Approve
                           </Button>
@@ -226,6 +292,7 @@ export default function LeaveApprovals() {
                             size="sm"
                             variant="destructive"
                             onClick={() => openRejectDialog(request._id)}
+                            className="btn-destructive"
                           >
                             Reject
                           </Button>
@@ -242,7 +309,7 @@ export default function LeaveApprovals() {
 
       {/* Reject Dialog */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px] card-modern">
           <DialogHeader>
             <DialogTitle>Reject Leave Request</DialogTitle>
             <DialogDescription>
@@ -259,6 +326,7 @@ export default function LeaveApprovals() {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={4}
+                className="input-modern"
               />
             </div>
           </div>
@@ -269,10 +337,15 @@ export default function LeaveApprovals() {
                 setShowRejectDialog(false);
                 setRejectionReason("");
               }}
+              className="btn-secondary"
             >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleReject}>
+            <Button
+              variant="destructive"
+              onClick={handleReject}
+              className="btn-destructive"
+            >
               Reject Request
             </Button>
           </DialogFooter>

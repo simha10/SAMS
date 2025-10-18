@@ -31,9 +31,12 @@ export interface AttendanceRecord {
     checkIn?: number;
     checkOut?: number;
   };
-  status: 'present' | 'absent';
+  status: 'present' | 'absent' | 'half-day' | 'on-leave' | 'outside-duty';
   workingHours: number;
   flagged: boolean;
+  flaggedReason?: string;
+  isHalfDay?: boolean;
+  halfDayType?: 'morning' | 'afternoon';
   createdAt: string;
   updatedAt: string;
 }
@@ -66,6 +69,12 @@ export interface LeaveRequest {
   approvedAt?: string;
   rejectionReason?: string;
   days: number;
+  isHalfDay?: boolean;
+  halfDayType?: 'morning' | 'afternoon';
+  isHalfDayStart?: boolean;
+  isHalfDayEnd?: boolean;
+  halfDayTypeStart?: 'morning' | 'afternoon';
+  halfDayTypeEnd?: 'morning' | 'afternoon';
   createdAt: string;
   updatedAt: string;
 }
@@ -99,6 +108,12 @@ export interface LeaveRequestData {
   endDate: string;
   reason: string;
   type: 'sick' | 'personal' | 'vacation' | 'emergency';
+  isHalfDay?: boolean;
+  halfDayType?: 'morning' | 'afternoon';
+  isHalfDayStart?: boolean;
+  isHalfDayEnd?: boolean;
+  halfDayTypeStart?: 'morning' | 'afternoon';
+  halfDayTypeEnd?: 'morning' | 'afternoon';
 }
 
 // Error type

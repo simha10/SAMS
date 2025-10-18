@@ -38,7 +38,6 @@ node_modules/
 # Ignore node_modules directory in the backend directory
 backend/node_modules/
 backend/.env
-backend/
 backend/dist/
 backend/dist-ssr/
 backend/logs/

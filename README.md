@@ -25,29 +25,29 @@ Geolocation: Native browser geolocation API
 Charts: Recharts for analytics visualization
 📁 Project Structure
 attendance/
-├── backend/                 # Express.js API server
-│   ├── src/
-│   │   ├── app.js          # Express app configuration
-│   │   ├── server.js       # Server entry point
-│   │   ├── config/         # Database and logger config
-│   │   ├── controllers/    # Route handlers
-│   │   ├── routes/         # API routes
-│   │   ├── models/         # MongoDB schemas
-│   │   ├── middleware/     # Auth and validation middleware
-│   │   ├── services/       # Business logic services
-│   │   ├── jobs/           # Cron job definitions
-│   │   └── utils/          # Utility functions
-│   ├── scripts/            # Database initialization
-│   ├── __tests__/          # Unit tests
-│   └── package.json
-├── src/                    # React frontend
-│   ├── components/         # UI components
-│   ├── pages/              # Route components
-│   ├── services/           # API client
-│   ├── stores/             # Zustand stores
-│   ├── hooks/              # Custom React hooks
-│   ├── types/              # TypeScript definitions
-│   └── utils/              # Utility functions
+├── backend/ # Express.js API server
+│ ├── src/
+│ │ ├── app.js # Express app configuration
+│ │ ├── server.js # Server entry point
+│ │ ├── config/ # Database and logger config
+│ │ ├── controllers/ # Route handlers
+│ │ ├── routes/ # API routes
+│ │ ├── models/ # MongoDB schemas
+│ │ ├── middleware/ # Auth and validation middleware
+│ │ ├── services/ # Business logic services
+│ │ ├── jobs/ # Cron job definitions
+│ │ └── utils/ # Utility functions
+│ ├── scripts/ # Database initialization
+│ ├── **tests**/ # Unit tests
+│ └── package.json
+├── src/ # React frontend
+│ ├── components/ # UI components
+│ ├── pages/ # Route components
+│ ├── services/ # API client
+│ ├── stores/ # Zustand stores
+│ ├── hooks/ # Custom React hooks
+│ ├── types/ # TypeScript definitions
+│ └── utils/ # Utility functions
 └── README.md
 🛠️ Installation & Setup
 Prerequisites
@@ -63,30 +63,37 @@ cp .env.example .env
 Edit .env with your configurations:
 
 # Database
+
 MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/gofence-attendance?retryWrites=true&w=majority
 
 # Authentication
+
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
 BCRYPT_SALT_ROUNDS=10
 
 # Server
+
 PORT=5000
 NODE_ENV=development
 
 # Office Configuration
-OFFICE_DEFAULT_LAT=37.7749
-OFFICE_DEFAULT_LNG=-122.4194
-OFFICE_DEFAULT_RADIUS=100
+
+OFFICE_DEFAULT_LAT=26.913595
+OFFICE_DEFAULT_LNG=80.953481
+OFFICE_DEFAULT_RADIUS=50
 
 # Admin Initialization (optional)
+
 ADMIN_INIT_EMAIL=admin@company.com
 ADMIN_INIT_PASSWORD=admin123
 
 # Notifications (optional)
+
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 TELEGRAM_CHAT_ID=your-telegram-chat-id
 
 # CORS
+
 FRONTEND_URL=http://localhost:5173
 Initialize Database:
 npm run init-db
@@ -103,7 +110,7 @@ pnpm run dev
 Backend Tests
 cd backend
 npm test
-npm run test:watch  # Watch mode
+npm run test:watch # Watch mode
 Frontend Build
 pnpm run build
 pnpm run lint
@@ -117,7 +124,7 @@ Start Command: cd backend && npm start
 Set Environment Variables in Render dashboard
 Add Scheduled Job (optional):
 Command: cd backend && node -e "require('./src/jobs/daily.js')"
-Schedule: 0 11 * * * (11 AM daily)
+Schedule: 0 11 \* \* \* (11 AM daily)
 Frontend Deployment (Vercel)
 Connect GitHub repository to Vercel
 Configure Build Settings:
@@ -133,7 +140,7 @@ Configure network access (0.0.0.0/0 for development)
 Get connection string and update MONGO_URI in environment variables
 📱 Usage
 Employee Features
-Location-based check-in/check-out during office hours (10 AM - 6 PM)
+Location-based check-in/check-out during office hours (9 AM - 8 PM)
 View attendance history and working hours
 Submit leave requests with approval workflow
 Manager Features
@@ -150,15 +157,15 @@ Top performers leaderboard
 Office Location
 Update office coordinates in environment variables:
 
-OFFICE_DEFAULT_LAT=37.7749      # Office latitude
-OFFICE_DEFAULT_LNG=-122.4194    # Office longitude
-OFFICE_DEFAULT_RADIUS=100       # Allowed radius in meters
+OFFICE_DEFAULT_LAT=26.913595 # Office latitude
+OFFICE_DEFAULT_LNG=80.953481 # Office longitude
+OFFICE_DEFAULT_RADIUS=50 # Allowed radius in meters
 Office Hours
 Modify isWithinOfficeHours() function in backend/src/utils/haversine.js:
 
 function isWithinOfficeHours(date = new Date()) {
-  const hour = date.getHours();
-  return hour >= 10 && hour < 18; // 10 AM to 6 PM
+const hour = date.getHours();
+return hour >= 9 && hour < 20; // 9 AM to 8 PM
 }
 Notifications
 Configure Telegram bot:
@@ -196,17 +203,20 @@ Check Telegram bot token and chat ID
 Verify API rate limits
 Review notification service logs
 Development Commands
-# Backend
-npm run dev          # Start development server
-npm run lint         # Run ESLint
-npm test             # Run tests
-npm run init-db      # Initialize database
 
-# Frontend  
-npm run dev         # Start development server
-npm run build       # Build for production
-npm run lint        # Run ESLint
-npm run preview     # Preview production build
+# Backend
+
+npm run dev # Start development server
+npm run lint # Run ESLint
+npm test # Run tests
+npm run init-db # Initialize database
+
+# Frontend
+
+npm run dev # Start development server
+npm run build # Build for production
+npm run lint # Run ESLint
+npm run preview # Preview production build
 📊 API Endpoints
 Authentication
 POST /api/auth/login - User login
@@ -243,3 +253,24 @@ For issues and questions:
 Check the troubleshooting section
 Review API documentation
 Create GitHub issue with detailed description
+
+## 🛠️ Maintenance Scripts
+
+### Fix Flagged Attendance Records
+
+If attendance records were incorrectly flagged due to geofence validation issues, you can use the fix script:
+
+```bash
+# Fix all incorrectly flagged attendance records
+node backend/scripts/fix-flagged-attendance.js
+
+# Fix flagged records for a specific employee
+node backend/scripts/fix-flagged-attendance.js EMP123
+```
+
+This script will:
+
+- Find attendance records flagged for geofence issues
+- Update their status from 'outside-duty' to 'present'
+- Clear the flagged status and reason
+- Provide a summary of attendance status counts

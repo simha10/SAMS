@@ -1,0 +1,4 @@
+"date","empId","name","email","role","checkInTime","checkOutTime","checkInLat","checkInLng","checkOutLat","checkOutLng","checkInDistance","checkOutDistance","status","workingHours"
+"2025-10-16","EMP001","Alice Employee","alice@company.com","employee","2025-10-16T11:16:43.379Z","2025-10-16T14:13:38.753Z",26.9134,80.9535,26.9134,80.9535,22,22,"present",177
+"2025-10-16","EMP002","Bob Employee","bob@company.com","employee","2025-10-16T11:17:02.678Z","2025-10-16T14:17:58.589Z",26.9134,80.9535,26.9134,80.9535,22,22,"present",181
+"2025-10-17","EMP001","Alice Employee","alice@company.com","employee","2025-10-17T04:42:17.680Z","",26.9134,80.9535,"","",22,"","present",0

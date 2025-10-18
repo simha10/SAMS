@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { authAPI } from "@/services/api";
 import { CollapsibleSidebar } from "@/components/ui/collapsible-sidebar";
+import { toast } from "@/components/ui/sonner";
 
 export default function AdminManagerLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -35,10 +36,16 @@ export default function AdminManagerLayout() {
       await authAPI.logout();
       logout();
       navigate("/login");
+      toast.success("Logged out successfully", {
+        description: "You have been successfully logged out.",
+      });
     } catch (error) {
       console.error("Logout failed:", error);
       logout(); // Logout locally even if server request fails
       navigate("/login");
+      toast.success("Logged out successfully", {
+        description: "You have been successfully logged out.",
+      });
     }
   };
 
@@ -56,15 +63,17 @@ export default function AdminManagerLayout() {
           sidebarCollapsed ? "md:ml-16" : "md:ml-64"
         }`}
       >
-        <header className="bg-white border-b sticky top-0 z-40">
+        <header className="bg-background border-b border-border sticky top-0 z-40">
           <div className="flex items-center justify-between px-4 py-4 sm:px-6">
             <div className="flex items-center space-x-2">
-              <h1 className="text-xl font-semibold">Manager Dashboard</h1>
+              <h1 className="text-xl font-semibold text-foreground">
+                Manager Dashboard
+              </h1>
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-right text-sm">
-                <p className="font-medium">{user?.name}</p>
-                <p className="text-gray-500">
+                <p className="font-medium text-foreground">{user?.name}</p>
+                <p className="text-muted-foreground">
                   {user?.role === "director" ? "Director" : "Manager"} •{" "}
                   {user?.empId}
                 </p>

@@ -23,7 +23,7 @@ import {
   Legend,
 } from "recharts";
 import { Loader2, Calendar, TrendingUp } from "lucide-react";
-import { adminAPI } from "@/services/api";
+import { managerAPI } from "@/services/api";
 import { format } from "date-fns";
 
 interface TeamTrendData {
@@ -53,42 +53,86 @@ export default function TeamTrends() {
   const fetchTeamTrends = async () => {
     setLoading(true);
     setError("");
-    try {
-      // For now, we'll use the insights API and transform the data
-      // In a real implementation, you might have a specific endpoint for this
-      const response = await adminAPI.getInsights(
-        String(
-          Math.ceil(
-            (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-              (24 * 60 * 60 * 1000)
-          )
-        )
-      );
 
-      if (response.success && response.data) {
-        // Transform the data for team trends
-        const transformedData = response.data.dailyTrends.map((trend) => ({
-          date: trend._id ? format(new Date(trend._id), "MMM dd") : "N/A",
-          present: trend.present,
-          absent: trend.absent,
-          flagged: trend.flagged,
-          total: trend.present + trend.absent + trend.flagged,
-          attendanceRate:
-            (trend.present / (trend.present + trend.absent)) * 100 || 0,
-        }));
-        setTeamTrends(transformedData);
-      } else {
-        // Set empty array if no data
-        setTeamTrends([]);
+    try {
+      // For manager team trends, we need to fetch data for each date in the range
+      const trendsData: TeamTrendData[] = [];
+      const currentDate = new Date(startDate);
+      const end = new Date(endDate);
+
+      while (currentDate <= end) {
+        const dateStr = currentDate.toISOString().split("T")[0];
+
+        try {
+          const response = await managerAPI.getTeamAttendance(dateStr);
+
+          if (response.success && response.data) {
+            const summary = response.data.summary;
+            const present = summary.present || 0;
+            const absent = summary.absent || 0;
+            const flagged = summary.flagged || 0;
+            const total = present + absent + flagged;
+            const attendanceRate =
+              present + absent > 0 ? (present / (present + absent)) * 100 : 0;
+
+            trendsData.push({
+              date: dateStr,
+              present,
+              absent,
+              flagged,
+              total,
+              attendanceRate,
+            });
+          }
+        } catch (err: unknown) {
+          console.error(`Failed to fetch data for ${dateStr}:`, err);
+          // Add empty record for failed dates
+          trendsData.push({
+            date: dateStr,
+            present: 0,
+            absent: 0,
+            flagged: 0,
+            total: 0,
+            attendanceRate: 0,
+          });
+        }
+
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1);
       }
+
+      setTeamTrends(trendsData);
     } catch (err: unknown) {
-      setError("Failed to fetch team trends data. Showing N/A values.");
+      console.error("Failed to fetch team trends data:", err);
+      setError("Failed to fetch team trends data. Please try again later.");
       // Set empty array on error
       setTeamTrends([]);
     } finally {
       setLoading(false);
     }
   };
+
+  // Calculate summary statistics
+  const avgPresent =
+    teamTrends.length > 0
+      ? teamTrends.reduce((sum, day) => sum + day.present, 0) /
+        teamTrends.length
+      : 0;
+
+  const avgAbsent =
+    teamTrends.length > 0
+      ? teamTrends.reduce((sum, day) => sum + day.absent, 0) / teamTrends.length
+      : 0;
+
+  const highestRate =
+    teamTrends.length > 0
+      ? Math.max(...teamTrends.map((day) => day.attendanceRate))
+      : 0;
+
+  const lowestRate =
+    teamTrends.length > 0
+      ? Math.min(...teamTrends.map((day) => day.attendanceRate))
+      : 0;
 
   return (
     <div className="space-y-6">
@@ -118,7 +162,7 @@ export default function TeamTrends() {
             <div className="space-y-2">
               <Label htmlFor="start-date">Start Date</Label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Calendar className="absolute left-3 top-3 h-4 w-4 text-blue-200" />
                 <Input
                   id="start-date"
                   type="date"
@@ -131,7 +175,7 @@ export default function TeamTrends() {
             <div className="space-y-2">
               <Label htmlFor="end-date">End Date</Label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Calendar className="absolute left-3 top-3 h-4 w-4 text-blue-200" />
                 <Input
                   id="end-date"
                   type="date"
@@ -187,7 +231,7 @@ export default function TeamTrends() {
               <div className="text-center">
                 <p>No data available for the selected period</p>
                 <p className="text-sm mt-2">
-                  Data will show as "NA" when not available
+                  Please adjust the date range or try again later
                 </p>
               </div>
             </div>
@@ -235,7 +279,7 @@ export default function TeamTrends() {
               <div className="text-center">
                 <p>No data available for the selected period</p>
                 <p className="text-sm mt-2">
-                  Data will show as "NA" when not available
+                  Please adjust the date range or try again later
                 </p>
               </div>
             </div>
@@ -250,17 +294,10 @@ export default function TeamTrends() {
             <CardTitle className="text-sm font-medium">
               Average Present
             </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-4 w-4 text-blue-200" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {teamTrends.length > 0
-                ? (
-                    teamTrends.reduce((sum, day) => sum + day.present, 0) /
-                    teamTrends.length
-                  ).toFixed(1)
-                : "NA"}
-            </div>
+            <div className="text-2xl font-bold">{avgPresent.toFixed(1)}</div>
             <p className="text-xs text-muted-foreground">
               Average daily present count
             </p>
@@ -272,17 +309,10 @@ export default function TeamTrends() {
             <CardTitle className="text-sm font-medium">
               Average Absent
             </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-4 w-4 text-blue-200" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {teamTrends.length > 0
-                ? (
-                    teamTrends.reduce((sum, day) => sum + day.absent, 0) /
-                    teamTrends.length
-                  ).toFixed(1)
-                : "NA"}
-            </div>
+            <div className="text-2xl font-bold">{avgAbsent.toFixed(1)}</div>
             <p className="text-xs text-muted-foreground">
               Average daily absent count
             </p>
@@ -295,14 +325,7 @@ export default function TeamTrends() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {teamTrends.length > 0
-                ? Math.max(
-                    ...teamTrends.map((day) => day.attendanceRate)
-                  ).toFixed(1)
-                : "NA"}
-              %
-            </div>
+            <div className="text-2xl font-bold">{highestRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
               Best attendance rate day
             </p>
@@ -315,14 +338,7 @@ export default function TeamTrends() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {teamTrends.length > 0
-                ? Math.min(
-                    ...teamTrends.map((day) => day.attendanceRate)
-                  ).toFixed(1)
-                : "NA"}
-              %
-            </div>
+            <div className="text-2xl font-bold">{lowestRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
               Worst attendance rate day
             </p>

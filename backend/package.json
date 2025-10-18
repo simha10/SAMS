@@ -1,0 +1,41 @@
+{
+  "name": "sams-backend",
+  "version": "1.0.0",
+  "description": "Backend for Geo-Fence Attendance Management System",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "init-db": "node scripts/init-db.js",
+    "fix-passwords": "node scripts/fixUserPasswords.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.18.2",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^6.8.1",
+    "helmet": "^7.0.0",
+    "jsonwebtoken": "^9.0.1",
+    "mongoose": "^7.4.1",
+    "xss-clean": "^0.1.4"
+  },
+  "devDependencies": {
+    "jest": "^29.6.1",
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "attendance",
+    "geofence",
+    "mongodb",
+    "express",
+    "nodejs"
+  ],
+  "author": "SAMS Team",
+  "license": "MIT"
+}

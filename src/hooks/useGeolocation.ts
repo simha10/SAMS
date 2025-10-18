@@ -68,7 +68,7 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
     const defaultOptions: PositionOptions = {
       enableHighAccuracy: true,
       timeout: 10000,
-      maximumAge: 60000,
+      maximumAge: 0, // Reduced from 60000 to ensure fresh location data
       ...options,
     };
 
@@ -89,7 +89,7 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 60000,
+        maximumAge: 0, // Ensure fresh location data
         ...options,
       });
     });

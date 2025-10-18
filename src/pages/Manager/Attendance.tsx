@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { managerAPI } from "@/services/api";
 import { format } from "date-fns";
-import type { AttendanceRecord } from "@/types";
+import { toast } from "@/components/ui/sonner";
 
 interface TeamMember {
   employee: {
@@ -84,19 +84,28 @@ export default function ManagerAttendance() {
     setLoading(true);
     setError("");
     try {
-      console.log("Fetching attendance for date:", selectedDate); // Debug log
+      console.log("Fetching attendance for date:", selectedDate);
       console.log(
         "Making API call to:",
         `/manager/team/attendance?date=${selectedDate}`
-      ); // Debug log
+      );
 
       const response = await managerAPI.getTeamAttendance(selectedDate);
-      console.log("API Response received:", response); // Debug log
+      console.log("API Response received:", response);
       if (response.success && response.data) {
-        console.log("Team data:", response.data.team); // Debug log
+        console.log("Team data:", response.data.team);
         setTeamAttendance(response.data);
+        toast.success("Attendance data loaded", {
+          description: `Attendance data for ${format(
+            new Date(selectedDate),
+            "MMM d, yyyy"
+          )} loaded successfully.`,
+        });
       } else {
         setError("No data received from server");
+        toast.error("No data received", {
+          description: "Could not load attendance data.",
+        });
       }
     } catch (err: unknown) {
       console.error("Failed to fetch team attendance:", err);
@@ -107,15 +116,19 @@ export default function ManagerAttendance() {
         "Failed to fetch team attendance: " +
           ((err as any).response?.data?.message || (err as Error).message)
       );
+      toast.error("Failed to load attendance", {
+        description: "Could not load attendance data. Please try again.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const getStatusBadge = (status: string, flagged: boolean) => {
+    // Show flagged status with yellow color
     if (flagged) {
       return (
-        <Badge variant="destructive">
+        <Badge variant="default" className="bg-yellow-500">
           <AlertTriangle className="w-3 h-3 mr-1" />
           Flagged
         </Badge>
@@ -137,8 +150,26 @@ export default function ManagerAttendance() {
             Absent
           </Badge>
         );
-      case "outside-geo":
-        return <Badge variant="destructive">Outside Area</Badge>;
+      case "half-day":
+        return (
+          <Badge variant="default" className="bg-yellow-500">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            Half Day
+          </Badge>
+        );
+      case "on-leave":
+        return (
+          <Badge variant="secondary" className="bg-blue-500 text-white">
+            On Leave
+          </Badge>
+        );
+      case "outside-duty":
+        return (
+          <Badge variant="default" className="bg-yellow-500">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            Outside Duty
+          </Badge>
+        );
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -322,11 +353,6 @@ export default function ManagerAttendance() {
                     <TableRow key={member.employee.id}>
                       <TableCell className="font-medium">
                         {member.employee.name}
-                        {member.employee.empId === "EMP001" && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                            Alice
-                          </span>
-                        )}
                       </TableCell>
                       <TableCell>{member.employee.empId}</TableCell>
                       <TableCell>
@@ -347,7 +373,9 @@ export default function ManagerAttendance() {
                       </TableCell>
                       <TableCell>
                         {member.attendance.workingHours !== null
-                          ? `${member.attendance.workingHours.toFixed(2)} hrs`
+                          ? `${Math.floor(
+                              member.attendance.workingHours / 60
+                            )}h ${member.attendance.workingHours % 60}m`
                           : "-"}
                       </TableCell>
                       <TableCell>

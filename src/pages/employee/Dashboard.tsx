@@ -18,6 +18,7 @@ import {
   Loader2,
   Calendar,
   Bell,
+  Trash2,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -33,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/sonner";
 
 interface TodayStatus {
   date: string;
@@ -81,47 +83,90 @@ export default function Dashboard() {
   const [rateLimitError, setRateLimitError] = useState(false);
 
   useEffect(() => {
+    console.log("=== DASHBOARD COMPONENT MOUNTED ===");
+    console.log("Timestamp:", new Date().toISOString());
+
     let mounted = true;
 
     const loadData = async () => {
+      console.log("=== STARTING TO LOAD DASHBOARD DATA ===");
+
       if (mounted) {
+        console.log("Fetching today status...");
         await fetchTodayStatus();
       }
+
+      // Add delay between requests to avoid rate limiting
       if (mounted) {
+        console.log("Adding delay before fetching attendance...");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log("Fetching recent attendance...");
         await fetchRecentAttendance();
       }
+
+      // Add delay between requests to avoid rate limiting
       if (mounted) {
-        // Add a delay between requests to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        console.log("Adding delay before fetching leaves...");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log("Fetching recent leaves...");
         await fetchRecentLeaves();
       }
+
+      // Add delay between requests to avoid rate limiting
       if (mounted) {
-        // Add a delay between requests to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        console.log("Adding delay before fetching notifications...");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log("Fetching recent notifications...");
         await fetchRecentNotifications();
       }
+
+      console.log("=== FINISHED LOADING DASHBOARD DATA ===");
     };
 
     loadData();
 
+    // Check if there was a rate limit error in previous requests
+    if (localStorage.getItem("rateLimitError") === "true") {
+      console.log("Rate limit error detected from previous requests");
+      setRateLimitError(true);
+      // Clear the flag
+      localStorage.removeItem("rateLimitError");
+    }
+
     return () => {
+      console.log("=== DASHBOARD COMPONENT UNMOUNTING ===");
       mounted = false;
     };
   }, []);
 
   const fetchTodayStatus = async () => {
+    console.log("=== FETCH TODAY STATUS STARTED ===");
     try {
       const response = await attendanceAPI.getTodayStatus();
+      console.log("Today status response:", response);
       if (response.success && response.data) {
         setTodayStatus(response.data);
       }
       setRateLimitError(false);
+      // Clear rate limit error flag on success
+      localStorage.removeItem("rateLimitError");
+      console.log("=== FETCH TODAY STATUS COMPLETED ===");
     } catch (err: unknown) {
       console.error("Failed to fetch today status:", err);
+      // Check if it's a rate limit error
+      const error = err as any;
+      if (error.response?.status === 429) {
+        setRateLimitError(true);
+        toast.error("Too many requests", {
+          description: "Please wait a moment and try again.",
+        });
+      }
+      console.log("=== FETCH TODAY STATUS FAILED ===");
     }
   };
 
   const fetchRecentAttendance = async () => {
+    console.log("=== FETCH RECENT ATTENDANCE STARTED ===");
     setLoading(true);
     try {
       const endDate = new Date();
@@ -133,38 +178,101 @@ export default function Dashboard() {
         endDate.toISOString().split("T")[0]
       );
 
+      console.log("Recent attendance response:", response);
       if (response.success && response.data) {
         setRecentAttendance(response.data.attendance);
       }
       setRateLimitError(false);
+      // Clear rate limit error flag on success
+      localStorage.removeItem("rateLimitError");
+      console.log("=== FETCH RECENT ATTENDANCE COMPLETED ===");
     } catch (err: unknown) {
       console.error("Failed to fetch attendance history:", err);
+      // Check if it's a rate limit error
+      const error = err as any;
+      if (error.response?.status === 429) {
+        setRateLimitError(true);
+        toast.error("Too many requests", {
+          description: "Please wait a moment and try again.",
+        });
+      }
+      console.log("=== FETCH RECENT ATTENDANCE FAILED ===");
     } finally {
       setLoading(false);
     }
   };
 
   const fetchRecentLeaves = async () => {
+    console.log("=== FETCH RECENT LEAVES STARTED ===");
     try {
       const response = await leaveAPI.getMyLeaveRequests();
+      console.log("Recent leaves response:", response);
       if (response.success && response.data) {
         setRecentLeaves(response.data.leaveRequests.slice(0, 5)); // Get last 5 leave requests
       }
       setRateLimitError(false);
+      // Clear rate limit error flag on success
+      localStorage.removeItem("rateLimitError");
+      console.log("=== FETCH RECENT LEAVES COMPLETED ===");
     } catch (err: unknown) {
       console.error("Failed to fetch leave requests:", err);
+      // Check if it's a rate limit error
+      const error = err as any;
+      if (error.response?.status === 429) {
+        setRateLimitError(true);
+        toast.error("Too many requests", {
+          description: "Please wait a moment and try again.",
+        });
+      }
+      console.log("=== FETCH RECENT LEAVES FAILED ===");
+    }
+  };
+
+  // Add function to delete leave request
+  const deleteLeaveRequest = async (id: string) => {
+    try {
+      const response = await leaveAPI.deleteLeaveRequest(id);
+      if (response.success) {
+        toast.success("Leave request deleted", {
+          description: "Your leave request has been deleted successfully.",
+        });
+        // Refresh the leave requests list
+        await fetchRecentLeaves();
+      } else {
+        toast.error("Failed to delete leave request", {
+          description: response.message || "Please try again.",
+        });
+      }
+    } catch (err: unknown) {
+      toast.error("Failed to delete leave request", {
+        description: "Please try again.",
+      });
     }
   };
 
   const fetchRecentNotifications = async () => {
+    console.log("=== FETCH RECENT NOTIFICATIONS STARTED ===");
     try {
       const response = await notificationsAPI.getNotifications(10, 0); // Get last 10 notifications
+      console.log("Recent notifications response:", response);
       if (response.success && response.data) {
         setRecentNotifications(response.data.notifications.slice(0, 5)); // Get last 5 notifications
       }
       setRateLimitError(false);
+      // Clear rate limit error flag on success
+      localStorage.removeItem("rateLimitError");
+      console.log("=== FETCH RECENT NOTIFICATIONS COMPLETED ===");
     } catch (err: unknown) {
       console.error("Failed to fetch notifications:", err);
+      // Check if it's a rate limit error
+      const error = err as any;
+      if (error.response?.status === 429) {
+        setRateLimitError(true);
+        toast.error("Too many requests", {
+          description: "Please wait a moment and try again.",
+        });
+      }
+      console.log("=== FETCH RECENT NOTIFICATIONS FAILED ===");
     }
   };
 
@@ -184,15 +292,15 @@ export default function Dashboard() {
 
       // Calculate distance from office using environment variables
       const officeLat =
-        parseFloat(import.meta.env.VITE_OFFICE_LAT) || 26.91359535056058;
+        parseFloat(import.meta.env.VITE_OFFICE_LAT) || 26.913595;
       const officeLng =
-        parseFloat(import.meta.env.VITE_OFFICE_LNG) || 80.95348145976982;
-      const allowedRadius = parseInt(import.meta.env.VITE_OFFICE_RADIUS) || 100;
+        parseFloat(import.meta.env.VITE_OFFICE_LNG) || 80.953481;
+      const allowedRadius = parseInt(import.meta.env.VITE_OFFICE_RADIUS) || 50;
 
       const distance = haversine(coords.lat, coords.lng, officeLat, officeLng);
 
       if (distance > allowedRadius) {
-        // User is outside geofence - show error dialog
+        // User is outside geofence - show confirmation dialog
         setDistanceInfo({
           distance: Math.round(distance),
           allowedRadius: allowedRadius,
@@ -201,16 +309,84 @@ export default function Dashboard() {
         setError(
           `You are ${Math.round(
             distance
-          )}m away from the office location. You must be within ${allowedRadius}m to mark attendance.`
+          )}m away from the office location. Your attendance will be marked as flagged for manager review.`
         );
+        setPendingAction(action);
         return;
       }
 
-      // User is within geofence - proceed with confirmation
+      // User is within geofence - proceed with normal confirmation
       setPendingAction(action);
       setShowConfirmation(true);
+      setError(""); // Clear any previous error
     } catch (err) {
       setError("Failed to get current location");
+    }
+  };
+
+  // New function to mark flagged attendance
+  const markFlaggedAttendance = async (action: "checkin" | "checkout") => {
+    if (!coordinates) {
+      setError("Location not available. Please enable location access.");
+      toast.error("Location not available", {
+        description: "Please enable location access.",
+      });
+      return;
+    }
+
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      // Mark attendance as flagged regardless of location
+      const response =
+        action === "checkin"
+          ? await attendanceAPI.checkin(coordinates.lat, coordinates.lng)
+          : await attendanceAPI.checkout(coordinates.lat, coordinates.lng);
+
+      if (response.success) {
+        setMessage(
+          action === "checkin"
+            ? "Flagged check-in recorded successfully!"
+            : "Flagged check-out recorded successfully!"
+        );
+        toast.success(
+          action === "checkin"
+            ? "Flagged check-in recorded"
+            : "Flagged check-out recorded",
+          {
+            description:
+              action === "checkin"
+                ? "Your flagged check-in has been recorded successfully."
+                : "Your flagged check-out has been recorded successfully.",
+          }
+        );
+        // Refresh today's status after successful action
+        await fetchTodayStatus();
+        setShowGeofenceWarning(false);
+        setDistanceInfo(null);
+        setRateLimitError(false);
+      } else {
+        setError(response.message || `${action} failed`);
+        toast.error(
+          action === "checkin" ? "Check-in failed" : "Check-out failed",
+          {
+            description: response.message || "Please try again.",
+          }
+        );
+      }
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      setError(error.response?.data?.message || `${action} failed`);
+      toast.error(
+        action === "checkin" ? "Check-in failed" : "Check-out failed",
+        {
+          description: error.response?.data?.message || "Please try again.",
+        }
+      );
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -232,6 +408,17 @@ export default function Dashboard() {
           pendingAction === "checkin"
             ? "Check-in successful!"
             : "Check-out successful!"
+        );
+        toast.success(
+          pendingAction === "checkin"
+            ? "Check-in successful"
+            : "Check-out successful",
+          {
+            description:
+              pendingAction === "checkin"
+                ? "You have been successfully checked in."
+                : "You have been successfully checked out.",
+          }
         );
         // Refresh today's status after successful action
         await fetchTodayStatus();
@@ -257,6 +444,12 @@ export default function Dashboard() {
           setShowGeofenceWarning(true);
         }
         setError(response.message || `${pendingAction} failed`);
+        toast.error(
+          pendingAction === "checkin" ? "Check-in failed" : "Check-out failed",
+          {
+            description: response.message || "Please try again.",
+          }
+        );
       }
     } catch (err: unknown) {
       const error = err as ApiError;
@@ -274,8 +467,18 @@ export default function Dashboard() {
         });
         setShowGeofenceWarning(true);
         setError(error.response.data.message || `${pendingAction} failed`);
+        toast.error("Geofence restriction", {
+          description:
+            error.response.data.message || "You are outside the allowed area.",
+        });
       } else {
         setError(error.response?.data?.message || `${pendingAction} failed`);
+        toast.error(
+          pendingAction === "checkin" ? "Check-in failed" : "Check-out failed",
+          {
+            description: error.response?.data?.message || "Please try again.",
+          }
+        );
       }
     } finally {
       setActionLoading(false);
@@ -286,23 +489,56 @@ export default function Dashboard() {
     switch (status) {
       case "present":
         return (
-          <Badge variant="default" className="bg-green-500">
+          <Badge variant="default" className="bg-emerald-500 text-emerald-50">
             <CheckCircle className="w-3 h-3 mr-1" />
             Present
           </Badge>
         );
       case "absent":
         return (
-          <Badge variant="destructive">
+          <Badge variant="default" className="bg-rose-500 text-rose-50">
             <XCircle className="w-3 h-3 mr-1" />
             Absent
           </Badge>
         );
+      case "half-day":
+        return (
+          <Badge variant="default" className="bg-amber-500 text-amber-50">
+            <Clock className="w-3 h-3 mr-1" />
+            Half Day
+          </Badge>
+        );
       case "on-leave":
         return (
-          <Badge variant="secondary" className="bg-blue-500 text-white">
+          <Badge variant="default" className="bg-sky-500 text-sky-50">
             <Clock className="w-3 h-3 mr-1" />
             On Leave
+          </Badge>
+        );
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  // Add function to get status badge with appropriate colors
+  const getLeaveStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return (
+          <Badge variant="default" className="bg-amber-500 text-amber-50">
+            Pending
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge variant="default" className="bg-emerald-500 text-emerald-50">
+            Approved
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge variant="default" className="bg-rose-500 text-rose-50">
+            Rejected
           </Badge>
         );
       default:
@@ -324,24 +560,24 @@ export default function Dashboard() {
     !todayStatus?.attendance?.checkOutTime;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-gray-600">Welcome back, {user?.name}!</p>
+        <p className="text-muted-foreground">Welcome back, {user?.name}!</p>
       </div>
 
       {/* Rate Limit Error Message */}
       {rateLimitError && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="alert-modern">
           <AlertDescription>
-            Server is receiving too many requests. Please wait a moment and try
-            again.
+            Too many requests sent to the server. Please wait a moment and try
+            again. You may need to refresh the page after a minute.
           </AlertDescription>
         </Alert>
       )}
 
       {/* Location Status */}
-      <Card>
+      <Card className="card-modern">
         <CardHeader>
           <CardTitle className="flex items-center">
             <MapPin className="w-5 h-5 mr-2" />
@@ -350,26 +586,26 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           {geoLoading ? (
-            <div className="flex items-center text-gray-600">
+            <div className="flex items-center text-muted-foreground">
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Getting your location...
             </div>
           ) : geoError ? (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="alert-modern">
               <AlertDescription>{geoError}</AlertDescription>
             </Alert>
           ) : (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
               <p>Latitude: {latitude?.toFixed(6)}</p>
               <p>Longitude: {longitude?.toFixed(6)}</p>
-              <p className="mt-2 text-green-600">✓ Location access granted</p>
+              <p className="mt-2 text-green-500">✓ Location access granted</p>
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Today's Status */}
-      <Card>
+      <Card className="card-modern">
         <CardHeader>
           <CardTitle className="flex items-center">
             <Clock className="w-5 h-5 mr-2" />
@@ -381,15 +617,15 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent className="space-y-4">
           {message && (
-            <Alert>
-              <AlertDescription className="text-green-600">
+            <Alert className="alert-modern">
+              <AlertDescription className="text-green-500">
                 {message}
               </AlertDescription>
             </Alert>
           )}
 
           {error && !distanceInfo && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="alert-modern">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
@@ -398,10 +634,14 @@ export default function Dashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span>Status:</span>
-                {getStatusBadge(todayStatus.attendance.status)}
+                {todayStatus.attendance ? (
+                  getStatusBadge(todayStatus.attendance.status)
+                ) : (
+                  <Badge variant="secondary">No Record</Badge>
+                )}
               </div>
 
-              {todayStatus.attendance.checkInTime && (
+              {todayStatus.attendance?.checkInTime && (
                 <div className="flex items-center justify-between">
                   <span>Check-in:</span>
                   <span className="font-mono">
@@ -413,7 +653,7 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {todayStatus.attendance.checkOutTime && (
+              {todayStatus.attendance?.checkOutTime && (
                 <div className="flex items-center justify-between">
                   <span>Check-out:</span>
                   <span className="font-mono">
@@ -425,15 +665,16 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {todayStatus.attendance.workingHours > 0 && (
-                <div className="flex items-center justify-between">
-                  <span>Working Hours:</span>
-                  <span className="font-mono">
-                    {Math.floor(todayStatus.attendance.workingHours / 60)}h{" "}
-                    {todayStatus.attendance.workingHours % 60}m
-                  </span>
-                </div>
-              )}
+              {todayStatus.attendance &&
+                todayStatus.attendance.workingHours > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span>Working Hours:</span>
+                    <span className="font-mono">
+                      {Math.floor(todayStatus.attendance.workingHours / 60)}h{" "}
+                      {todayStatus.attendance.workingHours % 60}m
+                    </span>
+                  </div>
+                )}
             </div>
           )}
 
@@ -448,7 +689,7 @@ export default function Dashboard() {
                 geoError !== null ||
                 !isWithinOfficeHours()
               }
-              className="flex-1"
+              className="flex-1 bg-green-500 border-2 border-white"
             >
               {actionLoading && pendingAction === "checkin" && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -460,7 +701,7 @@ export default function Dashboard() {
               onClick={() => prepareAttendanceAction("checkout")}
               variant="outline"
               disabled={!canCheckout || actionLoading || geoError !== null}
-              className="flex-1"
+              className="flex-1 bg-red-400 border-2 border-white hover:bg-white hover:text-red-400"
             >
               {actionLoading && pendingAction === "checkout" && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -470,7 +711,7 @@ export default function Dashboard() {
           </div>
 
           {!isWithinOfficeHours() && (
-            <p className="text-sm text-amber-600 text-center">
+            <p className="text-sm text-amber-500 text-center">
               ⚠️ Outside office hours (9:00 AM - 8:00 PM)
             </p>
           )}
@@ -478,7 +719,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Recent Attendance */}
-      <Card>
+      <Card className="card-modern">
         <CardHeader>
           <CardTitle>Recent Attendance (Last 7 Days)</CardTitle>
         </CardHeader>
@@ -488,7 +729,7 @@ export default function Dashboard() {
               <Loader2 className="w-6 h-6 animate-spin" />
             </div>
           ) : recentAttendance.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-muted-foreground text-center py-8">
               No attendance records found
             </p>
           ) : (
@@ -496,13 +737,13 @@ export default function Dashboard() {
               {recentAttendance.map((record) => (
                 <div
                   key={record._id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+                  className="flex items-center justify-between p-3 border rounded-lg bg-secondary/50"
                 >
                   <div>
                     <p className="font-medium">
                       {format(new Date(record.date), "MMM d, yyyy")}
                     </p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                       {record.checkInTime && (
                         <span>
                           In: {format(new Date(record.checkInTime), "HH:mm")}
@@ -513,7 +754,7 @@ export default function Dashboard() {
                           Out: {format(new Date(record.checkOutTime), "HH:mm")}
                         </span>
                       )}
-                      {record.workingHours > 0 && (
+                      {record.workingHours && record.workingHours > 0 && (
                         <span>
                           Hours: {Math.floor(record.workingHours / 60)}h{" "}
                           {record.workingHours % 60}m
@@ -530,16 +771,16 @@ export default function Dashboard() {
       </Card>
 
       {/* Recent Leaves */}
-      <Card>
+      <Card className="card-modern">
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Calendar className="w-5 h-5 mr-2" />
+            <Calendar className="w-5 h-5 mr-2 text-blue-200" />
             Recent Leave Requests
           </CardTitle>
         </CardHeader>
         <CardContent>
           {recentLeaves.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-muted-foreground text-center py-8">
               No leave requests found
             </p>
           ) : (
@@ -547,13 +788,13 @@ export default function Dashboard() {
               {recentLeaves.map((leave) => (
                 <div
                   key={leave._id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+                  className="flex items-center justify-between p-3 border rounded-lg bg-secondary/50"
                 >
                   <div>
                     <p className="font-medium">
                       {leave.type} - {leave.status}
                     </p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                       <span>
                         From: {format(new Date(leave.startDate), "MMM d, yyyy")}
                       </span>
@@ -563,17 +804,19 @@ export default function Dashboard() {
                       <span>{leave.days} days</span>
                     </div>
                   </div>
-                  <Badge
-                    variant={
-                      leave.status === "approved"
-                        ? "default"
-                        : leave.status === "rejected"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                  >
-                    {leave.status}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    {getLeaveStatusBadge(leave.status)}
+                    {leave.status === "pending" && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteLeaveRequest(leave._id)}
+                        className="btn-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -582,7 +825,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Recent Notifications */}
-      <Card>
+      <Card className="card-modern">
         <CardHeader>
           <CardTitle className="flex items-center">
             <Bell className="w-5 h-5 mr-2" />
@@ -591,7 +834,7 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           {recentNotifications.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-muted-foreground text-center py-8">
               No notifications found
             </p>
           ) : (
@@ -599,15 +842,15 @@ export default function Dashboard() {
               {recentNotifications.map((notification) => (
                 <div
                   key={notification._id}
-                  className="flex items-start p-3 border rounded-lg"
+                  className="flex items-start p-3 border rounded-lg bg-secondary/50"
                 >
                   <Bell className="w-4 h-4 mr-3 mt-0.5 text-muted-foreground" />
                   <div className="flex-1">
                     <p className="font-medium text-sm">{notification.title}</p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       {notification.message}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {format(
                         new Date(notification.createdAt),
                         "MMM d, yyyy 'at' h:mm a"
@@ -615,7 +858,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   {!notification.read && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
                   )}
                 </div>
               ))}
@@ -626,7 +869,7 @@ export default function Dashboard() {
 
       {/* Attendance Confirmation Dialog */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] card-modern">
           <DialogHeader>
             <DialogTitle>
               {pendingAction === "checkin"
@@ -640,16 +883,16 @@ export default function Dashboard() {
           </DialogHeader>
 
           {error && !distanceInfo && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="alert-modern">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           {distanceInfo && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="alert-modern">
               <AlertDescription>
                 <div className="space-y-2">
-                  <p className="font-semibold text-orange-800">
+                  <p className="font-semibold text-orange-500">
                     ⚠️ You are {distanceInfo.distance}m away from the office
                     location!
                   </p>
@@ -660,7 +903,7 @@ export default function Dashboard() {
                       {distanceInfo.allowedRadius}m
                     </span>
                   </p>
-                  <p className="text-sm text-orange-700">
+                  <p className="text-sm text-orange-500">
                     If you believe this is incorrect, please check your location
                     services and try again.
                   </p>
@@ -687,14 +930,14 @@ export default function Dashboard() {
                   <span className="text-sm font-medium">Location</span>
                 </div>
                 <div className="text-sm pl-6 space-y-1">
-                  <p>Latitude: {coordinates.lat.toFixed(6)}</p>
-                  <p>Longitude: {coordinates.lng.toFixed(6)}</p>
+                  <p>Latitude: {coordinates?.lat.toFixed(6)}</p>
+                  <p>Longitude: {coordinates?.lng.toFixed(6)}</p>
                 </div>
               </div>
             )}
 
-            <div className="rounded-md bg-yellow-50 p-3">
-              <p className="text-sm text-yellow-800">
+            <div className="rounded-md bg-yellow-900/50 p-3">
+              <p className="text-sm text-yellow-500">
                 <strong>Important:</strong> By confirming, you agree that your
                 location and time will be recorded for attendance purposes.
               </p>
@@ -709,10 +952,15 @@ export default function Dashboard() {
                 setDistanceInfo(null);
               }}
               disabled={actionLoading}
+              className="btn-secondary"
             >
               Cancel
             </Button>
-            <Button onClick={executeAttendanceAction} disabled={actionLoading}>
+            <Button
+              onClick={executeAttendanceAction}
+              disabled={actionLoading}
+              className="btn-primary"
+            >
               {actionLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -728,7 +976,7 @@ export default function Dashboard() {
 
       {/* Geofence Warning Dialog */}
       <Dialog open={showGeofenceWarning} onOpenChange={setShowGeofenceWarning}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] card-modern">
           <DialogHeader>
             <DialogTitle>Geofence Restriction</DialogTitle>
             <DialogDescription>
@@ -737,10 +985,10 @@ export default function Dashboard() {
           </DialogHeader>
 
           {distanceInfo && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="alert-modern">
               <AlertDescription>
                 <div className="space-y-2">
-                  <p className="font-semibold text-orange-800">
+                  <p className="font-semibold text-orange-500">
                     ⚠️ You are {distanceInfo.distance}m away from the office
                     location!
                   </p>
@@ -754,20 +1002,37 @@ export default function Dashboard() {
                       {distanceInfo.allowedRadius}m
                     </span>
                   </p>
-                  <p className="text-sm text-orange-700">
-                    Please reach the office location and try again.
+                  <p className="text-sm text-orange-500">
+                    Your attendance will be marked as "Outside Duty" and flagged
+                    for manager review. Are you sure you want to proceed?
                   </p>
                 </div>
               </AlertDescription>
             </Alert>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
+              variant="outline"
               onClick={() => setShowGeofenceWarning(false)}
               disabled={actionLoading}
+              className="btn-secondary"
             >
               Close
+            </Button>
+            <Button
+              onClick={() => markFlaggedAttendance(pendingAction || "checkin")}
+              disabled={actionLoading}
+              className="bg-orange-600 hover:bg-orange-700 text-white transition-all duration-300 transform hover:scale-105"
+            >
+              {actionLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                "Mark Flagged Attendance"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

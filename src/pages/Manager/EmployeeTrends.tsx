@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,8 +30,9 @@ import {
   Legend,
 } from "recharts";
 import { Loader2, Calendar, User, TrendingUp } from "lucide-react";
-import { adminAPI } from "@/services/api";
+import { managerAPI } from "@/services/api";
 import { format } from "date-fns";
+import type { AttendanceRecord } from "@/types";
 
 interface EmployeeTrendData {
   date: string;
@@ -39,6 +40,13 @@ interface EmployeeTrendData {
   checkInTime: string | null;
   checkOutTime: string | null;
   workingHours: number;
+}
+
+interface TeamMember {
+  id: string;
+  empId: string;
+  name: string;
+  email: string;
 }
 
 export default function EmployeeTrends() {
@@ -53,6 +61,24 @@ export default function EmployeeTrends() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [employeeName, setEmployeeName] = useState("");
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+
+  // Fetch team members when component mounts
+  useEffect(() => {
+    fetchTeamMembers();
+  }, []);
+
+  const fetchTeamMembers = async () => {
+    try {
+      const response = await managerAPI.getTeamMembers();
+      if (response.success && response.data) {
+        setTeamMembers(response.data.employees);
+      }
+    } catch (err: unknown) {
+      console.error("Failed to fetch team members:", err);
+      setError("Failed to load team members. Please try again later.");
+    }
+  };
 
   const fetchEmployeeTrends = async () => {
     if (!selectedEmployee) {
@@ -62,52 +88,71 @@ export default function EmployeeTrends() {
 
     setLoading(true);
     setError("");
+
     try {
-      // In a real implementation, you would call an API endpoint to get
-      // employee-specific attendance data
-      // For now, we'll simulate the data
-      const simulatedData: EmployeeTrendData[] = [];
+      const trendsData: EmployeeTrendData[] = [];
       const currentDate = new Date(startDate);
       const end = new Date(endDate);
 
+      // Get the selected employee details
+      const employee = teamMembers.find((emp) => emp.id === selectedEmployee);
+      if (employee) {
+        setEmployeeName(`${employee.name} (${employee.empId})`);
+      }
+
+      // Fetch data for each date in the range
       while (currentDate <= end) {
-        // Simulate different attendance patterns
-        const dayOfWeek = currentDate.getDay();
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const dateStr = currentDate.toISOString().split("T")[0];
 
-        if (!isWeekend) {
-          const status = Math.random() > 0.1 ? "present" : "absent";
-          const checkInHour = Math.floor(Math.random() * 3) + 9; // 9-11 AM
-          const checkOutHour = Math.floor(Math.random() * 3) + 17; // 5-7 PM
+        try {
+          const response = await managerAPI.getTeamAttendance(dateStr);
 
-          simulatedData.push({
-            date: format(currentDate, "yyyy-MM-dd"),
-            status: status,
-            checkInTime:
-              status === "present"
-                ? new Date(
-                    currentDate.setHours(checkInHour, 0, 0, 0)
-                  ).toISOString()
-                : null,
-            checkOutTime:
-              status === "present"
-                ? new Date(
-                    currentDate.setHours(checkOutHour, 0, 0, 0)
-                  ).toISOString()
-                : null,
-            workingHours:
-              status === "present" ? (checkOutHour - checkInHour) * 60 : 0,
+          if (response.success && response.data) {
+            // Find the attendance record for the selected employee
+            const employeeRecord = response.data.team.find(
+              (teamMember: any) => teamMember.employee.id === selectedEmployee
+            );
+
+            if (employeeRecord) {
+              const attendance = employeeRecord.attendance;
+              trendsData.push({
+                date: dateStr,
+                status: attendance.status,
+                checkInTime: attendance.checkInTime,
+                checkOutTime: attendance.checkOutTime,
+                workingHours: attendance.workingHours || 0,
+              });
+            } else {
+              // If no record found, add an absent record
+              trendsData.push({
+                date: dateStr,
+                status: "absent",
+                checkInTime: null,
+                checkOutTime: null,
+                workingHours: 0,
+              });
+            }
+          }
+        } catch (err: unknown) {
+          console.error(`Failed to fetch data for ${dateStr}:`, err);
+          // Add an absent record for failed dates
+          trendsData.push({
+            date: dateStr,
+            status: "absent",
+            checkInTime: null,
+            checkOutTime: null,
+            workingHours: 0,
           });
         }
 
+        // Move to next day
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      setEmployeeTrends(simulatedData);
-      setEmployeeName(`John Doe (EMP${Math.floor(Math.random() * 1000) + 1})`);
+      setEmployeeTrends(trendsData);
     } catch (err: unknown) {
-      setError("Failed to fetch employee trends data. Showing N/A values.");
-      // Set empty array on error
+      console.error("Failed to fetch employee trends data:", err);
+      setError("Failed to fetch employee trends data. Please try again later.");
       setEmployeeTrends([]);
       setEmployeeName("");
     } finally {
@@ -120,7 +165,16 @@ export default function EmployeeTrends() {
     date: record.date ? format(new Date(record.date), "MMM dd") : "N/A",
     workingHours: record.workingHours / 60, // Convert to hours
     status: record.status || "N/A",
+    statusValue: record.status === "present" ? 1 : 0, // For line chart
   }));
+
+  // Calculate summary statistics
+  const presentDays = employeeTrends.filter(
+    (r) => r.status === "present"
+  ).length;
+  const absentDays = employeeTrends.filter((r) => r.status === "absent").length;
+  const totalHours =
+    employeeTrends.reduce((sum, day) => sum + day.workingHours, 0) / 60;
 
   return (
     <div className="space-y-6">
@@ -150,7 +204,7 @@ export default function EmployeeTrends() {
             <div className="space-y-2">
               <Label htmlFor="start-date">Start Date</Label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Calendar className="absolute left-3 top-3 h-4 w-4 text-blue-200" />
                 <Input
                   id="start-date"
                   type="date"
@@ -163,7 +217,7 @@ export default function EmployeeTrends() {
             <div className="space-y-2">
               <Label htmlFor="end-date">End Date</Label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Calendar className="absolute left-3 top-3 h-4 w-4 text-blue-200" />
                 <Input
                   id="end-date"
                   type="date"
@@ -183,17 +237,19 @@ export default function EmployeeTrends() {
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="emp001">John Doe (EMP001)</SelectItem>
-                  <SelectItem value="emp002">Jane Smith (EMP002)</SelectItem>
-                  <SelectItem value="emp003">
-                    Robert Johnson (EMP003)
-                  </SelectItem>
-                  <SelectItem value="emp004">Emily Davis (EMP004)</SelectItem>
+                  {teamMembers.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.name} ({employee.empId})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-end">
-              <Button onClick={fetchEmployeeTrends} disabled={loading}>
+              <Button
+                onClick={fetchEmployeeTrends}
+                disabled={loading || !selectedEmployee}
+              >
                 {loading ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
@@ -220,32 +276,16 @@ export default function EmployeeTrends() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center p-4 bg-green-50 rounded-lg">
-              <p className="text-2xl font-bold text-green-600">
-                {employeeTrends.length > 0
-                  ? employeeTrends.filter((r) => r.status === "present").length
-                  : "NA"}
-              </p>
+              <p className="text-2xl font-bold text-green-600">{presentDays}</p>
               <p className="text-sm text-muted-foreground">Days Present</p>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
-              <p className="text-2xl font-bold text-red-600">
-                {employeeTrends.length > 0
-                  ? employeeTrends.filter((r) => r.status === "absent").length
-                  : "NA"}
-              </p>
+              <p className="text-2xl font-bold text-red-600">{absentDays}</p>
               <p className="text-sm text-muted-foreground">Days Absent</p>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <p className="text-2xl font-bold text-blue-600">
-                {employeeTrends.length > 0
-                  ? (
-                      employeeTrends.reduce(
-                        (sum, day) => sum + day.workingHours,
-                        0
-                      ) / 60
-                    ).toFixed(1)
-                  : "NA"}
-                h
+                {totalHours.toFixed(1)}h
               </p>
               <p className="text-sm text-muted-foreground">Total Hours</p>
             </div>
@@ -295,7 +335,7 @@ export default function EmployeeTrends() {
               <div className="text-center">
                 <p>Select an employee and date range to view trends</p>
                 <p className="text-sm mt-2">
-                  Data will show as "NA" when not available
+                  Please select an employee and date range to analyze
                 </p>
               </div>
             </div>
@@ -335,7 +375,7 @@ export default function EmployeeTrends() {
                 <Legend />
                 <Line
                   type="stepAfter"
-                  dataKey="status"
+                  dataKey="statusValue"
                   stroke="#10B981"
                   name="Attendance Status"
                   strokeWidth={2}
@@ -349,7 +389,7 @@ export default function EmployeeTrends() {
               <div className="text-center">
                 <p>Select an employee and date range to view trends</p>
                 <p className="text-sm mt-2">
-                  Data will show as "NA" when not available
+                  Please select an employee and date range to analyze
                 </p>
               </div>
             </div>

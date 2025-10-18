@@ -1,0 +1,4 @@
+"empId","name","email","role","totalDays","presentDays","absentDays","totalWorkingHours","attendanceRate"
+"EMP003","Charlie Employee","charlie@company.com","employee",1,0,1,0,0
+"EMP001","Alice Employee","alice@company.com","employee",2,2,0,2.95,100
+"EMP002","Bob Employee","bob@company.com","employee",2,1,1,3.02,50

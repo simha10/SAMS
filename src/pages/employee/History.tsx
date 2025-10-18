@@ -66,7 +66,7 @@ export default function History() {
   const getStatusBadge = (status: string, flagged: boolean) => {
     if (flagged) {
       return (
-        <Badge variant="destructive">
+        <Badge variant="default" className="bg-amber-500 text-amber-50">
           <AlertTriangle className="w-3 h-3 mr-1" />
           Flagged
         </Badge>
@@ -76,21 +76,21 @@ export default function History() {
     switch (status) {
       case "present":
         return (
-          <Badge variant="default" className="bg-green-500">
+          <Badge variant="default" className="bg-emerald-500 text-emerald-50">
             <CheckCircle className="w-3 h-3 mr-1" />
             Present
           </Badge>
         );
       case "absent":
         return (
-          <Badge variant="destructive">
+          <Badge variant="default" className="bg-rose-500 text-rose-50">
             <XCircle className="w-3 h-3 mr-1" />
             Absent
           </Badge>
         );
       case "outside-geo":
         return (
-          <Badge variant="destructive">
+          <Badge variant="default" className="bg-rose-500 text-rose-50">
             <MapPin className="w-3 h-3 mr-1" />
             Outside Area
           </Badge>
@@ -104,14 +104,22 @@ export default function History() {
     switch (status) {
       case "approved":
         return (
-          <Badge variant="default" className="bg-green-500">
+          <Badge variant="default" className="bg-emerald-500 text-emerald-50">
             Approved
           </Badge>
         );
       case "rejected":
-        return <Badge variant="destructive">Rejected</Badge>;
+        return (
+          <Badge variant="default" className="bg-rose-500 text-rose-50">
+            Rejected
+          </Badge>
+        );
       case "pending":
-        return <Badge variant="secondary">Pending</Badge>;
+        return (
+          <Badge variant="default" className="bg-amber-500 text-amber-50">
+            Pending
+          </Badge>
+        );
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -120,18 +128,26 @@ export default function History() {
   const getLeaveTypeBadge = (type: string) => {
     switch (type) {
       case "sick":
-        return <Badge variant="destructive">Sick</Badge>;
+        return (
+          <Badge variant="default" className="bg-rose-500 text-rose-50">
+            Sick
+          </Badge>
+        );
       case "personal":
-        return <Badge variant="secondary">Personal</Badge>;
+        return (
+          <Badge variant="default" className="bg-sky-500 text-sky-50">
+            Personal
+          </Badge>
+        );
       case "vacation":
         return (
-          <Badge variant="default" className="bg-blue-500">
+          <Badge variant="default" className="bg-indigo-500 text-indigo-50">
             Vacation
           </Badge>
         );
       case "emergency":
         return (
-          <Badge variant="default" className="bg-red-500">
+          <Badge variant="default" className="bg-red-500 text-red-50">
             Emergency
           </Badge>
         );
@@ -155,44 +171,46 @@ export default function History() {
     .reduce((total, request) => total + request.days, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-bold">History</h1>
-        <p className="text-gray-600">View your attendance and leave history</p>
+        <p className="text-muted-foreground">
+          View your attendance and leave history
+        </p>
       </div>
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card className="card-modern">
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{presentDays}</div>
-            <div className="text-sm text-gray-600">Present Days</div>
+            <div className="text-sm text-muted-foreground">Present Days</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="card-modern">
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{absentDays}</div>
-            <div className="text-sm text-gray-600">Absent Days</div>
+            <div className="text-sm text-muted-foreground">Absent Days</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="card-modern">
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{flaggedDays}</div>
-            <div className="text-sm text-gray-600">Flagged Days</div>
+            <div className="text-sm text-muted-foreground">Flagged Days</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="card-modern">
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{leaveDays}</div>
-            <div className="text-sm text-gray-600">Leave Days</div>
+            <div className="text-sm text-muted-foreground">Leave Days</div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="card-modern">
         <CardHeader>
           <CardTitle>Filter Records</CardTitle>
           <CardDescription>
@@ -207,18 +225,18 @@ export default function History() {
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full justify-start text-left font-normal btn-secondary",
                     !dateFrom && "text-muted-foreground"
                   )}
                   onClick={() => document.getElementById("date-from")?.focus()}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-2 h-4 w-4 text-blue-200" />
                   {dateFrom ? format(dateFrom, "PPP") : "Pick a date"}
                 </Button>
                 <Input
                   id="date-from"
                   type="date"
-                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  className="absolute inset-0 opacity-0 cursor-pointer input-modern"
                   value={dateFrom ? format(dateFrom, "yyyy-MM-dd") : ""}
                   onChange={(e) => setDateFrom(new Date(e.target.value))}
                 />
@@ -231,18 +249,18 @@ export default function History() {
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full justify-start text-left font-normal btn-secondary",
                     !dateTo && "text-muted-foreground"
                   )}
                   onClick={() => document.getElementById("date-to")?.focus()}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-2 h-4 w-4 text-blue-200" />
                   {dateTo ? format(dateTo, "PPP") : "Pick a date"}
                 </Button>
                 <Input
                   id="date-to"
                   type="date"
-                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  className="absolute inset-0 opacity-0 cursor-pointer input-modern"
                   value={dateTo ? format(dateTo, "yyyy-MM-dd") : ""}
                   onChange={(e) => setDateTo(new Date(e.target.value))}
                 />
@@ -250,7 +268,11 @@ export default function History() {
             </div>
 
             <div className="flex items-end">
-              <Button onClick={fetchHistoryData} disabled={loading}>
+              <Button
+                onClick={fetchHistoryData}
+                disabled={loading}
+                className="btn-primary"
+              >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Filter Records
               </Button>
@@ -260,23 +282,23 @@ export default function History() {
       </Card>
 
       {/* Tabs */}
-      <div className="border-b">
+      <div className="border-b border-border">
         <nav className="flex space-x-6">
           <button
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === "attendance"
                 ? "border-primary text-primary"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => setActiveTab("attendance")}
           >
             Attendance
           </button>
           <button
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === "leave"
                 ? "border-primary text-primary"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => setActiveTab("leave")}
           >
@@ -287,7 +309,7 @@ export default function History() {
 
       {/* Tab Content */}
       {activeTab === "attendance" ? (
-        <Card>
+        <Card className="card-modern">
           <CardHeader>
             <CardTitle>Attendance History</CardTitle>
             <CardDescription>
@@ -299,23 +321,27 @@ export default function History() {
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin" />
+                <span className="ml-2">Loading attendance records...</span>
               </div>
             ) : error ? (
-              <div className="text-center py-8 text-red-500">{error}</div>
+              <div className="text-center py-8 text-destructive">{error}</div>
             ) : attendanceRecords.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-muted-foreground">
                 No attendance records found for the selected date range
               </div>
             ) : (
               <div className="space-y-4">
                 {attendanceRecords.map((record) => (
-                  <div key={record._id} className="border rounded-lg p-4">
+                  <div
+                    key={record._id}
+                    className="border rounded-lg p-4 bg-secondary/50 border-border"
+                  >
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                       <div>
                         <h3 className="font-medium">
                           {format(new Date(record.date), "EEEE, MMMM d, yyyy")}
                         </h3>
-                        <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
+                        <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
                           {record.checkInTime && (
                             <span>
                               In:{" "}
@@ -345,7 +371,7 @@ export default function History() {
                     </div>
 
                     {record.flagged && record.flaggedReason && (
-                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                      <div className="mt-2 p-2 bg-yellow-900/30 border border-yellow-800/50 rounded text-sm text-yellow-200">
                         <AlertTriangle className="w-4 h-4 inline mr-1" />
                         {record.flaggedReason}
                       </div>
@@ -357,7 +383,7 @@ export default function History() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="card-modern">
           <CardHeader>
             <CardTitle>Leave Requests</CardTitle>
             <CardDescription>Your leave request history</CardDescription>
@@ -366,17 +392,21 @@ export default function History() {
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin" />
+                <span className="ml-2">Loading leave requests...</span>
               </div>
             ) : error ? (
-              <div className="text-center py-8 text-red-500">{error}</div>
+              <div className="text-center py-8 text-destructive">{error}</div>
             ) : leaveRequests.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-muted-foreground">
                 No leave requests found
               </div>
             ) : (
               <div className="space-y-4">
                 {leaveRequests.map((request) => (
-                  <div key={request._id} className="border rounded-lg p-4">
+                  <div
+                    key={request._id}
+                    className="border rounded-lg p-4 bg-secondary/50 border-border"
+                  >
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                       <div>
                         <h3 className="font-medium">
@@ -386,7 +416,7 @@ export default function History() {
                             {getLeaveTypeBadge(request.type)}
                           </span>
                         </h3>
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           {request.reason}
                         </p>
                       </div>
@@ -397,12 +427,12 @@ export default function History() {
 
                     {request.status === "rejected" &&
                       request.rejectionReason && (
-                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+                        <div className="mt-2 p-2 bg-red-900/30 border border-red-800/50 rounded text-sm text-red-200">
                           Rejection reason: {request.rejectionReason}
                         </div>
                       )}
 
-                    <div className="mt-2 text-sm text-gray-500">
+                    <div className="mt-2 text-sm text-muted-foreground">
                       Requested on{" "}
                       {format(new Date(request.createdAt), "MMM d, yyyy")}
                     </div>

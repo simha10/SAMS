@@ -31,16 +31,30 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       login: (user: User) => {
-        console.log("Auth store login called with user:", user);
+        console.log("=== AUTH STORE LOGIN ===");
+        console.log("User:", user);
+        console.log("Timestamp:", new Date().toISOString());
         set({ user, isAuthenticated: true });
         console.log("Auth store updated:", { user, isAuthenticated: true });
+        console.log("=== END AUTH STORE LOGIN ===");
       },
       logout: () => {
-        console.log("Auth store logout called");
+        console.log("=== AUTH STORE LOGOUT ===");
+        console.log("Timestamp:", new Date().toISOString());
+        // Clear all auth-related storage
+        localStorage.removeItem('auth-storage');
+        sessionStorage.removeItem('auth-storage');
         set({ user: null, isAuthenticated: false });
         console.log("Auth store updated:", { user: null, isAuthenticated: false });
+        console.log("=== END AUTH STORE LOGOUT ===");
       },
-      setLoading: (loading: boolean) => set({ isLoading: loading }),
+      setLoading: (loading: boolean) => {
+        console.log("=== AUTH STORE SET LOADING ===");
+        console.log("Loading:", loading);
+        console.log("Timestamp:", new Date().toISOString());
+        set({ isLoading: loading });
+        console.log("=== END AUTH STORE SET LOADING ===");
+      },
     }),
     {
       name: 'auth-storage',
@@ -49,6 +63,24 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated
       }),
+      onRehydrateStorage: () => {
+        console.log("=== AUTH STORE REHYDRATION START ===");
+        return (state, error) => {
+          if (error) {
+            console.error("=== AUTH STORE REHYDRATION ERROR ===");
+            console.error("Error:", error);
+          } else {
+            console.log("=== AUTH STORE REHYDRATION COMPLETE ===");
+            console.log("State:", state);
+            
+            // Check if we have a user but need to verify authentication
+            if (state?.isAuthenticated && state?.user) {
+              console.log("User is authenticated, verifying token...");
+              // We could make an API call here to verify the token is still valid
+            }
+          }
+        };
+      },
     }
   )
 );

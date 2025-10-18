@@ -1,19 +1,18 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  Home,
   Users,
   FileText,
   BarChart3,
   User,
   LogOut,
   Menu,
-  X,
   Calendar,
   TrendingUp,
   ChevronLeft,
   ChevronRight,
   CheckCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -39,6 +38,11 @@ const sidebarItems: SidebarItem[] = [
     icon: <CheckCircle className="h-5 w-5" />,
   },
   {
+    title: "Attendance Approvals",
+    href: "/manager/attendance-approvals",
+    icon: <AlertTriangle className="h-5 w-5" />,
+  },
+  {
     title: "Reports",
     href: "/manager/reports",
     icon: <FileText className="h-5 w-5" />,
@@ -56,7 +60,7 @@ const sidebarItems: SidebarItem[] = [
       {
         title: "Employee Trends",
         href: "/manager/analytics/employee",
-        icon: <Calendar className="h-4 w-4" />,
+        icon: <Calendar className="h-4 w-4 text-blue-200" />,
       },
     ],
   },
@@ -136,13 +140,16 @@ export function CollapsibleSidebar({
           <Button
             variant="outline"
             size="icon"
-            className="fixed top-4 left-4 z-50 rounded-full md:hidden"
+            className="fixed top-4 left-4 z-50 rounded-full md:hidden bg-primary text-primary-foreground hover:bg-primary/90 hover:border-blue-400 border border-transparent transition-all duration-300"
           >
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle sidebar</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent
+          side="left"
+          className="w-64 p-0 bg-gradient-to-b from-sidebar-background to-sidebar-accent"
+        >
           <SidebarContent
             logout={onLogout}
             isActive={isActive}
@@ -156,17 +163,19 @@ export function CollapsibleSidebar({
 
       {/* Desktop sidebar */}
       <div
-        className={`hidden md:block border-r bg-white fixed h-full transition-all duration-300 z-40 ${
+        className={`hidden md:block border-r border-sidebar-border bg-gradient-to-b from-sidebar-background to-sidebar-accent fixed h-full transition-all duration-300 z-40 ${
           collapsed ? "w-16" : "w-64"
         }`}
       >
         <div className="flex h-full flex-col">
           {/* Collapse toggle button */}
-          <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
             {!collapsed && (
               <div>
-                <h2 className="text-xl font-bold">LRMC Staff</h2>
-                <p className="text-xs text-gray-500 truncate">
+                <h2 className="text-xl font-bold text-sidebar-primary">
+                  LRMC Staff
+                </h2>
+                <p className="text-xs text-sidebar-foreground truncate">
                   {user?.role === "director" ? "Director" : "Manager"}
                 </p>
               </div>
@@ -175,7 +184,7 @@ export function CollapsibleSidebar({
               variant="ghost"
               size="icon"
               onClick={toggleSidebar}
-              className="ml-auto"
+              className="ml-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-primary hover:border-blue-400 border border-transparent transition-all duration-300"
             >
               {collapsed ? (
                 <ChevronRight className="h-5 w-5" />
@@ -216,11 +225,15 @@ function SidebarContent({
   return (
     <div className="flex h-full flex-col">
       {!collapsed && (
-        <div className="p-4 border-b">
+        <div className="p-4 border-b border-sidebar-border">
           <div>
-            <h2 className="text-xl font-bold">LRMC Staff</h2>
-            <p className="text-sm text-gray-500 truncate">{user?.name}</p>
-            <p className="text-xs text-gray-400">
+            <h2 className="text-xl font-bold text-sidebar-primary">
+              LRMC Staff
+            </h2>
+            <p className="text-sm text-sidebar-foreground truncate">
+              {user?.name}
+            </p>
+            <p className="text-xs text-sidebar-muted">
               {user?.role === "director" ? "Director" : "Manager"} •{" "}
               {user?.empId}
             </p>
@@ -234,17 +247,17 @@ function SidebarContent({
             <li key={item.href}>
               <Link
                 to={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300 border border-transparent ${
                   isActive(item.href) || isSubItemActive(item)
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-primary"
+                    ? "bg-primary text-primary-foreground shadow-md border-blue-400"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-primary hover:shadow-sm hover:border-blue-400"
                 }`}
                 onClick={() => {
                   if (onClose) onClose();
                 }}
               >
                 {item.icon}
-                {!collapsed && item.title}
+                {!collapsed && <span className="flex-1">{item.title}</span>}
               </Link>
               {!collapsed && item.subItems && (
                 <ul className="ml-8 mt-1 space-y-1">
@@ -252,10 +265,10 @@ function SidebarContent({
                     <li key={subItem.href}>
                       <Link
                         to={subItem.href}
-                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-all duration-300 border border-transparent ${
                           isActive(subItem.href)
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-muted hover:text-primary"
+                            ? "bg-primary/20 text-primary font-semibold border-blue-400"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-primary hover:border-blue-400"
                         }`}
                         onClick={() => {
                           if (onClose) onClose();
@@ -273,12 +286,12 @@ function SidebarContent({
         </ul>
       </nav>
 
-      <div className="p-4 border-t mt-auto">
+      <div className="p-4 border-t border-sidebar-border mt-auto">
         <Button
           variant="outline"
-          className={`w-full justify-start gap-3 ${
+          className={`w-full justify-start gap-3 transition-all duration-300 border border-transparent hover:border-blue-400 ${
             collapsed ? "px-3" : "px-4"
-          }`}
+          } bg-sidebar-accent text-sidebar-foreground hover:bg-primary hover:text-primary-foreground hover:shadow-md border-sidebar-border`}
           onClick={() => {
             logout();
             if (onClose) onClose();

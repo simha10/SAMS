@@ -1,1 +1,156 @@
-@import "tailwindcss";
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --ring: 215 20.2% 65.1%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 224 30% 10%; /* Dark blue background */
+    --foreground: 213 31% 91%;
+
+    --muted: 223 20% 20%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --popover: 224 30% 10%;
+    --popover-foreground: 215 20.2% 65.1%;
+
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+
+    --card: 224 30% 12%; /* Slightly lighter card background */
+    --card-foreground: 213 31% 91%;
+
+    --primary: 197 71% 73% /*  converted to  sky blue from 25 95% 65%;  Vibrant orange */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 224 30% 15%; /* Secondary elements */
+    --secondary-foreground: 210 40% 98%;
+
+    --destructive: 0 80% 50%; /* Vibrant red */
+    --destructive-foreground: 0 0% 100%;
+
+    --ring: 25 95% 65%; /* Orange ring */
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom gradient backgrounds */
+.bg-gradient-dark-blue {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+.bg-gradient-blue-orange {
+  background: linear-gradient(135deg, #1e40af 0%, #ea580c 100%);
+}
+
+.bg-gradient-blue-green {
+  background: linear-gradient(135deg, #1e40af 0%, #16a34a 100%);
+}
+
+/* Modern Gen-Z styling */
+.rounded-2xl {
+  border-radius: 1rem;
+}
+
+.shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Button enhancements */
+.btn-primary {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 transform hover:scale-105;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-all duration-300 transform hover:scale-105;
+}
+
+.btn-destructive {
+  @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all duration-300 transform hover:scale-105;
+}
+
+/* Card enhancements */
+.card-modern {
+  @apply bg-card text-card-foreground rounded-2xl shadow-xl border border-border transition-all duration-300 hover:shadow-2xl;
+}
+
+/* Input enhancements */
+.input-modern {
+  @apply bg-background border border-input rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-300;
+}
+
+/* Badge enhancements */
+.badge-modern {
+  @apply px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all duration-300;
+}
+
+/* Alert enhancements */
+.alert-modern {
+  @apply rounded-lg p-4 transition-all duration-300;
+}
+
+/* Animation for loading states */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Sidebar specific styles */
+.sidebar-gradient {
+  background: linear-gradient(135deg, hsl(var(--sidebar-background)) 0%, hsl(var(--sidebar-accent)) 100%);
+}

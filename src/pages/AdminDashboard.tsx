@@ -329,7 +329,7 @@ export default function AdminDashboard() {
                       <CardTitle className="text-sm font-medium">
                         Total Records
                       </CardTitle>
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <Calendar className="h-4 w-4 text-blue-200" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">

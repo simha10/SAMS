@@ -15,6 +15,7 @@ import { Loader2 } from "lucide-react";
 import { authAPI } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
 import type { ApiError } from "@/types";
+import { toast } from "@/components/ui/sonner";
 
 export default function Login() {
   const [empId, setEmpId] = useState("");
@@ -42,6 +43,9 @@ export default function Login() {
         console.log("Calling auth store login...");
         login(response.data.user);
         console.log("Auth store updated, navigating to dashboard...");
+        toast.success("Login successful", {
+          description: "Welcome back! You have been successfully logged in.",
+        });
 
         // Check user role and navigate accordingly
         if (response.data.user.role === "employee") {
@@ -62,6 +66,10 @@ export default function Login() {
       } else {
         console.log("Login failed with message:", response.message);
         setError(response.message || "Login failed");
+        toast.error("Login failed", {
+          description:
+            response.message || "Please check your credentials and try again.",
+        });
       }
     } catch (err: unknown) {
       console.error("Login error caught:", err);
@@ -70,6 +78,11 @@ export default function Login() {
         error.response?.data?.message || "Login failed. Please try again.";
       console.log("Setting error message:", errorMessage);
       setError(errorMessage);
+      toast.error("Login failed", {
+        description:
+          error.response?.data?.message ||
+          "Please check your credentials and try again.",
+      });
     } finally {
       console.log("Login process completed");
       setLoading(false);
@@ -77,8 +90,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-blue-orange p-4">
+      <Card className="w-full max-w-md card-modern">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
             LRMC Staff Attendance System
@@ -90,7 +103,7 @@ export default function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="alert-modern">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -105,6 +118,7 @@ export default function Login() {
                 onChange={(e) => setEmpId(e.target.value)}
                 required
                 disabled={loading}
+                className="input-modern"
               />
             </div>
 
@@ -118,10 +132,15 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
+                className="input-modern"
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full btn-primary"
+              disabled={loading}
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign In
             </Button>
