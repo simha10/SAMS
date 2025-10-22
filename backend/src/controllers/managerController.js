@@ -250,7 +250,7 @@ async function getTeamMembers(req, res) {
 async function updateAttendanceStatus(req, res) {
   try {
     const { id } = req.params;
-    const { status, approvalReason } = req.body;
+    const { status, approvalReason, checkOutTime } = req.body;
     const managerId = req.user._id;
     
     // Validate status
@@ -284,6 +284,20 @@ async function updateAttendanceStatus(req, res) {
     // Update attendance record
     attendance.status = status;
     attendance.flagged = false; // Unflag after approval
+    
+    // If checkout time is provided, update it
+    if (checkOutTime) {
+      attendance.checkOutTime = new Date(checkOutTime);
+      
+      // Recalculate working hours if both check-in and check-out times exist
+      if (attendance.checkInTime && attendance.checkOutTime) {
+        const checkInTime = new Date(attendance.checkInTime);
+        const checkoutTime = new Date(attendance.checkOutTime);
+        const diffMs = checkoutTime - checkInTime;
+        attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
+      }
+    }
+    
     if (approvalReason) {
       attendance.flaggedReason = `Approved as ${status}: ${approvalReason}`;
     } else {

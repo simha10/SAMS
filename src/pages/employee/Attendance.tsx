@@ -159,40 +159,47 @@ export default function Attendance() {
   const getDayClassNames = (day: Date) => {
     const attendance = getAttendanceForDate(day);
     let baseClasses =
-      "flex items-center justify-center h-10 w-10 border-2 border-blue-500 rounded-full text-sm cursor-pointer transition-all duration-200 hover:bg-primary hover:text-primary-foreground";
+      "flex items-center justify-center h-10 w-10 rounded-full text-sm font-medium transition-all duration-200 ";
 
     if (!isSameMonth(day, currentMonth)) {
-      return baseClasses + "text-muted-foreground";
+      baseClasses += "text-gray-400 ";
+    } else {
+      baseClasses += "text-gray-700 hover:bg-gray-100 ";
     }
 
+    // Today's date styling
     if (isSameDay(day, new Date())) {
-      baseClasses +=
-        "bg-primary text-primary-foreground font-bold ring-2 ring-primary ";
+      baseClasses += "bg-blue-500 text-white font-bold shadow-sm ";
     }
 
-    // Fix the date comparison logic to properly handle null dates
+    // Selected date styling
     const currentDate = selectedDate || hoveredDate;
     if (currentDate && isSameDay(day, currentDate)) {
-      baseClasses += "bg-primary text-primary-foreground ring-2 ring-primary ";
+      baseClasses += "ring-2 ring-blue-400 ring-offset-1 ";
     }
 
     if (attendance) {
       if (attendance.flagged) {
-        baseClasses += "bg-yellow-500/20 hover:bg-yellow-500/30 "; // Yellow for flagged
+        baseClasses += "bg-amber-100 text-amber-800 border-2 border-amber-300 "; // Amber for flagged
       } else if (attendance.status === "present") {
-        baseClasses += "bg-green-500/20 hover:bg-green-500/30 "; // Green for present
+        baseClasses +=
+          "bg-emerald-100 text-emerald-800 border-2 border-emerald-300 "; // Emerald for present
       } else if (attendance.status === "absent") {
-        baseClasses += "bg-red-800 hover:bg-red-500 "; // Red for absent
+        baseClasses += "bg-rose-100 text-rose-800 border-2 border-rose-300 "; // Rose for absent
       } else if (attendance.status === "half-day") {
-        baseClasses += "bg-orange-500/20 hover:bg-orange-500/30 "; // Orange for half-day
+        baseClasses +=
+          "bg-orange-100 text-orange-800 border-2 border-orange-300 "; // Orange for half-day
       } else if (attendance.status === "on-leave") {
-        baseClasses += "bg-blue-500/20 hover:bg-blue-500/30 "; // Blue for on-leave
+        baseClasses += "bg-sky-100 text-sky-800 border-2 border-sky-300 "; // Sky blue for on-leave
       } else if (attendance.status === "outside-duty") {
-        baseClasses += "bg-yellow-500/20 hover:bg-yellow-500/30 "; // Yellow for outside-duty
+        baseClasses +=
+          "bg-violet-100 text-violet-800 border-2 border-violet-300 "; // Violet for outside-duty
       }
     } else {
-      // Default to absent for days without records
-      baseClasses += "bg-red-500/10 hover:bg-red-500/20 "; // Light red for absent
+      // Default for days without records
+      if (isSameMonth(day, currentMonth)) {
+        baseClasses += "bg-gray-50 text-gray-500 border border-gray-200 ";
+      }
     }
 
     return baseClasses;
@@ -209,7 +216,7 @@ export default function Attendance() {
     const paddingDays = Array(startDayOfWeek).fill(null);
 
     return (
-      <div className="p-4 border-2 border-blue-500 rounded-lg">
+      <div className="p-4 border rounded-lg ">
         <div className="grid grid-cols-7 gap-1 mb-2">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <div

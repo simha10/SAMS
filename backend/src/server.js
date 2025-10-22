@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const app = require('./App');
 require('dotenv').config();
 
+// Initialize cron jobs
+require('./jobs/daily');
+require('./jobs/autoCheckout');
+
 console.log("=== SERVER STARTUP ===");
 console.log("Environment:", process.env.NODE_ENV || 'development');
 console.log("Port:", process.env.PORT || 5000);

@@ -35,6 +35,7 @@ export default function AttendanceApprovals() {
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [approvalReason, setApprovalReason] = useState("");
   const [newStatus, setNewStatus] = useState("present");
+  const [checkOutTime, setCheckOutTime] = useState("");
   const [dateRange, setDateRange] = useState({
     from: format(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
     to: format(new Date(), "yyyy-MM-dd"),
@@ -71,13 +72,15 @@ export default function AttendanceApprovals() {
   const handleAttendanceAction = async (
     id: string,
     status: string,
-    approvalReason?: string
+    approvalReason?: string,
+    checkOutTime?: string
   ) => {
     try {
       const response = await managerAPI.updateAttendanceStatus(
         id,
         status,
-        approvalReason
+        approvalReason,
+        checkOutTime
       );
       if (response.success) {
         setMessage(`Attendance record updated to ${status} successfully`);
@@ -103,9 +106,15 @@ export default function AttendanceApprovals() {
 
   const handleApprove = async () => {
     if (selectedRecordId) {
-      await handleAttendanceAction(selectedRecordId, newStatus, approvalReason);
+      await handleAttendanceAction(
+        selectedRecordId,
+        newStatus,
+        approvalReason,
+        checkOutTime
+      );
       setShowApprovalDialog(false);
       setApprovalReason("");
+      setCheckOutTime("");
       setSelectedRecordId(null);
       toast.success("Attendance record updated", {
         description: "Attendance record has been updated successfully.",
@@ -280,6 +289,15 @@ export default function AttendanceApprovals() {
                             {record.flaggedReason}
                           </p>
                         )}
+                        {record.checkOutTime &&
+                          record.flaggedReason &&
+                          record.flaggedReason.includes("Auto checkout") && (
+                            <p className="text-sm text-blue-600">
+                              <strong>Auto Checkout:</strong> This record was
+                              auto-checked out at 9:00 PM. You can update the
+                              checkout time in the approval dialog.
+                            </p>
+                          )}
                       </div>
                     </div>
                     <div className="flex flex-col items-start sm:items-end space-y-2">
@@ -325,6 +343,19 @@ export default function AttendanceApprovals() {
               </select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="checkOutTime">Checkout Time (Optional)</Label>
+              <Input
+                id="checkOutTime"
+                type="time"
+                value={checkOutTime}
+                onChange={(e) => setCheckOutTime(e.target.value)}
+              />
+              <p className="text-sm text-gray-500">
+                Leave blank to keep current checkout time. For auto-checked
+                records, you can set the actual checkout time here.
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="approvalReason">Approval Reason (Optional)</Label>
               <Textarea
                 id="approvalReason"
@@ -341,6 +372,7 @@ export default function AttendanceApprovals() {
               onClick={() => {
                 setShowApprovalDialog(false);
                 setApprovalReason("");
+                setCheckOutTime("");
               }}
             >
               Cancel

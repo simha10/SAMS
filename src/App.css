@@ -55,7 +55,7 @@
     --card: 224 30% 12%; /* Slightly lighter card background */
     --card-foreground: 213 31% 91%;
 
-    --primary: 197 71% 73% /*  converted to  sky blue from 25 95% 65%;  Vibrant orange */
+    --primary: 25 95% 65%; /* Vibrant orange */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 224 30% 15%; /* Secondary elements */

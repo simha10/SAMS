@@ -319,11 +319,12 @@ export const managerAPI = {
   },
   
   // New method for updating attendance status
-  updateAttendanceStatus: async (id: string, status: string, approvalReason?: string) => {
+  updateAttendanceStatus: async (id: string, status: string, approvalReason?: string, checkOutTime?: string) => {
     try {
       const response = await api.put(`/manager/attendance/${id}`, { 
         status, 
-        approvalReason 
+        approvalReason,
+        checkOutTime
       });
       toast.success("Attendance record updated", {
         description: "Attendance record has been updated successfully.",
