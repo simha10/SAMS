@@ -22,6 +22,7 @@ interface AuthState {
   login: (user: User) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
+  setUser: (user: User | null) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -54,6 +55,14 @@ export const useAuthStore = create<AuthState>()(
         console.log("Timestamp:", new Date().toISOString());
         set({ isLoading: loading });
         console.log("=== END AUTH STORE SET LOADING ===");
+      },
+      setUser: (user: User | null) => {
+        console.log("=== AUTH STORE SET USER ===");
+        console.log("User:", user);
+        console.log("Timestamp:", new Date().toISOString());
+        set({ user });
+        console.log("Auth store updated:", { user });
+        console.log("=== END AUTH STORE SET USER ===");
       },
     }),
     {

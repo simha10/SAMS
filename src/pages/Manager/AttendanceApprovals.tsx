@@ -142,7 +142,7 @@ export default function AttendanceApprovals() {
         return <Badge variant="destructive">Absent</Badge>;
       case "half-day":
         return (
-          <Badge variant="default" className="bg-yellow-500">
+          <Badge variant="default" className="bg-yellow-700">
             Half Day
           </Badge>
         );
@@ -154,7 +154,7 @@ export default function AttendanceApprovals() {
         );
       case "outside-duty":
         return (
-          <Badge variant="default" className="bg-purple-500">
+          <Badge variant="default" className="bg-orange-400">
             Outside Duty
           </Badge>
         );
@@ -168,7 +168,7 @@ export default function AttendanceApprovals() {
       <div>
         <h1 className="text-2xl font-bold">Attendance Approvals</h1>
         <p className="text-gray-600">
-          Review and approve/reject flagged attendance records from your team
+          Review and approve/reject flagged attendance records from your staff
         </p>
       </div>
 

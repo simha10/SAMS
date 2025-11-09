@@ -11,8 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -21,15 +19,27 @@ import {
   PieChart,
   Pie,
   Cell,
+  AreaChart,
+  Area,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  Legend as RechartsLegend,
 } from "recharts";
 import {
   TrendingUp,
   Calendar,
   Users,
   CheckCircle,
-  XCircle,
-  AlertTriangle,
   Loader2,
+  Clock,
+  Target,
+  Award,
 } from "lucide-react";
 import { managerAPI } from "@/services/api";
 import { format } from "date-fns";
@@ -59,6 +69,9 @@ interface InsightsData {
     present: number;
     absent: number;
     flagged: number;
+    onLeave: number;
+    halfDay: number;
+    outsideDuty: number;
   }>;
   topPerformers: Array<{
     empId: string;
@@ -89,6 +102,8 @@ const COLORS = [
   "#8B5CF6",
   "#06B6D4",
   "#F97316",
+  "#8B5CF6",
+  "#EC4899",
 ];
 
 // Function to generate date range
@@ -123,18 +138,50 @@ const generateDailyTrends = (
       (sum, d) => sum + (d.summary.flagged || 0),
       0
     );
+    const onLeave = dayData.reduce(
+      (sum, d) => sum + (d.summary.onLeave || 0),
+      0
+    );
+    const halfDay = dayData.reduce(
+      (sum, d) => sum + (d.summary.halfDay || 0),
+      0
+    );
+    const outsideDuty = dayData.reduce(
+      (sum, d) => sum + (d.summary.outsideDuty || 0),
+      0
+    );
 
     trends.push({
       _id: dateStr,
       present: present || 0,
       absent: absent || 0,
       flagged: flagged || 0,
+      onLeave: onLeave || 0,
+      halfDay: halfDay || 0,
+      outsideDuty: outsideDuty || 0,
     });
 
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
   return trends;
+};
+
+// Custom tooltip component for better visualization
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-lg">
+        <p className="font-bold text-gray-800">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} style={{ color: entry.color }} className="text-sm">
+            {entry.name}: {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
 };
 
 export default function ManagerAnalytics() {
@@ -182,6 +229,9 @@ export default function ManagerAnalytics() {
       let totalPresent = 0;
       let totalAbsent = 0;
       let totalFlagged = 0;
+      let totalOnLeave = 0;
+      let totalHalfDay = 0;
+      let totalOutsideDuty = 0;
       let totalRecords = 0;
 
       // Get unique employees
@@ -198,16 +248,25 @@ export default function ManagerAnalytics() {
       let presentCount = 0;
       let absentCount = 0;
       let flaggedCount = 0;
+      let onLeaveCount = 0;
+      let halfDayCount = 0;
+      let outsideDutyCount = 0;
 
       teamData.forEach((data) => {
         presentCount += data.summary.present || 0;
         absentCount += data.summary.absent || 0;
         flaggedCount += data.summary.flagged || 0;
+        onLeaveCount += data.summary.onLeave || 0;
+        halfDayCount += data.summary.halfDay || 0;
+        outsideDutyCount += data.summary.outsideDuty || 0;
       });
 
       totalPresent = presentCount;
       totalAbsent = absentCount;
       totalFlagged = flaggedCount;
+      totalOnLeave = onLeaveCount;
+      totalHalfDay = halfDayCount;
+      totalOutsideDuty = outsideDutyCount;
       totalRecords = presentCount + absentCount;
       const overallAttendanceRate =
         totalRecords > 0
@@ -234,6 +293,10 @@ export default function ManagerAnalytics() {
         attendanceStats: {
           present: totalPresent,
           absent: totalAbsent,
+          "outside-geo": 0, // This would come from a different data source
+          "on-leave": totalOnLeave,
+          "half-day": totalHalfDay,
+          "outside-duty": totalOutsideDuty,
           flagged: totalFlagged,
         },
         dailyTrends,
@@ -277,6 +340,9 @@ export default function ManagerAnalytics() {
       present: trend.present,
       absent: trend.absent,
       flagged: trend.flagged,
+      onLeave: trend.onLeave,
+      halfDay: trend.halfDay,
+      outsideDuty: trend.outsideDuty,
     })) || [];
 
   const pieData = insights
@@ -287,6 +353,33 @@ export default function ManagerAnalytics() {
           value: value as number,
         }))
     : [];
+
+  // Prepare data for radar chart (attendance distribution)
+  const radarData = insights
+    ? Object.entries(insights.attendanceStats)
+        .filter(([key, value]) => value && value > 0)
+        .map(([key, value]) => ({
+          status: key.charAt(0).toUpperCase() + key.slice(1).replace(/-/g, " "),
+          count: value as number,
+          fullMark: Math.max(
+            ...(Object.values(insights.attendanceStats).filter(
+              (v) => v
+            ) as number[])
+          ),
+        }))
+    : [];
+
+  // Prepare data for scatter plot (attendance rate vs flagged records)
+  const scatterData =
+    insights?.dailyTrends.map((trend, index) => ({
+      day: index + 1,
+      attendanceRate:
+        trend.present + trend.absent > 0
+          ? Math.round((trend.present / (trend.present + trend.absent)) * 100)
+          : 0,
+      flagged: trend.flagged,
+      date: trend._id ? format(new Date(trend._id), "MMM dd") : "N/A",
+    })) || [];
 
   return (
     <div className="space-y-6">
@@ -426,16 +519,21 @@ export default function ManagerAnalytics() {
           </Card>
         </div>
 
-        {/* Charts */}
+        {/* Enhanced Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
+          {/* Daily Attendance Trends - Enhanced Area Chart */}
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Daily Attendance Trends</CardTitle>
+              <CardTitle className="flex items-center">
+                <TrendingUp className="w-5 h-5 mr-2 text-blue-500" />
+                Daily Attendance Trends
+              </CardTitle>
               <CardDescription>
-                Attendance patterns over the selected period
+                Attendance patterns over the selected period with detailed
+                breakdown
               </CardDescription>
             </CardHeader>
-            <CardContent className="h-80">
+            <CardContent className="h-96">
               {loading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="w-6 h-6 animate-spin" />
@@ -443,15 +541,70 @@ export default function ManagerAnalytics() {
                 </div>
               ) : attendanceData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={attendanceData}>
+                  <AreaChart
+                    data={attendanceData}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
                     <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="present" fill="#10B981" name="Present" />
-                    <Bar dataKey="absent" fill="#EF4444" name="Absent" />
-                    <Bar dataKey="flagged" fill="#F59E0B" name="Flagged" />
-                  </BarChart>
+                    <Tooltip content={<CustomTooltip />} />
+                    <RechartsLegend />
+                    <Area
+                      type="monotone"
+                      dataKey="present"
+                      stackId="1"
+                      stroke="#10B981"
+                      fill="#10B981"
+                      fillOpacity={0.6}
+                      name="Present"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="absent"
+                      stackId="1"
+                      stroke="#EF4444"
+                      fill="#EF4444"
+                      fillOpacity={0.6}
+                      name="Absent"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="flagged"
+                      stackId="1"
+                      stroke="#F59E0B"
+                      fill="#F59E0B"
+                      fillOpacity={0.6}
+                      name="Flagged"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="onLeave"
+                      stackId="1"
+                      stroke="#8B5CF6"
+                      fill="#8B5CF6"
+                      fillOpacity={0.6}
+                      name="On Leave"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="halfDay"
+                      stackId="1"
+                      stroke="#06B6D4"
+                      fill="#06B6D4"
+                      fillOpacity={0.6}
+                      name="Half Day"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="outsideDuty"
+                      stackId="1"
+                      stroke="#F97316"
+                      fill="#F97316"
+                      fillOpacity={0.6}
+                      name="Outside Duty"
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -466,9 +619,13 @@ export default function ManagerAnalytics() {
             </CardContent>
           </Card>
 
+          {/* Attendance Distribution - Enhanced Pie Chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Attendance Distribution</CardTitle>
+              <CardTitle className="flex items-center">
+                <Target className="w-5 h-5 mr-2 text-purple-500" />
+                Attendance Distribution
+              </CardTitle>
               <CardDescription>
                 Overall attendance status distribution
               </CardDescription>
@@ -486,7 +643,7 @@ export default function ManagerAnalytics() {
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -505,7 +662,143 @@ export default function ManagerAnalytics() {
                       formatter={(value) => [value, "Count"]}
                       labelFormatter={(name) => `Status: ${name}`}
                     />
+                    <RechartsLegend />
                   </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="text-center">
+                    <p>No data available</p>
+                    <p className="text-sm mt-2">
+                      Data will show as "NA" when not available
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Attendance Radar Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Award className="w-5 h-5 mr-2 text-yellow-500" />
+                Attendance Status Radar
+              </CardTitle>
+              <CardDescription>
+                Comparative view of attendance statuses
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-80">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <span className="ml-2">Loading analytics data...</span>
+                </div>
+              ) : radarData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart
+                    cx="50%"
+                    cy="50%"
+                    outerRadius="80%"
+                    data={radarData}
+                  >
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="status" />
+                    <PolarRadiusAxis
+                      angle={30}
+                      domain={[
+                        0,
+                        Math.max(...radarData.map((d) => d.fullMark)),
+                      ]}
+                    />
+                    <Radar
+                      name="Attendance Status"
+                      dataKey="count"
+                      stroke="#8884d8"
+                      fill="#8884d8"
+                      fillOpacity={0.6}
+                    />
+                    <Tooltip />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="text-center">
+                    <p>No data available</p>
+                    <p className="text-sm mt-2">
+                      Data will show as "NA" when not available
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Scatter Plot - Attendance Rate vs Flagged Records */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="w-5 h-5 mr-2 text-green-500" />
+                Attendance Rate vs Flagged Records
+              </CardTitle>
+              <CardDescription>
+                Correlation between attendance rate and flagged records per day
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-96">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <span className="ml-2">Loading analytics data...</span>
+                </div>
+              ) : scatterData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart
+                    margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                  >
+                    <CartesianGrid />
+                    <XAxis
+                      type="number"
+                      dataKey="day"
+                      name="Day"
+                      label={{
+                        value: "Days",
+                        position: "insideBottom",
+                        offset: -5,
+                      }}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="attendanceRate"
+                      name="Attendance Rate"
+                      label={{
+                        value: "Attendance Rate (%)",
+                        angle: -90,
+                        position: "insideLeft",
+                      }}
+                    />
+                    <ZAxis
+                      type="number"
+                      dataKey="flagged"
+                      range={[100, 1000]}
+                      name="Flagged"
+                    />
+                    <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+                    <RechartsLegend />
+                    <Scatter
+                      name="Daily Attendance"
+                      data={scatterData}
+                      fill="#8884d8"
+                    >
+                      {scatterData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.flagged > 0 ? "#F59E0B" : "#10B981"}
+                        />
+                      ))}
+                    </Scatter>
+                  </ScatterChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

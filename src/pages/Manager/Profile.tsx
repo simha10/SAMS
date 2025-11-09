@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuthStore } from "@/stores/authStore";
-import { Loader2, User, BadgeCheck, } from "lucide-react";
+import { Loader2, User, BadgeCheck } from "lucide-react";
 import type { User as FullUser } from "@/types";
+import { authAPI } from "@/services/api";
 
 export default function ManagerProfile() {
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const fullUser = user as FullUser | null;
   const [name, setName] = useState(fullUser?.name || "");
   const [email, setEmail] = useState(fullUser?.email || "");
@@ -23,22 +24,80 @@ export default function ManagerProfile() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+
   const handleUpdateProfile = async () => {
     setLoading(true);
     setError("");
     setSuccess("");
 
     try {
-      // In a real implementation, you would call an API to update the profile
-      // For now, we'll just simulate the update
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setSuccess("Profile updated successfully!");
+      const response = await authAPI.updateProfile({ name, email });
+      if (response.success && response.data?.user) {
+        setUser(response.data.user);
+        setSuccess("Profile updated successfully!");
+      } else {
+        setError("Failed to update profile");
+      }
     } catch (err: unknown) {
       setError("Failed to update profile");
       console.error("Failed to update profile:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordLoading(true);
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    // Validate passwords
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("All password fields are required");
+      setPasswordLoading(false);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New password and confirm password do not match");
+      setPasswordLoading(false);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters long");
+      setPasswordLoading(false);
+      return;
+    }
+
+    try {
+      const response = await authAPI.changePassword({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
+
+      if (response.success) {
+        setPasswordSuccess("Password changed successfully!");
+        // Clear password fields
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        setPasswordError(response.message || "Failed to change password");
+      }
+    } catch (err: unknown) {
+      setPasswordError("Failed to change password");
+      console.error("Failed to change password:", err);
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -122,6 +181,75 @@ export default function ManagerProfile() {
                   ) : null}
                   Update Profile
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Change Password Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Change Password</CardTitle>
+              <CardDescription>
+                Update your password to keep your account secure
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {passwordError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{passwordError}</AlertDescription>
+                </Alert>
+              )}
+
+              {passwordSuccess && (
+                <Alert>
+                  <AlertDescription className="text-green-600">
+                    {passwordSuccess}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleChangePassword}
+                    disabled={passwordLoading}
+                  >
+                    {passwordLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    Change Password
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

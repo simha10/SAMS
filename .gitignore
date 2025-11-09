@@ -42,3 +42,4 @@ backend/dist/
 backend/dist-ssr/
 backend/logs/
 backend/*.log
+backend/scripts/*

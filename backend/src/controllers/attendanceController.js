@@ -1,5 +1,6 @@
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
+const Holiday = require('../models/Holiday'); // Added Holiday model
 const { haversine, isWithinOfficeHours, formatWorkingHours } = require('../utils/haversine');
 const mongoose = require('mongoose');
 
@@ -17,10 +18,14 @@ async function checkin(req, res) {
     
     console.log('User office location:', user.officeLocation);
     
-    // Check if user already has a check-in for today
+    // Check if today is a holiday
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
+    const holiday = await Holiday.findOne({ date: today });
+    const isHoliday = !!holiday;
+    
+    // Check if user already has a check-in for today
     let attendance = await Attendance.findOne({
       userId,
       date: {
@@ -29,7 +34,7 @@ async function checkin(req, res) {
       }
     });
     
-    // If attendance record exists, check if already checked in
+    // If attendance record exists with check-in time, they're already checked in
     if (attendance && attendance.checkInTime) {
       return res.status(400).json({ 
         success: false, 
@@ -60,6 +65,7 @@ async function checkin(req, res) {
     
     // Create or update attendance record
     if (!attendance) {
+      // No attendance record exists, create a new one
       attendance = new Attendance({
         userId,
         date: new Date(new Date().toISOString().split('T')[0]), // Use date-only format to match daily job
@@ -67,8 +73,14 @@ async function checkin(req, res) {
         distanceFromOffice: { checkIn: distance }
       });
     } else {
+      // Attendance record exists (possibly marked as absent), update it
       attendance.location.checkIn = { lat, lng };
       attendance.distanceFromOffice.checkIn = distance;
+      // Reset flagged status when user checks in (unless it's a holiday)
+      if (!isHoliday) {
+        attendance.flagged = false;
+        attendance.flaggedReason = '';
+      }
     }
     
     // Set check-in time
@@ -77,12 +89,17 @@ async function checkin(req, res) {
     // Check if within office hours
     const isWithinHours = isWithinOfficeHours(new Date(attendance.checkInTime));
     
-    // Determine status based on location and time
+    // Determine status based on location, time, and holiday
     let status = 'present';
     let flagged = false;
     let flaggedReason = '';
     
-    if (!isWithinRadius) {
+    if (isHoliday) {
+      // If it's a holiday, flag the attendance
+      status = 'present'; // Keep status as present
+      flagged = true;
+      flaggedReason = 'Working on holiday - Awaiting manager approval';
+    } else if (!isWithinRadius) {
       status = 'outside-duty';  // Changed from 'absent' to 'outside-duty'
       flagged = true;
       flaggedReason = `Outside allowed radius (${distance.toFixed(2)}m from office, allowed ${user.officeLocation.radius}m) - Awaiting manager approval`;
@@ -102,17 +119,22 @@ async function checkin(req, res) {
     
     await attendance.save();
     
-    res.json({
+    // Add holiday information to response if it's a holiday
+    const responseData = {
       success: true,
-      message: 'Check-in successful',
+      message: isHoliday ? 'Check-in successful (holiday attendance will be flagged for manager approval)' : 'Check-in successful',
       data: {
         checkInTime: attendance.checkInTime,
         distance,
         status,
         flagged,
-        flaggedReason
+        flaggedReason,
+        isHoliday,
+        holiday: holiday || null
       }
-    });
+    };
+    
+    res.json(responseData);
   } catch (error) {
     console.error('Check-in error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });

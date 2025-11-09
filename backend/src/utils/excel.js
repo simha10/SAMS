@@ -1,7 +1,7 @@
 const ExcelJS = require('exceljs');
 
 // Generate attendance report data in the required format
-function generateAttendanceReportData(attendanceRecords) {
+function generateAttendanceReportData(attendanceRecords, startDate, endDate) {
   // Handle empty records
   if (!attendanceRecords || attendanceRecords.length === 0) {
     return [{
@@ -13,11 +13,24 @@ function generateAttendanceReportData(attendanceRecords) {
       'Day 16': '', 'Day 17': '', 'Day 18': '', 'Day 19': '', 'Day 20': '',
       'Day 21': '', 'Day 22': '', 'Day 23': '', 'Day 24': '', 'Day 25': '',
       'Day 26': '', 'Day 27': '', 'Day 28': '', 'Day 29': '', 'Day 30': '',
-      'Total Office Working Days': 0,
-      'Employee Present Days': 0,
-      'Employee Absent Days': 0
+      'Day 31': '',
+      'Total Days': 0,
+      'Present Days': 0,
+      'Absent Days': 0,
+      'Half Days': 0,
+      'Leave Days': 0,
+      'Outside Duty Days': 0
     }];
   }
+  
+  // Calculate total days in range
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  // Set end date to end of day to include the entire last day
+  end.setHours(23, 59, 59, 999);
+  // Calculate difference in days (inclusive)
+  const timeDiff = end.getTime() - start.getTime();
+  const totalDaysInRange = Math.floor(timeDiff / (1000 * 3600 * 24)) + 1;
   
   // Group records by employee
   const employeeData = {};
@@ -31,55 +44,67 @@ function generateAttendanceReportData(attendanceRecords) {
       employeeData[user._id] = {
         'Employee ID': user.empId,
         'Employee Name': user.name,
-        'Day 1': 'A', 'Day 2': 'A', 'Day 3': 'A', 'Day 4': 'A', 'Day 5': 'A',
-        'Day 6': 'A', 'Day 7': 'A', 'Day 8': 'A', 'Day 9': 'A', 'Day 10': 'A',
-        'Day 11': 'A', 'Day 12': 'A', 'Day 13': 'A', 'Day 14': 'A', 'Day 15': 'A',
-        'Day 16': 'A', 'Day 17': 'A', 'Day 18': 'A', 'Day 19': 'A', 'Day 20': 'A',
-        'Day 21': 'A', 'Day 22': 'A', 'Day 23': 'A', 'Day 24': 'A', 'Day 25': 'A',
-        'Day 26': 'A', 'Day 27': 'A', 'Day 28': 'A', 'Day 29': 'A', 'Day 30': 'A',
-        'Total Office Working Days': 0,
-        'Employee Present Days': 0,
-        'Employee Absent Days': 0
+        'Day 1': '', 'Day 2': '', 'Day 3': '', 'Day 4': '', 'Day 5': '',
+        'Day 6': '', 'Day 7': '', 'Day 8': '', 'Day 9': '', 'Day 10': '',
+        'Day 11': '', 'Day 12': '', 'Day 13': '', 'Day 14': '', 'Day 15': '',
+        'Day 16': '', 'Day 17': '', 'Day 18': '', 'Day 19': '', 'Day 20': '',
+        'Day 21': '', 'Day 22': '', 'Day 23': '', 'Day 24': '', 'Day 25': '',
+        'Day 26': '', 'Day 27': '', 'Day 28': '', 'Day 29': '', 'Day 30': '',
+        'Day 31': '',
+        'Total Days': totalDaysInRange, // Total days in range
+        'Present Days': 0,
+        'Absent Days': 0,
+        'Half Days': 0,
+        'Leave Days': 0,
+        'Outside Duty Days': 0
       };
     }
     
-    // Map status to required format
-    let status = 'A'; // Default to Absent
+    // Map status to required format and count different statuses
+    let status = ''; // Default to empty
     switch (record.status) {
       case 'present':
         status = 'P';
-        employeeData[user._id]['Employee Present Days']++;
+        employeeData[user._id]['Present Days']++;
         break;
       case 'absent':
         status = 'A';
-        employeeData[user._id]['Employee Absent Days']++;
+        // Don't increment absent days here, we'll calculate it at the end
         break;
       case 'half-day':
         status = '1/2';
-        employeeData[user._id]['Employee Present Days'] += 0.5;
-        employeeData[user._id]['Employee Absent Days'] += 0.5;
+        employeeData[user._id]['Half Days']++;
         break;
       case 'on-leave':
         status = 'L';
+        employeeData[user._id]['Leave Days']++;
         break;
       case 'outside-duty':
         status = 'OD';
-        employeeData[user._id]['Employee Present Days']++;
+        employeeData[user._id]['Outside Duty Days']++;
         break;
     }
     
     // Set the status for this day
-    if (dayOfMonth >= 1 && dayOfMonth <= 30) {
+    if (dayOfMonth >= 1 && dayOfMonth <= 31) {
       employeeData[user._id][`Day ${dayOfMonth}`] = status;
-      // Only increment working days for actual attendance (not leaves)
-      if (status !== 'L') {
-        employeeData[user._id]['Total Office Working Days']++;
-      }
     }
   });
   
-  // Convert to array
-  const result = Object.values(employeeData);
+  // Convert to array and calculate absent days
+  const result = Object.values(employeeData).map(employee => {
+    // Calculate absent days as per the formula:
+    // Total Absents = Total Days - Present Days - Half Days - Leave Days
+    const present = employee['Present Days'];
+    const halfDays = employee['Half Days'];
+    const leaveDays = employee['Leave Days'];
+    const outsideDutyDays = employee['Outside Duty Days'];
+    
+    // Calculate absent days based on the formula provided
+    employee['Absent Days'] = employee['Total Days'] - present - halfDays - leaveDays - outsideDutyDays;
+    
+    return employee;
+  });
   
   // Ensure we always have headers by returning at least one row
   return result.length > 0 ? result : [{
@@ -91,9 +116,13 @@ function generateAttendanceReportData(attendanceRecords) {
     'Day 16': '', 'Day 17': '', 'Day 18': '', 'Day 19': '', 'Day 20': '',
     'Day 21': '', 'Day 22': '', 'Day 23': '', 'Day 24': '', 'Day 25': '',
     'Day 26': '', 'Day 27': '', 'Day 28': '', 'Day 29': '', 'Day 30': '',
-    'Total Office Working Days': 0,
-    'Employee Present Days': 0,
-    'Employee Absent Days': 0
+    'Day 31': '',
+    'Total Days': totalDaysInRange,
+    'Present Days': 0,
+    'Absent Days': totalDaysInRange,
+    'Half Days': 0,
+    'Leave Days': 0,
+    'Outside Duty Days': 0
   }];
 }
 
@@ -129,23 +158,33 @@ function generateSummaryReportData(summaryData) {
   // Handle empty records
   if (!summaryData || summaryData.length === 0) {
     return [{
+      'Employee ID': 'No Data',
       'Employee Name': 'No attendance records found for the selected period',
       'Total Days': 0,
-      'Total Presents': 0,
-      'Total Absents': 0,
-      'Total Leaves': 0,
-      'Total ODs': 0
+      'Present Days': 0,
+      'Absent Days': 0,
+      'Leave Days': 0,
+      'Half Days': 0,
+      'Outside Duty Days': 0,
+      'Attendance Rate': '0%'
     }];
   }
   
   return summaryData.map(item => {
+    // Calculate the attendance rate properly
+    const totalWorkingDays = item.presentDays + item.halfDays * 0.5;
+    const attendanceRate = item.totalDays > 0 ? ((totalWorkingDays / item.totalDays) * 100).toFixed(2) + '%' : '0%';
+    
     return {
+      'Employee ID': item.empId,
       'Employee Name': item.name,
       'Total Days': item.totalDays,
-      'Total Presents': item.presentDays,
-      'Total Absents': item.absentDays,
-      'Total Leaves': item.leaveDays,
-      'Total ODs': item.outsideDutyDays
+      'Present Days': item.presentDays,
+      'Absent Days': item.absentDays,
+      'Leave Days': item.leaveDays,
+      'Half Days': item.halfDays,
+      'Outside Duty Days': item.outsideDutyDays,
+      'Attendance Rate': attendanceRate
     };
   });
 }
@@ -207,7 +246,7 @@ async function createMultiSheetExcel(sheetsData) {
       // Apply conditional formatting for attendance status
       if (sheetName === 'Attendance') {
         // Apply styling for status columns
-        for (let i = 3; i <= 32; i++) { // Day 1 to Day 30 columns
+        for (let i = 3; i <= 33; i++) { // Day 1 to Day 31 columns
           const column = worksheet.getColumn(i);
           column.eachCell((cell, rowNumber) => {
             if (rowNumber > 1) { // Skip header row

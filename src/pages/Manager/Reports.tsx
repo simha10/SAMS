@@ -17,48 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Loader2,
-  FileText,
-  Download,
-  Calendar,
-  Eye,
-  Trash2,
-  X,
-} from "lucide-react";
-import { reportAPI, managerAPI } from "@/services/api";
+import { Loader2, FileText, Download, Calendar, Eye } from "lucide-react";
+import { reportAPI } from "@/services/api";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import ReportPreview from "@/components/ReportPreview";
-
-import type {
-  User,
-  AttendanceRecord,
-  LeaveRequest,
-  ApiResponse,
-  RegisterData,
-  LeaveRequestData,
-  ApiError,
-} from "@/types";
-
-interface Report {
-  _id: string;
-  title: string;
-  type: string;
-  format: string;
-  createdAt: string;
-  recordCount: number;
-}
+import type { User } from "@/types";
 
 interface Employee extends User {
   id: string;
@@ -76,75 +39,27 @@ export default function ManagerReports() {
   const [reportFormat, setReportFormat] = useState("csv");
   const [loading, setLoading] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [reports, setReports] = useState<Report[]>([]);
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [reportStats, setReportStats] = useState({
-    attendance: 0,
-    leave: 0,
-    summary: 0,
-    combined: 0,
-  });
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [reportToDelete, setReportToDelete] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  // Fetch reports and employees on component mount
+  // Fetch employees on component mount
   useEffect(() => {
-    fetchReports();
     fetchEmployees();
   }, []);
 
   const fetchEmployees = async () => {
     try {
-      const response = await managerAPI.getTeamMembers();
-      if (response.success && response.data) {
-        // Map employees to include id field
-        const mappedEmployees = response.data.employees.map((emp: any) => ({
-          ...emp,
-          id: emp._id,
-        }));
-        setEmployees(mappedEmployees);
-      }
+      // Since we don't have a managerAPI.getTeamMembers anymore, we'll need to implement this
+      // For now, let's just set an empty array
+      setEmployees([]);
     } catch (err) {
       console.error("Failed to fetch employees:", err);
       setError("Failed to fetch employee data");
       toast.error("Failed to fetch employees", {
         description: "Could not load employee data. Please try again.",
-      });
-    }
-  };
-
-  const fetchReports = async () => {
-    try {
-      const response = await reportAPI.getMyReports();
-      if (response.success && response.data) {
-        setReports(response.data.reports);
-
-        // Calculate report stats
-        const stats = {
-          attendance: response.data.reports.filter(
-            (r: any) => r.type === "attendance"
-          ).length,
-          leave: response.data.reports.filter((r: any) => r.type === "leave")
-            .length,
-          summary: response.data.reports.filter(
-            (r: any) => r.type === "summary"
-          ).length,
-          combined: response.data.reports.filter(
-            (r: any) => r.type === "combined"
-          ).length,
-        };
-        setReportStats(stats);
-      }
-    } catch (err) {
-      console.error("Failed to fetch reports:", err);
-      toast.error("Failed to fetch reports", {
-        description: "Could not load reports. Please try again.",
       });
     }
   };
@@ -158,10 +73,8 @@ export default function ManagerReports() {
       // For combined reports, force Excel format
       const format = reportType === "combined" ? "xlsx" : reportFormat;
 
-      const response = await reportAPI.generateReport({
-        title: `${
-          reportType.charAt(0).toUpperCase() + reportType.slice(1)
-        } Report ${startDate} to ${endDate}`,
+      // Use streaming for direct download instead of saving to server
+      const blob = await reportAPI.streamReport({
         type: reportType,
         format,
         startDate,
@@ -170,14 +83,21 @@ export default function ManagerReports() {
           selectedEmployee === "all" ? {} : { employeeId: selectedEmployee },
       });
 
-      if (response.success) {
-        setMessage("Report generated successfully!");
-        toast.success("Report generated", {
-          description: "Your report has been generated successfully.",
-        });
-        // Refresh reports list
-        fetchReports();
-      }
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${reportType}_report_${new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-")}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Report downloaded", {
+        description: "Your report has been downloaded successfully.",
+      });
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to generate report");
       toast.error("Failed to generate report", {
@@ -234,61 +154,6 @@ export default function ManagerReports() {
     }
   };
 
-  const downloadReport = async (reportId: string, reportTitle: string) => {
-    setDownloading(true);
-    try {
-      const blob = await reportAPI.downloadReport(reportId);
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${reportTitle}.${reportFormat}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast.success("Report downloaded", {
-        description: "Your report has been downloaded successfully.",
-      });
-    } catch (err) {
-      setError("Failed to download report");
-      toast.error("Failed to download report", {
-        description: "Please try again.",
-      });
-      console.error("Failed to download report:", err);
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const deleteReport = async (reportId: string) => {
-    setDeleting(true);
-    try {
-      await reportAPI.deleteReport(reportId);
-      // Refresh reports list
-      fetchReports();
-      toast.success("Report deleted", {
-        description: "Report has been deleted successfully.",
-      });
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to delete report");
-      toast.error("Failed to delete report", {
-        description: err.response?.data?.message || "Please try again.",
-      });
-    } finally {
-      setDeleting(false);
-      setShowDeleteDialog(false);
-      setReportToDelete(null);
-    }
-  };
-
-  const openDeleteDialog = (reportId: string) => {
-    setReportToDelete(reportId);
-    setShowDeleteDialog(true);
-  };
-
   // Function to open preview in a new tab with enhanced UI/UX for all report types
   const openPreviewInNewTab = () => {
     // Create a new window/tab with the preview data
@@ -298,8 +163,7 @@ export default function ManagerReports() {
       const filterText =
         selectedEmployee === "all"
           ? "All Employees"
-          : employees.find((emp) => emp.empId === selectedEmployee)?.name ||
-            selectedEmployee;
+          : `Employee ID: ${selectedEmployee}`;
 
       // Generate date headers for attendance reports
       const start = new Date(startDate);
@@ -742,7 +606,7 @@ export default function ManagerReports() {
                                 .join("")}
                               <td>${row["Total Office Working Days"] || 0}</td>
                               <td>${row["Employee Present Days"] || 0}</td>
-                              <td>${row["Employee Absent Days"] || 0}</td>
+                              <td>${row["Absent Days"] || 0}</td>
                             </tr>
                           `
                             )
@@ -1284,7 +1148,9 @@ export default function ManagerReports() {
                         <th>Total Days</th>
                         <th>Present Days</th>
                         <th>Absent Days</th>
-                        <th>Status</th>
+                        <th>Half Days</th>
+                        <th>Leave Days</th>
+                        <th>Outside Duty Days</th>
                       `
                           : `
                         ${
@@ -1337,24 +1203,12 @@ export default function ManagerReports() {
                               return `<td class="day-cell ${statusClass}">${status}</td>`;
                             })
                             .join("")}
-                          <td>${row["Total Office Working Days"] || 0}</td>
-                          <td>${row["Employee Present Days"] || 0}</td>
-                          <td>${row["Employee Absent Days"] || 0}</td>
-                          <td>
-                            <span class="status-cell status-${
-                              (row["Employee Present Days"] || 0) >
-                              (row["Employee Absent Days"] || 0)
-                                ? "P"
-                                : "A"
-                            }">
-                              ${
-                                (row["Employee Present Days"] || 0) >
-                                (row["Employee Absent Days"] || 0)
-                                  ? "Present"
-                                  : "Absent"
-                              }
-                            </span>
-                          </td>
+                          <td>${row["Total Days"] || 0}</td>
+                          <td>${row["Present Days"] || 0}</td>
+                          <td>${row["Absent Days"] || 0}</td>
+                          <td>${row["Half Days"] || 0}</td>
+                          <td>${row["Leave Days"] || 0}</td>
+                          <td>${row["Outside Duty Days"] || 0}</td>
                         `
                             : `
                           ${
@@ -1443,7 +1297,7 @@ export default function ManagerReports() {
       <div>
         <h1 className="text-3xl font-bold">Reports</h1>
         <p className="text-muted-foreground">
-          Generate and download attendance reports
+          Generate and download attendance reports directly
         </p>
       </div>
 
@@ -1465,7 +1319,7 @@ export default function ManagerReports() {
         <CardHeader>
           <CardTitle>Generate Report</CardTitle>
           <CardDescription>
-            Select parameters to generate attendance reports
+            Select parameters to generate attendance reports directly
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1624,149 +1478,11 @@ export default function ManagerReports() {
               ) : (
                 <Download className="w-4 h-4 mr-2" />
               )}
-              Generate Report
+              Download Report
             </Button>
           </div>
         </CardContent>
       </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Attendance Reports
-            </CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{reportStats.attendance}</div>
-            <p className="text-xs text-muted-foreground">
-              Generated this month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Summary Reports
-            </CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{reportStats.summary}</div>
-            <p className="text-xs text-muted-foreground">
-              Generated this month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Leave Reports</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{reportStats.leave}</div>
-            <p className="text-xs text-muted-foreground">
-              Generated this month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Combined Reports
-            </CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{reportStats.combined}</div>
-            <p className="text-xs text-muted-foreground">
-              Generated this month
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Reports</CardTitle>
-          <CardDescription>
-            Download or delete previously generated reports
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {reports.length > 0 ? (
-            <div className="space-y-4">
-              {reports.slice(0, 5).map((report) => (
-                <div
-                  key={report._id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div>
-                    <h3 className="font-medium">{report.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(report.createdAt), "MMM dd, yyyy HH:mm")}{" "}
-                      • {report.type} • {report.recordCount} records
-                    </p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => downloadReport(report._id, report.title)}
-                      disabled={downloading}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => openDeleteDialog(report._id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No recent reports available</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              report and remove it from the server.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => reportToDelete && deleteReport(reportToDelete)}
-              disabled={deleting}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {deleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { login, logout, getProfile, register } = require('../controllers/authController');
+const { login, logout, getProfile, register, updateProfile, changePassword } = require('../controllers/authController');
 const { protect, restrictTo } = require('../middleware/auth');
 
 console.log("=== REGISTERING AUTH ROUTES ===");
@@ -23,6 +23,8 @@ router.post('/logout', logout);
 
 // Protected routes
 router.get('/profile', protect, getProfile);
+router.put('/profile', protect, updateProfile);
+router.put('/change-password', protect, changePassword);
 router.post('/register', protect, restrictTo('director'), register);
 
 console.log("=== AUTH ROUTES REGISTERED ===");

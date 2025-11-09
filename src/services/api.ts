@@ -153,6 +153,40 @@ export const authAPI = {
     return response.data;
   },
   
+  updateProfile: async (userData: { name?: string; email?: string }): Promise<ApiResponse<{ user: User }>> => {
+    try {
+      const response = await api.put('/auth/profile', userData);
+      toast.success("Profile updated", {
+        description: "Your profile has been updated successfully.",
+      });
+      return response.data;
+    } catch (error) {
+      toast.error("Update failed", {
+        description: "Could not update profile. Please try again.",
+      });
+      throw error;
+    }
+  },
+  
+  changePassword: async (passwordData: { 
+    currentPassword: string; 
+    newPassword: string; 
+    confirmPassword: string 
+  }): Promise<ApiResponse> => {
+    try {
+      const response = await api.put('/auth/change-password', passwordData);
+      toast.success("Password changed", {
+        description: "Your password has been changed successfully.",
+      });
+      return response.data;
+    } catch (error: any) {
+      toast.error("Password change failed", {
+        description: error.response?.data?.message || "Could not change password. Please try again.",
+      });
+      throw error;
+    }
+  },
+  
   register: async (userData: RegisterData): Promise<ApiResponse<{ user: User }>> => {
     try {
       const response = await api.post('/auth/register', userData);
@@ -350,14 +384,63 @@ export const managerAPI = {
     }
   },
   
-  // New method for getting team members
-  getTeamMembers: async () => {
+  // Holiday management methods
+  createHoliday: async (date: string, name: string, description?: string) => {
     try {
-      const response = await api.get('/manager/team/members');
+      const response = await api.post('/manager/holidays', { date, name, description });
+      toast.success("Holiday created", {
+        description: "Holiday has been created successfully.",
+      });
+      return response.data;
+    } catch (error: any) {
+      toast.error("Failed to create holiday", {
+        description: error.response?.data?.message || "Could not create holiday. Please try again.",
+      });
+      throw error;
+    }
+  },
+  
+  getHolidays: async (year?: string, month?: string) => {
+    try {
+      const params = new URLSearchParams();
+      if (year) params.append('year', year);
+      if (month) params.append('month', month);
+      
+      const response = await api.get(`/manager/holidays?${params}`);
       return response.data;
     } catch (error) {
-      toast.error("Failed to load team members", {
-        description: "Could not load team members. Please try again.",
+      toast.error("Failed to load holidays", {
+        description: "Could not load holidays. Please try again.",
+      });
+      throw error;
+    }
+  },
+  
+  updateHoliday: async (id: string, date: string, name: string, description?: string) => {
+    try {
+      const response = await api.put(`/manager/holidays/${id}`, { date, name, description });
+      toast.success("Holiday updated", {
+        description: "Holiday has been updated successfully.",
+      });
+      return response.data;
+    } catch (error: any) {
+      toast.error("Failed to update holiday", {
+        description: error.response?.data?.message || "Could not update holiday. Please try again.",
+      });
+      throw error;
+    }
+  },
+  
+  deleteHoliday: async (id: string) => {
+    try {
+      const response = await api.delete(`/manager/holidays/${id}`);
+      toast.success("Holiday deleted", {
+        description: "Holiday has been deleted successfully.",
+      });
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to delete holiday", {
+        description: "Could not delete holiday. Please try again.",
       });
       throw error;
     }
@@ -366,46 +449,16 @@ export const managerAPI = {
 
 // Report API
 export const reportAPI = {
-  generateReport: async (reportData: {
-    title: string;
+  // New streaming report function
+  streamReport: async (reportData: {
     type: string;
     format?: string;
     startDate: string;
     endDate: string;
     filters?: Record<string, any>;
-  }) => {
+  }): Promise<Blob> => {
     try {
-      const response = await api.post('/reports', reportData);
-      toast.success("Report generated", {
-        description: "Your report has been generated successfully.",
-      });
-      return response.data;
-    } catch (error) {
-      toast.error("Failed to generate report", {
-        description: "Could not generate report. Please try again.",
-      });
-      throw error;
-    }
-  },
-
-  getMyReports: async (type?: string) => {
-    try {
-      const params = new URLSearchParams();
-      if (type) params.append('type', type);
-      
-      const response = await api.get(`/reports/my?${params}`);
-      return response.data;
-    } catch (error) {
-      toast.error("Failed to load reports", {
-        description: "Could not load reports. Please try again.",
-      });
-      throw error;
-    }
-  },
-
-  downloadReport: async (id: string): Promise<Blob> => {
-    try {
-      const response = await api.get(`/reports/${id}/download`, {
+      const response = await api.post('/reports/stream', reportData, {
         responseType: 'blob'
       });
       toast.success("Report downloaded", {
@@ -419,22 +472,7 @@ export const reportAPI = {
       throw error;
     }
   },
-  
-  deleteReport: async (id: string) => {
-    try {
-      const response = await api.delete(`/reports/${id}`);
-      toast.success("Report deleted", {
-        description: "Report has been deleted successfully.",
-      });
-      return response.data;
-    } catch (error) {
-      toast.error("Failed to delete report", {
-        description: "Could not delete report. Please try again.",
-      });
-      throw error;
-    }
-  },
-  
+
   // Preview report functionality
   previewReport: async (reportData: {
     type: string;
@@ -570,6 +608,21 @@ export const notificationsAPI = {
     } catch (error) {
       toast.error("Failed to load notifications", {
         description: "Could not load notifications. Please try again.",
+      });
+      throw error;
+    }
+  }
+};
+
+// Holiday API
+export const holidayAPI = {
+  isHoliday: async (date: string) => {
+    try {
+      const response = await api.get(`/holidays/check?date=${date}`);
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to check holiday status", {
+        description: "Could not check if date is a holiday. Please try again.",
       });
       throw error;
     }

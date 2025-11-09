@@ -27,6 +27,8 @@ import EmployeeTrends from "./pages/Manager/EmployeeTrends";
 import ManagerProfile from "./pages/Manager/Profile";
 import LeaveApprovals from "./pages/Manager/LeaveApprovals";
 import AttendanceApprovals from "./pages/Manager/AttendanceApprovals";
+import AddEmployee from "./pages/Manager/AddEmployee";
+import ManagerHolidays from "./pages/Manager/Holidays"; // Added Holidays import
 // Admin pages
 import AdminAttendanceLogs from "./pages/AdminAttendanceLogs";
 
@@ -229,11 +231,14 @@ const App = () => {
                   element={<Navigate to="/manager/attendance" replace />}
                 />
                 <Route path="attendance" element={<ManagerAttendance />} />
+                <Route path="add-employee" element={<AddEmployee />} />
                 <Route path="leave-approvals" element={<LeaveApprovals />} />
                 <Route
                   path="attendance-approvals"
                   element={<AttendanceApprovals />}
                 />
+                <Route path="holidays" element={<ManagerHolidays />} />{" "}
+                {/* Added Holidays route */}
                 <Route path="reports" element={<ManagerReports />} />
                 <Route path="analytics" element={<ManagerAnalytics />} />
                 <Route path="analytics/team" element={<TeamTrends />} />

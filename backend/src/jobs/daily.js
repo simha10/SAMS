@@ -33,7 +33,7 @@ cron.schedule('0 11 * * *', async () => {
     // Get existing attendance records for today
     const existingAttendance = await Attendance.find({ 
       date: today 
-    }).select('userId');
+    }).select('userId status');
 
     const employeesWithAttendance = new Set(
       existingAttendance.map(att => att.userId.toString())

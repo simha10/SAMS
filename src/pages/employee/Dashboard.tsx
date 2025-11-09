@@ -22,7 +22,12 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { attendanceAPI, leaveAPI, notificationsAPI } from "@/services/api";
+import {
+  attendanceAPI,
+  leaveAPI,
+  notificationsAPI,
+  holidayAPI,
+} from "@/services/api";
 import { format } from "date-fns";
 import type { AttendanceRecord, LeaveRequest, ApiError } from "@/types";
 import { haversine } from "@/config";
@@ -289,6 +294,24 @@ export default function Dashboard() {
         lng: position.coords.longitude,
       };
       setCoordinates(coords);
+
+      // Check if today is a holiday
+      const today = new Date().toISOString().split("T")[0];
+      const holidayResponse = await holidayAPI.isHoliday(today);
+
+      if (
+        holidayResponse.success &&
+        holidayResponse.data &&
+        holidayResponse.data.isHoliday
+      ) {
+        // Today is a holiday - show holiday confirmation dialog
+        setError(
+          `You are trying to mark your attendance on a declared holiday (${holidayResponse.data.holiday.name}). This attendance will be flagged and will go for manager approval.`
+        );
+        setPendingAction(action);
+        setShowGeofenceWarning(true); // Reuse the geofence warning dialog for holiday warning
+        return;
+      }
 
       // Calculate distance from office using environment variables
       const officeLat =
@@ -1030,6 +1053,8 @@ export default function Dashboard() {
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Recording...
                 </>
+              ) : error && error.includes("holiday") ? (
+                "Mark Holiday Attendance"
               ) : (
                 "Mark Flagged Attendance"
               )}

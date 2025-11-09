@@ -1,14 +1,18 @@
-const Report = require('../models/Report');
 const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const User = require('../models/User');
 const { generateAttendanceReportData, generateLeaveReportData, 
-        generateSummaryReportData } = require('../utils/excel');
+        generateSummaryReportData, convertToCSV, createMultiSheetExcel, 
+        workbookToBuffer } = require('../utils/excel');
 
-// Generate report - streamlined to work without file storage
-async function generateReport(req, res) {
+/**
+ * Stream report directly to client without storing on filesystem
+ */
+
+// Stream report directly to client
+async function streamReport(req, res) {
   try {
-    const { title, type, format = 'csv', startDate, endDate, filters = {} } = req.body;
+    const { type, format = 'csv', startDate, endDate, filters = {} } = req.body;
     const userId = req.user._id;
     
     // Validate dates
@@ -23,192 +27,81 @@ async function generateReport(req, res) {
       });
     }
     
-    // For streamlined approach, we don't store reports anymore
-    // Return success message indicating the report can be streamed directly
-    res.json({
-      success: true,
-      message: 'Report generation available via streaming. Use the stream endpoint to download.',
-      data: {
-        title,
-        type,
-        format: format === 'xlsx' ? 'xlsx' : 'csv',
-        startDate: start,
-        endDate: end,
-        filters
-      }
-    });
-  } catch (error) {
-    console.error('Generate report error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
-// Preview report - keep this functionality but without file storage
-async function previewReport(req, res) {
-  try {
-    const { type, startDate, endDate, filters = {} } = req.body;
+    // Generate filename for download
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `${type}_report_${timestamp}.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
     
-    // Log incoming data for debugging
-    console.log("=== PREVIEW REPORT REQUEST DATA ===");
-    console.log("Type:", type);
-    console.log("Start Date:", startDate);
-    console.log("End Date:", endDate);
-    console.log("Filters:", filters);
-    
-    // Validate required fields
-    if (!type) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Report type is required' 
-      });
-    }
-    
-    if (!startDate) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Start date is required' 
-      });
-    }
-    
-    if (!endDate) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'End date is required' 
-      });
-    }
-    
-    // Validate dates
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    // Check if dates are valid
-    if (isNaN(start.getTime())) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid start date format' 
-      });
-    }
-    
-    if (isNaN(end.getTime())) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid end date format' 
-      });
-    }
-    
-    if (end < start) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'End date must be after start date' 
-      });
-    }
+    // Set appropriate headers for file download
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Type', format === 'xlsx' ? 
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
+      'text/csv');
     
     let reportData = [];
-    let recordCount = 0;
     
-    // Generate preview data (limited to 10 records)
+    // Generate report based on type
     switch (type) {
       case 'attendance':
-        reportData = await generateAttendanceReport(req, start, end, filters, 10);
-        // Format for preview
+        reportData = await generateAttendanceReport(req, start, end, filters);
+        // Format the data for attendance reports
         reportData = generateAttendanceReportData(reportData, startDate, endDate);
-        recordCount = reportData.length;
         break;
       case 'leave':
-        reportData = await generateLeaveReport(req, start, end, filters, 10);
+        reportData = await generateLeaveReport(req, start, end, filters);
         reportData = generateLeaveReportData(reportData);
-        recordCount = reportData.length;
         break;
       case 'summary':
-        reportData = await generateSummaryReport(req, start, end, filters, 10);
+        reportData = await generateSummaryReport(req, start, end, filters);
         reportData = generateSummaryReportData(reportData);
-        recordCount = reportData.length;
         break;
       case 'combined':
-        // For combined reports, we'll create a preview with data from all three report types
-        const attendanceData = await generateAttendanceReport(req, start, end, filters, 5);
-        const leaveData = await generateLeaveReport(req, start, end, filters, 5);
-        const summaryData = await generateSummaryReport(req, start, end, filters, 5);
+        // For combined reports, we'll create a multi-sheet Excel file
+        if (format !== 'xlsx') {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Combined reports must be in Excel format' 
+          });
+        }
         
-        // Format the data for preview
-        const formattedAttendanceData = generateAttendanceReportData(attendanceData, startDate, endDate);
-        const formattedLeaveData = generateLeaveReportData(leaveData);
-        const formattedSummaryData = generateSummaryReportData(summaryData);
+        const attendanceData = await generateAttendanceReport(req, start, end, filters);
+        const leaveData = await generateLeaveReport(req, start, end, filters);
+        const summaryData = await generateSummaryReport(req, start, end, filters);
         
-        // Combine the data for preview
-        reportData = {
-          attendance: formattedAttendanceData.slice(0, 3), // Limit to 3 records for preview
-          leave: formattedLeaveData.slice(0, 3),
-          summary: formattedSummaryData.slice(0, 3)
+        const excelSheets = {
+          'Attendance': generateAttendanceReportData(attendanceData, startDate, endDate),
+          'Leave': generateLeaveReportData(leaveData),
+          'Summary': generateSummaryReportData(summaryData)
         };
         
-        recordCount = reportData.attendance.length + reportData.leave.length + reportData.summary.length;
-        break;
+        // Create Excel workbook with multiple sheets and stream directly
+        const workbook = await createMultiSheetExcel(excelSheets);
+        const buffer = await workbookToBuffer(workbook);
+        return res.send(buffer);
+        
       default:
         return res.status(400).json({ 
           success: false, 
-          message: 'Invalid report type. Valid types are: attendance, leave, summary, combined' 
+          message: 'Invalid report type' 
         });
     }
     
-    // Ensure we always return an array or object, even if empty
-    if (type !== 'combined' && !Array.isArray(reportData)) {
-      reportData = [];
+    // Stream report data directly to client
+    if (format === 'xlsx') {
+      // Single sheet Excel
+      const sheetData = type === 'attendance' ? generateAttendanceReportData(reportData, startDate, endDate) :
+                       type === 'leave' ? generateLeaveReportData(reportData) :
+                       generateSummaryReportData(reportData);
+      
+      const workbook = await createMultiSheetExcel({ [type]: sheetData });
+      const buffer = await workbookToBuffer(workbook);
+      res.send(buffer);
+    } else {
+      // CSV format
+      const csv = convertToCSV(reportData);
+      res.send(csv);
     }
-    
-    res.json({
-      success: true,
-      message: 'Report preview generated',
-      data: {
-        reportData,
-        recordCount: recordCount
-      }
-    });
   } catch (error) {
-    console.error('Preview report error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
-// Get user's reports - return empty array since we're not storing reports anymore
-async function getMyReports(req, res) {
-  try {
-    // Since we're not storing reports anymore, return empty array
-    res.json({
-      success: true,
-      data: {
-        reports: [],
-        total: 0
-      }
-    });
-  } catch (error) {
-    console.error('Get reports error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
-// Download report - return error since we're not storing reports anymore
-async function downloadReport(req, res) {
-  try {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Report storage has been disabled. Please use the streaming endpoint to generate reports directly.' 
-    });
-  } catch (error) {
-    console.error('Download report error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
-// Delete report - return error since we're not storing reports anymore
-async function deleteReport(req, res) {
-  try {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Report storage has been disabled. No reports to delete.' 
-    });
-  } catch (error) {
-    console.error('Delete report error:', error);
+    console.error('Stream report error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -477,9 +370,5 @@ async function generateSummaryReport(req, start, end, filters, limit = 0) {
 }
 
 module.exports = {
-  generateReport,
-  previewReport,
-  getMyReports,
-  downloadReport,
-  deleteReport
+  streamReport
 };

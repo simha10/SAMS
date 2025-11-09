@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { generateReport, previewReport, getMyReports, downloadReport, deleteReport } = require('../controllers/reportController');
+const { streamReport } = require('../controllers/streamReportController');
 const { protect, restrictTo } = require('../middleware/auth');
 
 // Report routes
 router.post('/', protect, generateReport);
+router.post('/stream', protect, streamReport); // New streaming endpoint
 router.post('/preview', protect, previewReport);
 router.get('/my', protect, getMyReports);
 router.get('/:id/download', protect, downloadReport);

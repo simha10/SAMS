@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   Card,
@@ -13,13 +12,24 @@ import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/authStore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import { authAPI } from "@/services/api";
+import type { ApiResponse } from "@/types";
 
 export default function Profile() {
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const [name, setName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,12 +37,53 @@ export default function Profile() {
     setMessage("");
     setError("");
 
-    // In a real app, you would call an API to update the profile
-    // For now, we'll just simulate the update
-    setTimeout(() => {
+    try {
+      const response = await authAPI.updateProfile({ name, email });
+      if (response.success) {
+        setMessage(response.message || "Profile updated successfully");
+        // Update the user in the store
+        if (response.data?.user) {
+          setUser(response.data.user);
+        }
+      } else {
+        setError(response.message || "Failed to update profile");
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to update profile");
+    } finally {
       setLoading(false);
-      setMessage("Profile updated successfully");
-    }, 1000);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordLoading(true);
+    setPasswordMessage("");
+    setPasswordError("");
+
+    try {
+      const response: ApiResponse = await authAPI.changePassword({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
+
+      if (response.success) {
+        setPasswordMessage(response.message || "Password changed successfully");
+        // Clear password fields
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        setPasswordError(response.message || "Failed to change password");
+      }
+    } catch (err: any) {
+      setPasswordError(
+        err.response?.data?.message || "Failed to change password"
+      );
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   return (
@@ -74,8 +125,8 @@ export default function Profile() {
                 <Input
                   id="email"
                   type="email"
-                  value={user?.email || ""}
-                  disabled
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
@@ -110,23 +161,59 @@ export default function Profile() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            {passwordMessage && (
+              <Alert>
+                <AlertDescription className="text-green-600">
+                  {passwordMessage}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {passwordError && (
+              <Alert variant="destructive">
+                <AlertDescription>{passwordError}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="currentPassword">Current Password</Label>
-              <Input id="currentPassword" type="password" />
+              <Input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
-              <Input id="newPassword" type="password" />
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={6}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input id="confirmPassword" type="password" />
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
             </div>
 
-            <Button type="submit" variant="outline">
+            <Button type="submit" disabled={passwordLoading}>
+              {passwordLoading && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Change Password
             </Button>
           </form>

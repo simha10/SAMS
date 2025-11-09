@@ -18,6 +18,18 @@ interface Employee {
   updatedAt: string;
 }
 
+interface SummaryDataItem {
+  empId: string;
+  name: string;
+  totalDays: number;
+  presentDays: number;
+  absentDays: number;
+  leaveDays: number;
+  halfDays: number;
+  outsideDutyDays: number;
+  attendanceRate?: number;
+}
+
 interface ReportPreviewProps {
   reportType: string;
   startDate: string;
@@ -122,6 +134,24 @@ export default function ReportPreview({
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Absent Days
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Half Days
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Leave Days
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Outside Duty Days
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Half Days
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Leave Days
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Outside Duty Days
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -168,13 +198,22 @@ export default function ReportPreview({
                         );
                       })}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {row["Total Office Working Days"] || 0}
+                        {row["Total Days"] || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {row["Employee Present Days"] || 0}
+                        {row["Present Days"] || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {row["Employee Absent Days"] || 0}
+                        {row["Absent Days"] || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {row["Half Days"] || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {row["Leave Days"] || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {row["Outside Duty Days"] || 0}
                       </td>
                     </tr>
                   ))}
@@ -513,9 +552,6 @@ export default function ReportPreview({
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Absent Days
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
                       </>
                     ) : (
                       Array.isArray(previewData) &&
@@ -578,28 +614,22 @@ export default function ReportPreview({
                               );
                             })}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {row["Total Office Working Days"] || 0}
+                              {row["Total Days"] || 0}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {row["Employee Present Days"] || 0}
+                              {row["Present Days"] || 0}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {row["Employee Absent Days"] || 0}
+                              {row["Absent Days"] || 0}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <span
-                                className={`status-cell px-2 py-1 rounded-full text-xs font-medium ${
-                                  (row["Employee Present Days"] || 0) >
-                                  (row["Employee Absent Days"] || 0)
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {(row["Employee Present Days"] || 0) >
-                                (row["Employee Absent Days"] || 0)
-                                  ? "Present"
-                                  : "Absent"}
-                              </span>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {row["Half Days"] || 0}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {row["Leave Days"] || 0}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {row["Outside Duty Days"] || 0}
                             </td>
                           </>
                         ) : (

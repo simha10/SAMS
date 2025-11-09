@@ -139,14 +139,14 @@ async function getProfile(req, res) {
   }
 }
 
-// Register user (admin only)
+// Register user (managers and directors can register new users)
 async function register(req, res) {
   try {
-    // Check if user is admin
-    if (req.user.role !== 'director') {
+    // Check if user is manager or director
+    if (req.user.role !== 'manager' && req.user.role !== 'director') {
       return res.status(403).json({ 
         success: false, 
-        message: 'Only directors can register new users' 
+        message: 'Only managers and directors can register new users' 
       });
     }
     
@@ -159,6 +159,17 @@ async function register(req, res) {
         message: 'Employee ID, name, email, password, and role are required' 
       });
     }
+    
+    // Managers can only register employees, not other managers or directors
+    if (req.user.role === 'manager' && role !== 'employee') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Managers can only register employees' 
+      });
+    }
+    
+    // If manager is registering an employee, set the managerId to the current manager
+    const effectiveManagerId = req.user.role === 'manager' ? req.user._id : managerId;
     
     // Check if user already exists
     const existingUser = await User.findOne({ 
@@ -179,7 +190,7 @@ async function register(req, res) {
       email,
       password,
       role,
-      managerId: role === 'employee' ? managerId : undefined,
+      managerId: role === 'employee' ? effectiveManagerId : undefined,
       officeLocation: officeLocation || {
         lat: process.env.OFFICE_DEFAULT_LAT || 26.913595,
         lng: process.env.OFFICE_DEFAULT_LNG || 80.953481,
@@ -213,9 +224,130 @@ async function register(req, res) {
   }
 }
 
+// Update user profile
+async function updateProfile(req, res) {
+  try {
+    const { name, email } = req.body;
+    const userId = req.user._id;
+    
+    // Validate input
+    if (!name && !email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Name or email is required' 
+      });
+    }
+    
+    // Build update object
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    
+    // Update user
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        user: {
+          _id: user._id,
+          empId: user.empId,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          managerId: user.managerId,
+          officeLocation: user.officeLocation,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+// Change password
+async function changePassword(req, res) {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const userId = req.user._id;
+    
+    // Validate input
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'All password fields are required' 
+      });
+    }
+    
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'New password and confirm password do not match' 
+      });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'New password must be at least 6 characters long' 
+      });
+    }
+    
+    // Find user
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    // Check current password
+    const isMatch = await user.comparePassword(currentPassword);
+    
+    if (!isMatch) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Current password is incorrect' 
+      });
+    }
+    
+    // Update password
+    user.password = newPassword;
+    await user.save();
+    
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   login,
   logout,
   getProfile,
-  register
+  register,
+  updateProfile,
+  changePassword
 };

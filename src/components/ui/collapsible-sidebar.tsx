@@ -13,6 +13,7 @@ import {
   ChevronRight,
   CheckCircle,
   AlertTriangle,
+  PlusCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -30,32 +31,42 @@ const sidebarItems: SidebarItem[] = [
   {
     title: "Attendance",
     href: "/manager/attendance",
-    icon: <Users className="h-5 w-5" />,
+    icon: <Users className="h-4 w-4" />,
+  },
+  {
+    title: "Add Employee",
+    href: "/manager/add-employee",
+    icon: <PlusCircle className="h-4 w-4" />,
   },
   {
     title: "Leave Approvals",
     href: "/manager/leave-approvals",
-    icon: <CheckCircle className="h-5 w-5" />,
+    icon: <CheckCircle className="h-4 w-4" />,
   },
   {
     title: "Attendance Approvals",
     href: "/manager/attendance-approvals",
-    icon: <AlertTriangle className="h-5 w-5" />,
+    icon: <AlertTriangle className="h-4 w-4" />,
+  },
+  {
+    title: "Holidays",
+    href: "/manager/holidays",
+    icon: <Calendar className="h-4 w-4" />,
   },
   {
     title: "Reports",
     href: "/manager/reports",
-    icon: <FileText className="h-5 w-5" />,
+    icon: <FileText className="h-4 w-4" />,
   },
   {
     title: "Analytics",
     href: "/manager/analytics",
-    icon: <BarChart3 className="h-5 w-5" />,
+    icon: <BarChart3 className="h-3 w-3" />,
     subItems: [
       {
         title: "Team Trends",
         href: "/manager/analytics/team",
-        icon: <TrendingUp className="h-4 w-4" />,
+        icon: <TrendingUp className="h-3 w-3" />,
       },
       {
         title: "Employee Trends",
@@ -67,7 +78,7 @@ const sidebarItems: SidebarItem[] = [
   {
     title: "Profile",
     href: "/manager/profile",
-    icon: <User className="h-5 w-5" />,
+    icon: <User className="h-4 w-4" />,
   },
 ];
 
@@ -211,7 +222,6 @@ function SidebarContent({
   logout,
   isActive,
   isSubItemActive,
-  user,
   onClose,
   collapsed = false,
 }: {
@@ -224,23 +234,6 @@ function SidebarContent({
 }) {
   return (
     <div className="flex h-full flex-col">
-      {!collapsed && (
-        <div className="p-4 border-b border-sidebar-border">
-          <div>
-            <h2 className="text-xl font-bold text-sidebar-primary">
-              LRMC Staff
-            </h2>
-            <p className="text-sm text-sidebar-foreground truncate">
-              {user?.name}
-            </p>
-            <p className="text-xs text-sidebar-muted">
-              {user?.role === "director" ? "Director" : "Manager"} •{" "}
-              {user?.empId}
-            </p>
-          </div>
-        </div>
-      )}
-
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-3">
           {sidebarItems.map((item) => (
