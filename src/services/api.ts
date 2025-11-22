@@ -1,134 +1,159 @@
 import axios from 'axios';
 import type { User, AttendanceRecord, LeaveRequest, ApiResponse, RegisterData, LeaveRequestData, ApiError } from '@/types';
 import { toast } from '@/components/ui/sonner';
+import { useAuthStore } from '@/stores/authStore';
+import { getDeviceId } from '@/lib/deviceId';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Create axios instance with default config
 export const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
-  withCredentials: true, // Important for HTTP-only cookies
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add request interceptor to add a small delay between requests to prevent rate limiting
+// Add request interceptor for Bearer token and device ID
 let lastRequestTime = 0;
-const minRequestInterval = 500; // Increased from 200 to 500ms
+const minRequestInterval = 500;
 
 api.interceptors.request.use(
   async (config) => {
-    console.log("=== API REQUEST ===");
-    console.log("Method:", config.method?.toUpperCase());
-    console.log("URL:", config.url);
-    console.log("Data:", config.data);
-    console.log("Timestamp:", new Date().toISOString());
+    console.log('[API] Request:', config.method?.toUpperCase(), config.url);
     
-    // Ensure credentials are included
-    config.withCredentials = true;
+    // Get device ID and add to headers
+    const deviceId = getDeviceId();
+    config.headers['X-Device-Id'] = deviceId;
+    
+    // Get access token from auth store and add to headers
+    const { accessToken } = useAuthStore.getState();
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
     
     // Add delay between requests to prevent rate limiting
     const now = Date.now();
     const timeSinceLastRequest = now - lastRequestTime;
-    console.log(`Time since last request: ${timeSinceLastRequest}ms`);
     
     if (timeSinceLastRequest < minRequestInterval) {
       const delay = minRequestInterval - timeSinceLastRequest;
-      console.log(`Adding delay of ${delay}ms to prevent rate limiting`);
+      console.log(`[API] Adding delay of ${delay}ms`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
     lastRequestTime = Date.now();
     
-    console.log("=== END API REQUEST ===");
     return config;
   },
   (error) => {
-    console.error("=== API REQUEST ERROR ===");
-    console.error("Error:", error);
-    console.error("=== END API REQUEST ERROR ===");
+    console.error('[API] Request error:', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor
+// Response interceptor for token refresh and error handling
 api.interceptors.response.use(
   (response) => {
-    console.log("=== API RESPONSE ===");
-    console.log("Status:", response.status);
-    console.log("URL:", response.config.url);
-    console.log("Response data:", response.data);
-    console.log("Timestamp:", new Date().toISOString());
-    console.log("=== END API RESPONSE ===");
+    console.log('[API] Response:', response.status, response.config.url);
     return response;
   },
   async (error) => {
-    console.error("=== API RESPONSE ERROR ===");
-    console.error("Status:", error.response?.status);
-    console.error("Data:", error.response?.data);
-    console.error("Message:", error.message);
-    console.error("Config:", error.config);
-    console.error("Request:", error.request);
-    console.error("Timestamp:", new Date().toISOString());
+    const originalRequest = error.config;
+    
+    console.error('[API] Error:', error.response?.status, error.response?.data?.message);
     
     // Handle rate limiting (429)
     if (error.response?.status === 429) {
-      console.log("RATE LIMIT EXCEEDED - Setting error flag");
-      // Set a flag in localStorage to indicate rate limit error
-      localStorage.setItem('rateLimitError', 'true');
-      // Don't retry on rate limit to prevent infinite loop
-      console.log("=== END API RESPONSE ERROR ===");
+      console.log('[API] Rate limit exceeded');
       toast.error("Too many requests", {
         description: "Please wait a moment and try again.",
       });
       return Promise.reject(error);
     }
     
-    // Handle authentication errors (401)
-    if (error.response?.status === 401) {
-      console.log("AUTHENTICATION ERROR - Redirecting to login");
-      console.log("Error message:", error.response?.data?.message);
+    // Handle token expiration (401) with refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      const { refreshToken, refreshAccessToken, logout } = useAuthStore.getState();
       
-      // Check if it's a token/user not found error
-      if (error.response?.data?.message?.includes('user not found')) {
-        console.log("User not found in database - clearing auth state");
-        // Clear auth state
-        localStorage.removeItem('auth-storage');
-        sessionStorage.removeItem('auth-storage');
+      // Check if it's a token expiration that can be refreshed
+      if (error.response?.data?.requireRefresh && refreshToken) {
+        console.log('[API] Access token expired, refreshing...');
+        originalRequest._retry = true;
+        
+        try {
+          // Call refresh endpoint
+          const response = await axios.post(
+            `${API_BASE_URL}/api/auth/refresh`,
+            { refreshToken },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Device-Id': getDeviceId()
+              }
+            }
+          );
+          
+          const { accessToken } = response.data.data;
+          
+          // Update access token in store
+          refreshAccessToken(accessToken);
+          
+          // Retry original request with new token
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          console.error('[API] Token refresh failed, logging out');
+          logout();
+          window.location.href = '/login';
+          toast.error("Session expired", {
+            description: "Please log in again.",
+          });
+          return Promise.reject(refreshError);
+        }
+      } else {
+        // No refresh token or refresh not needed, logout
+        console.log('[API] Authentication failed, logging out');
+        logout();
+        window.location.href = '/login';
+        toast.error("Session expired", {
+          description: "Please log in again.",
+        });
       }
-      
-      // Handle unauthorized - redirect to login
-      console.log("Redirecting to login page");
-      window.location.href = '/login';
-      toast.error("Session expired", {
-        description: "Please log in again to continue.",
-      });
     }
     
+    // Handle forbidden (403)
     if (error.response?.status === 403) {
-      console.log("FORBIDDEN ACCESS - Possible authentication issue");
-      console.log("Error message:", error.response?.data?.message);
+      console.log('[API] Access forbidden');
       toast.error("Access denied", {
         description: "You don't have permission to perform this action.",
       });
-      // Don't redirect automatically for 403, let the component handle it
     }
     
-    console.log("=== END API RESPONSE ERROR ===");
     return Promise.reject(error);
   }
 );
 
 // Auth API
 export const authAPI = {
-  login: async (empId: string, password: string): Promise<ApiResponse<{ user: User }>> => {
-    console.log("Calling login API with:", { empId, password });
+  login: async (empId: string, password: string): Promise<ApiResponse<{ user: User; accessToken: string; refreshToken: string; unusual?: boolean; unusualActions?: string[] }>> => {
+    console.log('[Auth] Login attempt:', empId);
     try {
-      const response = await api.post('/auth/login', { empId, password });
-      console.log("Login API response:", response.data);
+      // Get device ID
+      const deviceId = getDeviceId();
+      
+      // Make login request
+      const response = await api.post('/auth/login', { empId, password }, {
+        headers: {
+          'X-Device-Id': deviceId
+        }
+      });
+      
+      console.log('[Auth] Login successful');
+      
+      // Return response data which includes tokens
       return response.data;
-    } catch (error) {
-      console.error("Login API error:", error);
+    } catch (error: any) {
+      console.error('[Auth] Login error:', error);
       throw error;
     }
   },

@@ -31,60 +31,64 @@ export default function Login() {
     setError("");
     setLoading(true);
 
-    console.log("Login form submitted with:", { empId, password });
+    console.log("[Login] Form submitted:", empId);
 
     try {
-      console.log("Calling authAPI.login...");
+      console.log("[Login] Calling authAPI.login...");
       const response = await authAPI.login(empId, password);
-      console.log("API response received:", response);
+      console.log("[Login] API response received:", response);
 
       if (response.success && response.data) {
-        console.log("Login successful, user data:", response.data.user);
-        console.log("Calling auth store login...");
-        login(response.data.user);
-        console.log("Auth store updated, navigating to dashboard...");
+        const { user, accessToken, refreshToken, unusual, unusualActions } = response.data;
+        
+        console.log("[Login] Login successful, user:", user.empId);
+        
+        // Store tokens and user in auth store
+        login(user, accessToken, refreshToken, unusual, unusualActions);
+        
+        // Show unusual login warning if detected
+        if (unusual) {
+          toast.warning("Unusual Login Detected", {
+            description: `Warning: ${unusualActions?.join(', ') || 'Unusual login activity detected'}`,
+            duration: 5000,
+          });
+        }
+        
         toast.success("Login successful", {
           description: "Welcome back! You have been successfully logged in.",
         });
 
-        // Check user role and navigate accordingly
-        if (response.data.user.role === "employee") {
-          console.log("User is employee, navigating to /employee/dashboard");
+        // Navigate based on user role
+        if (user.role === "employee") {
+          console.log("[Login] Navigating to employee dashboard");
           navigate("/employee/dashboard");
-        } else if (response.data.user.role === "manager") {
-          console.log("User is manager, navigating to /manager");
+        } else if (user.role === "manager") {
+          console.log("[Login] Navigating to manager dashboard");
           navigate("/manager");
-        } else if (response.data.user.role === "director") {
-          console.log("User is director, navigating to /admin");
+        } else if (user.role === "director") {
+          console.log("[Login] Navigating to admin dashboard");
           navigate("/admin");
         } else {
-          console.log(
-            "User role not recognized, navigating to default dashboard"
-          );
+          console.log("[Login] Navigating to default dashboard");
           navigate("/dashboard");
         }
       } else {
-        console.log("Login failed with message:", response.message);
+        console.log("[Login] Login failed:", response.message);
         setError(response.message || "Login failed");
         toast.error("Login failed", {
-          description:
-            response.message || "Please check your credentials and try again.",
+          description: response.message || "Please check your credentials and try again.",
         });
       }
     } catch (err: unknown) {
-      console.error("Login error caught:", err);
+      console.error("[Login] Error:", err);
       const error = err as ApiError;
-      const errorMessage =
-        error.response?.data?.message || "Login failed. Please try again.";
-      console.log("Setting error message:", errorMessage);
+      const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
       setError(errorMessage);
       toast.error("Login failed", {
-        description:
-          error.response?.data?.message ||
-          "Please check your credentials and try again.",
+        description: error.response?.data?.message || "Please check your credentials and try again.",
       });
     } finally {
-      console.log("Login process completed");
+      console.log("[Login] Process completed");
       setLoading(false);
     }
   };

@@ -46,6 +46,28 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  dateOfBirth: {
+    type: Date,
+    default: null
+  },
+  loginCount: {
+    type: Number,
+    default: 0
+  },
+  lastLoginAt: {
+    type: Date,
+    default: null
+  },
+  lastLogoutAt: {
+    type: Date,
+    default: null
+  },
+  flags: {
+    allowMultiLogin: {
+      type: Boolean,
+      default: false
+    }
   }
 }, {
   timestamps: true
@@ -80,8 +102,9 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 // Index for faster queries
-userSchema.index({ empId: 1 });
-userSchema.index({ email: 1 });
+// Note: empId and email already have unique indexes from schema
 userSchema.index({ role: 1 });
+userSchema.index({ dateOfBirth: 1 }); // For birthday queries
+userSchema.index({ isActive: 1 }); // For active user queries
 
 module.exports = mongoose.model('User', userSchema);

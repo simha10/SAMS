@@ -1,29 +1,35 @@
 const User = require('../models/User');
+const Session = require('../models/Session');
+const UnusualActionLog = require('../models/UnusualActionLog');
 const jwt = require('jsonwebtoken');
+const { 
+  generateTokens, 
+  refreshAccessToken, 
+  invalidateSession,
+  verifyToken 
+} = require('../utils/tokenHelper');
 
-// Generate JWT token
-function generateToken(user) {
-  return jwt.sign(
-    { 
-      id: user._id, 
-      empId: user.empId, 
-      role: user.role 
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '24h' }
-  );
-}
-
-// Login user
+// Login user with Bearer token authentication and device tracking
 async function login(req, res) {
   try {
     const { empId, password } = req.body;
+    const deviceId = req.headers['x-device-id'];
+    const userAgent = req.headers['user-agent'];
+    const ipAddress = req.ip || req.connection.remoteAddress;
     
     // Validate input
     if (!empId || !password) {
       return res.status(400).json({ 
         success: false, 
         message: 'Employee ID and password are required' 
+      });
+    }
+
+    // Validate device ID
+    if (!deviceId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Device ID is required. Please refresh your browser.' 
       });
     }
     
@@ -54,22 +60,82 @@ async function login(req, res) {
         message: 'Invalid credentials' 
       });
     }
-    
-    // Generate token
-    const token = generateToken(user);
-    
-    // Set cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    });
-    
-    res.json({
+
+    // Check for unusual login patterns
+    let unusual = false;
+    const unusualActions = [];
+
+    // Check if different user is already logged in on same device
+    const existingDeviceSession = await Session.findOne({ 
+      deviceId, 
+      isActive: true,
+      userId: { $ne: user._id }
+    }).populate('userId', 'empId name');
+
+    if (existingDeviceSession) {
+      unusual = true;
+      await UnusualActionLog.logAction({
+        userId: user._id,
+        actionType: 'MULTI_USER_DEVICE',
+        deviceId,
+        metadata: {
+          previousUser: existingDeviceSession.userId.empId,
+          currentUser: user.empId,
+          message: 'Different user logging in on same device'
+        },
+        severity: 'high'
+      });
+      unusualActions.push('MULTI_USER_DEVICE');
+    }
+
+    // Check if user is re-logging in after recent logout
+    if (user.lastLogoutAt) {
+      const timeSinceLogout = new Date() - new Date(user.lastLogoutAt);
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (timeSinceLogout < fiveMinutes) {
+        unusual = true;
+        await UnusualActionLog.logAction({
+          userId: user._id,
+          actionType: 'RELOGIN_AFTER_LOGOUT',
+          deviceId,
+          metadata: {
+            lastLogoutAt: user.lastLogoutAt,
+            timeSinceLogout: Math.floor(timeSinceLogout / 1000),
+            message: 'User re-logged in shortly after logout'
+          },
+          severity: 'medium'
+        });
+        unusualActions.push('RELOGIN_AFTER_LOGOUT');
+      }
+    }
+
+    // Deactivate all existing sessions for this user on this device (single login per device)
+    await Session.updateMany(
+      { userId: user._id, deviceId, isActive: true },
+      { isActive: false }
+    );
+
+    // Generate new tokens and create session
+    const { accessToken, refreshToken, session, expiresAt } = await generateTokens(
+      user, 
+      deviceId, 
+      { userAgent, ipAddress }
+    );
+
+    // Update user login metadata
+    user.loginCount = (user.loginCount || 0) + 1;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    // Prepare response
+    const response = {
       success: true,
-      message: 'Login successful',
+      message: unusual ? 'Login successful, but unusual activity detected' : 'Login successful',
       data: {
+        accessToken,
+        refreshToken,
+        expiresAt,
         user: {
           _id: user._id,
           empId: user.empId,
@@ -79,21 +145,44 @@ async function login(req, res) {
           managerId: user.managerId,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
+          dateOfBirth: user.dateOfBirth,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt
         }
       }
-    });
+    };
+
+    // Add unusual flag if detected
+    if (unusual) {
+      response.unusual = true;
+      response.unusualActions = unusualActions;
+    }
+    
+    res.json(response);
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
 
-// Logout user
+// Logout user with session invalidation
 async function logout(req, res) {
   try {
-    res.clearCookie('token');
+    const sessionId = req.user?.sessionId;
+    const userId = req.user?._id;
+
+    // Update user logout timestamp
+    if (userId) {
+      await User.findByIdAndUpdate(userId, {
+        lastLogoutAt: new Date()
+      });
+    }
+
+    // Invalidate session if available
+    if (sessionId) {
+      await invalidateSession(sessionId);
+    }
+
     res.json({
       success: true,
       message: 'Logout successful'
@@ -104,10 +193,12 @@ async function logout(req, res) {
   }
 }
 
-// Get user profile
+// Get user profile (optimized with lean)
 async function getProfile(req, res) {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id)
+      .select('-password')
+      .lean();
     
     if (!user) {
       return res.status(404).json({ 
@@ -118,20 +209,7 @@ async function getProfile(req, res) {
     
     res.json({
       success: true,
-      data: {
-        user: {
-          _id: user._id,
-          empId: user.empId,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          managerId: user.managerId,
-          officeLocation: user.officeLocation,
-          isActive: user.isActive,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt
-        }
-      }
+      data: { user }
     });
   } catch (error) {
     console.error('Get profile error:', error);
@@ -343,11 +421,61 @@ async function changePassword(req, res) {
   }
 }
 
+// Refresh access token using refresh token
+async function refresh(req, res) {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Refresh token is required' 
+      });
+    }
+
+    // Refresh the access token
+    const { accessToken, user } = await refreshAccessToken(refreshToken);
+
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      data: {
+        accessToken,
+        user: {
+          _id: user._id,
+          empId: user.empId,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          managerId: user.managerId,
+          officeLocation: user.officeLocation,
+          isActive: user.isActive,
+          dateOfBirth: user.dateOfBirth
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    
+    // Handle specific errors
+    if (error.message.includes('expired') || error.message.includes('invalid') || error.message.includes('inactive')) {
+      return res.status(401).json({ 
+        success: false, 
+        message: error.message,
+        requireLogin: true
+      });
+    }
+    
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   login,
   logout,
   getProfile,
   register,
   updateProfile,
-  changePassword
+  changePassword,
+  refresh
 };

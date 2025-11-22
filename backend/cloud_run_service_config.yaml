@@ -1,0 +1,48 @@
+# Cloud Run service configuration for SAMS Backend
+# This file defines the service configuration for Google Cloud Run
+# It is documented for manual deployment - NOT automatically executed
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: sams-backend
+  labels:
+    cloud.googleapis.com/location: us-central1
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/cpu-throttling: "false"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      containers:
+      - image: gcr.io/PROJECT_ID/sams-backend:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: PORT
+          value: "5000"
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: sams-mongodb-uri
+              key: uri
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: sams-jwt-secret
+              key: secret
+        - name: FRONTEND_URL
+          value: "https://app.yourdomain.com"
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+  traffic:
+  - percent: 100
+    latestRevision: true

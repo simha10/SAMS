@@ -1,54 +1,89 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Session = require('../models/Session');
+const { verifyToken } = require('../utils/tokenHelper');
 
-// Protect routes - require authentication
+// Protect routes - require Bearer token authentication
 async function protect(req, res, next) {
   try {
-    console.log("=== AUTH PROTECT MIDDLEWARE ===");
+    console.log("=== AUTH PROTECT MIDDLEWARE (BEARER TOKEN) ===");
     console.log("URL:", req.url);
     console.log("Method:", req.method);
     console.log("IP:", req.ip);
     
-    // Get token from cookie
-    const token = req.cookies.token;
-    console.log("Token present:", !!token);
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    console.log("Authorization header present:", !!authHeader);
     
-    if (!token) {
-      console.log("No token found, returning 401");
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log("No valid Bearer token found, returning 401");
       console.log("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
-        message: 'Not authorized, no token' 
+        message: 'Not authorized. Please provide a valid Bearer token.' 
       });
     }
+
+    // Extract token
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     
-    // Verify token
-    console.log("Verifying token...");
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("Token verified, user ID:", decoded.id);
-    console.log("Token expiration:", new Date(decoded.exp * 1000));
-    console.log("Token issued at:", new Date(decoded.iat * 1000));
+    // Verify and decode token
+    console.log("Verifying access token...");
+    const decoded = verifyToken(token, 'access');
+    console.log("Token verified, user ID:", decoded.sub);
+    console.log("Session ID:", decoded.sessionId);
+    console.log("Device ID:", decoded.deviceId);
     
-    // Get user from token
-    req.user = await User.findById(decoded.id);
-    console.log("User found:", !!req.user);
+    // Verify session is active
+    const session = await Session.findById(decoded.sessionId);
     
-    if (!req.user) {
-      console.log("CRITICAL ERROR: User not found in database!");
-      console.log("This usually happens when:");
-      console.log("1. Database was re-seeded and user IDs changed");
-      console.log("2. User was deleted from database");
-      console.log("3. Token contains invalid user ID");
-      console.log("SOLUTION: User needs to log out and log in again to get a fresh token");
+    if (!session) {
+      console.log("Session not found in database");
       console.log("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
-        message: 'Not authorized, user not found. Please log out and log in again.' 
+        message: 'Session not found. Please log in again.' 
+      });
+    }
+
+    if (!session.isActive) {
+      console.log("Session is inactive");
+      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Session is inactive. Please log in again.' 
+      });
+    }
+
+    // Verify access token ID matches session
+    if (session.accessTokenId !== decoded.tokenId) {
+      console.log("Access token ID mismatch");
+      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid access token. Please log in again.' 
+      });
+    }
+
+    // Update session last seen
+    session.lastSeenAt = new Date();
+    await session.save();
+    
+    // Get user from token
+    const user = await User.findById(decoded.sub);
+    console.log("User found:", !!user);
+    
+    if (!user) {
+      console.log("User not found in database");
+      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not found. Please log in again.' 
       });
     }
     
     // Check if user is active
-    if (!req.user.isActive) {
+    if (!user.isActive) {
       console.log("User account is deactivated");
       console.log("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
@@ -56,6 +91,11 @@ async function protect(req, res, next) {
         message: 'Account is deactivated' 
       });
     }
+    
+    // Attach user and session info to request
+    req.user = user;
+    req.user.sessionId = decoded.sessionId;
+    req.user.deviceId = decoded.deviceId;
     
     console.log("Authentication successful for user:", req.user.empId, req.user.name);
     console.log("=== END AUTH PROTECT MIDDLEWARE ===");
@@ -69,17 +109,22 @@ async function protect(req, res, next) {
     console.error('Method:', req.method);
     console.error('IP:', req.ip);
     
-    if (error.name === 'TokenExpiredError') {
-      console.log("Token has expired, user needs to log in again");
-    } else if (error.name === 'JsonWebTokenError') {
-      console.log("Token is invalid, user needs to log in again");
+    let message = 'Not authorized. Please log in again.';
+    
+    if (error.message === 'Token has expired') {
+      console.log("Access token has expired, client should use refresh token");
+      message = 'Access token expired. Please refresh your token.';
+    } else if (error.message === 'Invalid token') {
+      console.log("Token is invalid");
+      message = 'Invalid access token. Please log in again.';
     }
     
     console.error('=== END AUTHENTICATION ERROR ===');
     res.status(401).json({ 
       success: false, 
-      message: 'Not authorized, token failed. Please log out and log in again.' 
-      });
+      message,
+      requireRefresh: error.message === 'Token has expired'
+    });
   }
 }
 

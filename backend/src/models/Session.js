@@ -6,27 +6,84 @@ const sessionSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  action: {
+  deviceId: {
     type: String,
-    enum: ['checkin', 'checkout'],
     required: true
   },
-  timestamp: {
+  sessionId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  jti: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  accessTokenId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  refreshTokenId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
     type: Date,
     default: Date.now
   },
-  location: {
-    lat: Number,
-    lng: Number
+  lastSeenAt: {
+    type: Date,
+    default: Date.now
   },
-  ipAddress: String,
-  userAgent: String
+  expiresAt: {
+    type: Date,
+    required: true
+  },
+  userAgent: {
+    type: String
+  },
+  ipAddress: {
+    type: String
+  }
 }, {
   timestamps: true
 });
 
-// Index for efficient queries
-sessionSchema.index({ userId: 1, timestamp: -1 });
-sessionSchema.index({ timestamp: -1 });
+// Compound indexes for optimized queries
+sessionSchema.index({ userId: 1, deviceId: 1 });
+sessionSchema.index({ deviceId: 1, isActive: 1 });
+sessionSchema.index({ userId: 1, isActive: 1 });
+sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // Auto-delete expired sessions
+
+// Method to deactivate session
+sessionSchema.methods.deactivate = async function() {
+  this.isActive = false;
+  return await this.save();
+};
+
+// Static method to deactivate all user sessions on a device
+sessionSchema.statics.deactivateDeviceSessions = async function(deviceId, excludeSessionId = null) {
+  const query = { deviceId, isActive: true };
+  if (excludeSessionId) {
+    query._id = { $ne: excludeSessionId };
+  }
+  return await this.updateMany(query, { isActive: false });
+};
+
+// Static method to deactivate all user sessions
+sessionSchema.statics.deactivateUserSessions = async function(userId, excludeSessionId = null) {
+  const query = { userId, isActive: true };
+  if (excludeSessionId) {
+    query._id = { $ne: excludeSessionId };
+  }
+  return await this.updateMany(query, { isActive: false });
+};
 
 module.exports = mongoose.model('Session', sessionSchema);

@@ -1,31 +1,129 @@
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
-const Holiday = require('../models/Holiday'); // Added Holiday model
-const { haversine, isWithinOfficeHours, formatWorkingHours } = require('../utils/haversine');
+const Holiday = require('../models/Holiday');
+const Branch = require('../models/Branch');
+const UnusualActionLog = require('../models/UnusualActionLog');
+const { 
+  haversine, 
+  isWithinAttendanceWindow, 
+  isWithinCoreOfficeHours,
+  getOvertimeFlags,
+  isLateCheckIn,
+  isEarlyCheckOut,
+  formatWorkingHours 
+} = require('../utils/haversine');
 const mongoose = require('mongoose');
 
-// Check-in function
+// Branch cache with 15-minute TTL
+let branchCache = {
+  data: null,
+  timestamp: null,
+  ttl: 15 * 60 * 1000 // 15 minutes
+};
+
+/**
+ * Get active branches (with caching)
+ * @returns {Promise<Array>} Active branches
+ */
+async function getActiveBranchesWithCache() {
+  const now = Date.now();
+  
+  // Return cached data if still valid
+  if (branchCache.data && branchCache.timestamp && (now - branchCache.timestamp) < branchCache.ttl) {
+    console.log('Returning cached branches');
+    return branchCache.data;
+  }
+  
+  // Fetch fresh data
+  console.log('Fetching fresh branch data from database');
+  const branches = await Branch.getActiveBranches();
+  
+  // Update cache
+  branchCache.data = branches;
+  branchCache.timestamp = now;
+  
+  return branches;
+}
+
+/**
+ * Find nearest branch within radius
+ * @param {number} lat - User latitude
+ * @param {number} lng - User longitude
+ * @param {Array} branches - List of branches
+ * @returns {object|null} { branch, distance, isValid }
+ */
+function findNearestBranch(lat, lng, branches) {
+  let nearestBranch = null;
+  let minDistance = Infinity;
+  
+  for (const branch of branches) {
+    const distance = haversine(lat, lng, branch.location.lat, branch.location.lng);
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearestBranch = {
+        branch,
+        distance,
+        isValid: distance <= branch.location.radius
+      };
+    }
+  }
+  
+  return nearestBranch;
+}
+
+// Check-in function with multi-branch geo-fencing and timing constraints
 async function checkin(req, res) {
   try {
     const { lat, lng } = req.body;
     const userId = req.user._id;
+    const deviceId = req.user.deviceId; // From auth middleware
     
-    // Get user with office location
-    const user = await User.findById(userId);
+    // Validate coordinates
+    if (!lat || !lng) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Latitude and longitude are required' 
+      });
+    }
+    
+    // Get user
+    const user = await User.findById(userId).lean();
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
-    console.log('User office location:', user.officeLocation);
     
     // Check if today is a holiday
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const holiday = await Holiday.findOne({ date: today });
+    const holiday = await Holiday.findOne({ date: today }).lean();
     const isHoliday = !!holiday;
     
-    // Check if user already has a check-in for today
+    // Check if within attendance window (9 AM - 8 PM)
+    const checkInTime = new Date();
+    if (!isWithinAttendanceWindow(checkInTime)) {
+      // Log unusual action
+      await UnusualActionLog.logAction({
+        userId,
+        actionType: 'ATTENDANCE_OUTSIDE_HOURS',
+        deviceId,
+        metadata: {
+          checkInTime: checkInTime.toISOString(),
+          lat,
+          lng,
+          message: 'Attempted check-in outside allowed hours (9 AM - 8 PM)'
+        },
+        severity: 'high'
+      });
+      
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Check-in is only allowed between 9:00 AM and 8:00 PM' 
+      });
+    }
+    
+    // Check for existing attendance record today
     let attendance = await Attendance.findOne({
       userId,
       date: {
@@ -34,126 +132,203 @@ async function checkin(req, res) {
       }
     });
     
-    // If attendance record exists with check-in time, they're already checked in
+    // If attendance record exists with check-in time, log unusual action
     if (attendance && attendance.checkInTime) {
+      await UnusualActionLog.logAction({
+        userId,
+        actionType: 'MULTIPLE_CHECKIN_ATTEMPTS',
+        deviceId,
+        attendanceId: attendance._id,
+        metadata: {
+          firstCheckIn: attendance.checkInTime,
+          attemptedCheckIn: checkInTime.toISOString(),
+          message: 'Multiple check-in attempts on same day'
+        },
+        severity: 'medium'
+      });
+      
       return res.status(400).json({ 
         success: false, 
         message: 'Already checked in today' 
       });
     }
     
-    // Calculate distance from office
-    const distance = haversine(
-      lat, 
-      lng, 
-      user.officeLocation.lat, 
-      user.officeLocation.lng
-    );
+    // Get all active branches (cached)
+    const branches = await getActiveBranchesWithCache();
     
-    console.log('Geofence check:', {
-      userLat: lat,
-      userLng: lng,
-      officeLat: user.officeLocation.lat,
-      officeLng: user.officeLocation.lng,
-      calculatedDistance: distance,
-      allowedRadius: user.officeLocation.radius,
-      isWithinRadius: distance <= user.officeLocation.radius
-    });
+    if (!branches || branches.length === 0) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'No active branches configured. Please contact administrator.' 
+      });
+    }
     
-    // Check if within allowed radius
-    const isWithinRadius = distance <= user.officeLocation.radius;
+    // Find nearest branch and validate geo-fence
+    const nearestBranchResult = findNearestBranch(lat, lng, branches);
+    
+    if (!nearestBranchResult) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Unable to determine branch location' 
+      });
+    }
+    
+    const { branch, distance, isValid: isGeoValid } = nearestBranchResult;
+    
+    // Determine if check-in is late (after 10 AM core hours)
+    const lateCheckIn = isLateCheckIn(checkInTime);
+    const isWithinCore = isWithinCoreOfficeHours(checkInTime);
+    
+    // Initialize status and flags
+    let status = 'present';
+    let flagged = false;
+    let flaggedReasons = [];
+    
+    // Check geo-fencing
+    if (!isGeoValid) {
+      status = 'outside-geo';
+      flagged = true;
+      flaggedReasons.push(`Outside all branch geofences (nearest: ${branch.name}, ${distance.toFixed(2)}m away, allowed: ${branch.location.radius}m)`);
+      
+      // Log unusual action
+      await UnusualActionLog.logAction({
+        userId,
+        actionType: 'ATTENDANCE_OUTSIDE_ALL_BRANCHES',
+        deviceId,
+        metadata: {
+          userLocation: { lat, lng },
+          nearestBranch: {
+            code: branch.code,
+            name: branch.name,
+            distance
+          },
+          message: 'Check-in attempted outside all branch geofences'
+        },
+        severity: 'critical'
+      });
+    }
+    
+    // Check if it's a holiday
+    if (isHoliday) {
+      flagged = true;
+      flaggedReasons.push(`Working on holiday: ${holiday.name || 'Holiday'}`);
+    }
+    
+    // Check if late check-in
+    if (lateCheckIn.isLate && isGeoValid) {
+      flagged = true;
+      flaggedReasons.push(`Late check-in: ${lateCheckIn.minutesLate} minutes after 10:00 AM`);
+      
+      // Log late check-in
+      await UnusualActionLog.logAction({
+        userId,
+        actionType: 'LATE_CHECKIN',
+        deviceId,
+        metadata: {
+          checkInTime: checkInTime.toISOString(),
+          minutesLate: lateCheckIn.minutesLate,
+          branchCode: branch.code
+        },
+        severity: 'low'
+      });
+    }
     
     // Create or update attendance record
     if (!attendance) {
-      // No attendance record exists, create a new one
       attendance = new Attendance({
         userId,
-        date: new Date(new Date().toISOString().split('T')[0]), // Use date-only format to match daily job
+        date: new Date(new Date().toISOString().split('T')[0]),
         location: { checkIn: { lat, lng } },
         distanceFromOffice: { checkIn: distance }
       });
     } else {
-      // Attendance record exists (possibly marked as absent), update it
+      // Update existing absent record
       attendance.location.checkIn = { lat, lng };
       attendance.distanceFromOffice.checkIn = distance;
-      // Reset flagged status when user checks in (unless it's a holiday)
-      if (!isHoliday) {
-        attendance.flagged = false;
-        attendance.flaggedReason = '';
-      }
     }
     
-    // Set check-in time
-    attendance.checkInTime = new Date();
-    
-    // Check if within office hours
-    const isWithinHours = isWithinOfficeHours(new Date(attendance.checkInTime));
-    
-    // Determine status based on location, time, and holiday
-    let status = 'present';
-    let flagged = false;
-    let flaggedReason = '';
-    
-    if (isHoliday) {
-      // If it's a holiday, flag the attendance
-      status = 'present'; // Keep status as present
-      flagged = true;
-      flaggedReason = 'Working on holiday - Awaiting manager approval';
-    } else if (!isWithinRadius) {
-      status = 'outside-duty';  // Changed from 'absent' to 'outside-duty'
-      flagged = true;
-      flaggedReason = `Outside allowed radius (${distance.toFixed(2)}m from office, allowed ${user.officeLocation.radius}m) - Awaiting manager approval`;
-      console.log('User is outside geofence during check-in, marking as outside-duty');
-    } else if (!isWithinHours) {
-      status = 'outside-duty';
-      flagged = true;
-      flaggedReason = 'Check-in outside office hours';
-      console.log('User is outside office hours during check-in, marking as outside-duty');
-    } else {
-      console.log('User is within geofence and office hours during check-in, marking as present');
-    }
-    
+    // Set check-in details
+    attendance.checkInTime = checkInTime;
+    attendance.branchId = branch._id;
+    attendance.isGeoValid = isGeoValid;
+    attendance.distanceFromBranch = distance;
     attendance.status = status;
     attendance.flagged = flagged;
-    attendance.flaggedReason = flaggedReason;
+    attendance.flaggedReason = flaggedReasons.join('; ');
     
     await attendance.save();
     
-    // Add holiday information to response if it's a holiday
-    const responseData = {
+    // Prepare response
+    res.json({
       success: true,
-      message: isHoliday ? 'Check-in successful (holiday attendance will be flagged for manager approval)' : 'Check-in successful',
+      message: flagged 
+        ? 'Check-in successful but flagged for review' 
+        : 'Check-in successful',
       data: {
         checkInTime: attendance.checkInTime,
-        distance,
+        branch: {
+          code: branch.code,
+          name: branch.name
+        },
+        distance: parseFloat(distance.toFixed(2)),
+        isGeoValid,
         status,
         flagged,
-        flaggedReason,
+        flaggedReason: attendance.flaggedReason,
         isHoliday,
+        isLate: lateCheckIn.isLate,
+        minutesLate: lateCheckIn.minutesLate,
         holiday: holiday || null
       }
-    };
-    
-    res.json(responseData);
+    });
   } catch (error) {
     console.error('Check-in error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
 
-// Check-out function
+// Check-out function with overtime tracking and timing validation
 async function checkout(req, res) {
   try {
     const { lat, lng } = req.body;
     const userId = req.user._id;
+    const deviceId = req.user.deviceId;
     
-    // Get user with office location
-    const user = await User.findById(userId);
+    // Validate coordinates
+    if (!lat || !lng) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Latitude and longitude are required' 
+      });
+    }
+    
+    // Get user
+    const user = await User.findById(userId).lean();
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
     
-    console.log('User office location (checkout):', user.officeLocation);
+    // Check if within attendance window (9 AM - 8 PM)
+    const checkOutTime = new Date();
+    if (!isWithinAttendanceWindow(checkOutTime)) {
+      await UnusualActionLog.logAction({
+        userId,
+        actionType: 'ATTENDANCE_OUTSIDE_HOURS',
+        deviceId,
+        metadata: {
+          checkOutTime: checkOutTime.toISOString(),
+          lat,
+          lng,
+          message: 'Attempted check-out outside allowed hours (9 AM - 8 PM)'
+        },
+        severity: 'medium'
+      });
+      
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Check-out is only allowed between 9:00 AM and 8:00 PM' 
+      });
+    }
     
     // Get today's attendance record
     const today = new Date();
@@ -174,6 +349,13 @@ async function checkout(req, res) {
       });
     }
     
+    if (!attendance.checkInTime) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot check out without checking in first' 
+      });
+    }
+    
     if (attendance.checkOutTime) {
       return res.status(400).json({ 
         success: false, 
@@ -181,122 +363,97 @@ async function checkout(req, res) {
       });
     }
     
-    // Calculate distance from office
-    const distance = haversine(
-      lat, 
-      lng, 
-      user.officeLocation.lat, 
-      user.officeLocation.lng
-    );
+    // Get all active branches (cached)
+    const branches = await getActiveBranchesWithCache();
     
-    console.log('Geofence check (checkout):', {
-      userLat: lat,
-      userLng: lng,
-      officeLat: user.officeLocation.lat,
-      officeLng: user.officeLocation.lng,
-      calculatedDistance: distance,
-      allowedRadius: user.officeLocation.radius,
-      isWithinRadius: distance <= user.officeLocation.radius
-    });
+    if (!branches || branches.length === 0) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'No active branches configured' 
+      });
+    }
+    
+    // Find nearest branch and validate geo-fence
+    const nearestBranchResult = findNearestBranch(lat, lng, branches);
+    
+    if (!nearestBranchResult) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Unable to determine branch location' 
+      });
+    }
+    
+    const { branch, distance, isValid: isGeoValid } = nearestBranchResult;
     
     // Update checkout information
     attendance.location.checkOut = { lat, lng };
     attendance.distanceFromOffice.checkOut = distance;
-    attendance.checkOutTime = new Date();
+    attendance.checkOutTime = checkOutTime;
     
     // Calculate working hours in minutes
-    if (attendance.checkInTime) {
-      const checkInTime = new Date(attendance.checkInTime);
-      const checkOutTime = new Date(attendance.checkOutTime);
-      const diffMs = checkOutTime - checkInTime;
-      attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
-      console.log('Working hours calculated:', attendance.workingHours, 'minutes');
-    }
+    const checkInTime = new Date(attendance.checkInTime);
+    const diffMs = checkOutTime - checkInTime;
+    attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
     
-    // Check if within allowed radius
-    const isWithinRadius = distance <= user.officeLocation.radius;
+    // Calculate overtime flags
+    const overtimeData = getOvertimeFlags(checkInTime, checkOutTime);
+    attendance.overtimeMinutes = overtimeData.overtimeMinutes;
     
-    // Check if within office hours
-    const isWithinHours = isWithinOfficeHours(new Date(attendance.checkOutTime));
+    // Check if early checkout (before 6 PM)
+    const earlyCheckOut = isEarlyCheckOut(checkOutTime);
     
-    console.log('Checkout validation:', {
-      isWithinRadius,
-      isWithinHours,
-      currentStatus: attendance.status,
-      isFlagged: attendance.flagged
-    });
+    // Determine final status based on geo-validation and working hours
+    let flaggedReasons = attendance.flaggedReason ? [attendance.flaggedReason] : [];
     
-    // Update status if needed
-    console.log('Before status update:', {
-      currentStatus: attendance.status,
-      isFlagged: attendance.flagged,
-      flaggedReason: attendance.flaggedReason,
-      isWithinRadius,
-      isWithinHours,
-      workingHours: attendance.workingHours
-    });
-    
-    // Handle the case where user was previously flagged as outside-duty due to geofence
-    if (!isWithinRadius) {
-      // User is currently outside the geofence
-      if (!attendance.flagged || attendance.status !== 'outside-duty' || 
-          !attendance.flaggedReason || !attendance.flaggedReason.includes('radius')) {
-        // Only update if not already flagged for geofence issues
-        attendance.status = 'outside-duty';
-        attendance.flagged = true;
-        attendance.flaggedReason = `Outside allowed radius at checkout (${distance.toFixed(2)}m from office, allowed ${user.officeLocation.radius}m) - Awaiting manager approval`;
-        console.log('User is outside geofence, setting status to outside-duty');
-      } else {
-        console.log('User is outside geofence but already flagged for geofence issues');
-      }
-    } else {
-      // User is currently within the geofence
-      // Check if they were previously flagged for geofence issues and update accordingly
-      if (attendance.flagged && attendance.status === 'outside-duty' && 
-          attendance.flaggedReason && attendance.flaggedReason.includes('radius')) {
-        // User was previously outside but is now inside, update status to present
-        attendance.status = 'present';
-        attendance.flagged = false;
-        attendance.flaggedReason = '';
-        console.log('User was previously outside but is now inside, updating status to present');
-      } else {
-        console.log('User is inside geofence, keeping current status');
-      }
-      // If they were flagged for other reasons (like office hours), keep that flag
-    }
-    
-    // Check office hours only if user is within geofence and not already flagged for geofence issues
-    if (isWithinRadius && !isWithinHours && 
-        (!attendance.flagged || !attendance.flaggedReason || !attendance.flaggedReason.includes('radius'))) {
-      attendance.status = 'outside-duty';
+    // Handle geo-validation for checkout
+    if (!isGeoValid && attendance.isGeoValid) {
+      // User checked in valid location but checking out from invalid location
+      flaggedReasons.push(`Check-out outside geofence (${distance.toFixed(2)}m from ${branch.name})`);
       attendance.flagged = true;
-      attendance.flaggedReason = 'Check-out outside office hours';
-      console.log('User is within geofence but outside office hours, setting status to outside-duty');
     }
     
-    // Auto-mark as full-day or half-day based on working hours
-    // If working hours > 5 hours = Full day (present), otherwise = Half day
-    if (attendance.status === 'present' || attendance.status === 'outside-duty') {
-      if (attendance.workingHours > 300) { // 5 hours = 300 minutes
-        // Keep as present (full day) if not already outside-duty
-        if (attendance.status !== 'outside-duty') {
-          attendance.status = 'present';
-        }
-        console.log('Working hours > 5 hours, keeping as present (full day)');
-      } else if (attendance.workingHours > 0) {
-        // Mark as half-day
-        attendance.status = 'half-day';
-        attendance.isHalfDay = true;
-        console.log('Working hours <= 5 hours, marking as half-day');
-      }
+    // Check for early checkout
+    if (earlyCheckOut.isEarly && attendance.isGeoValid) {
+      flaggedReasons.push(`Early check-out: ${earlyCheckOut.minutesEarly} minutes before 6:00 PM`);
+      attendance.flagged = true;
+      
+      // Log early checkout
+      await UnusualActionLog.logAction({
+        userId,
+        actionType: 'EARLY_CHECKOUT',
+        deviceId,
+        attendanceId: attendance._id,
+        metadata: {
+          checkOutTime: checkOutTime.toISOString(),
+          minutesEarly: earlyCheckOut.minutesEarly,
+          branchCode: branch.code
+        },
+        severity: 'low'
+      });
     }
     
-    console.log('After status update:', {
-      updatedStatus: attendance.status,
-      isFlagged: attendance.flagged,
-      flaggedReason: attendance.flaggedReason,
-      workingHours: attendance.workingHours
-    });
+    // Determine status based on working hours and geo-validity
+    if (attendance.status === 'outside-geo') {
+      // Keep as outside-geo if checked in outside geofence
+      attendance.status = 'outside-geo';
+    } else if (attendance.workingHours >= 300) {
+      // 5 hours or more = full day
+      attendance.status = 'present';
+      attendance.isHalfDay = false;
+    } else if (attendance.workingHours > 0) {
+      // Less than 5 hours = half day
+      attendance.status = 'half-day';
+      attendance.isHalfDay = true;
+      attendance.halfDayType = checkInTime.getHours() < 13 ? 'morning' : 'afternoon';
+    } else {
+      // No working hours (shouldn't happen normally)
+      attendance.status = 'absent';
+    }
+    
+    // Update flagged reason if any
+    if (flaggedReasons.length > 0) {
+      attendance.flaggedReason = flaggedReasons.join('; ');
+    }
     
     await attendance.save();
     
@@ -305,9 +462,24 @@ async function checkout(req, res) {
       message: 'Check-out successful',
       data: {
         checkOutTime: attendance.checkOutTime,
-        distance,
+        branch: {
+          code: branch.code,
+          name: branch.name
+        },
+        distance: parseFloat(distance.toFixed(2)),
+        isGeoValid,
         workingHours: attendance.workingHours,
-        formattedWorkingHours: formatWorkingHours(attendance.workingHours)
+        formattedWorkingHours: formatWorkingHours(attendance.workingHours),
+        status: attendance.status,
+        isHalfDay: attendance.isHalfDay,
+        overtime: {
+          earlyArrival: overtimeData.earlyArrival,
+          lateStay: overtimeData.lateStay,
+          totalMinutes: overtimeData.overtimeMinutes,
+          details: overtimeData.details
+        },
+        flagged: attendance.flagged,
+        flaggedReason: attendance.flaggedReason
       }
     });
   } catch (error) {
@@ -316,10 +488,10 @@ async function checkout(req, res) {
   }
 }
 
-// Get user's attendance records
+// Get user's attendance records (optimized with lean and projection)
 async function getMyAttendance(req, res) {
   try {
-    const { from, to } = req.query;
+    const { from, to, limit = 50, page = 1 } = req.query;
     const userId = req.user._id;
     
     // Build date filter
@@ -327,28 +499,43 @@ async function getMyAttendance(req, res) {
     if (from || to) {
       filter.date = {};
       if (from) {
-        // Convert to date-only format to ensure consistency
         const fromDate = new Date(from);
         filter.date.$gte = new Date(fromDate.toISOString().split('T')[0]);
       }
       if (to) {
-        // Convert to date-only format to ensure consistency
         const toDate = new Date(to);
-        // Add one day to include the entire end date
         toDate.setDate(toDate.getDate() + 1);
         filter.date.$lte = new Date(toDate.toISOString().split('T')[0]);
       }
     }
     
+    // Calculate pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Fetch attendance records with lean() for performance
     const attendance = await Attendance.find(filter)
+      .select('date checkInTime checkOutTime status workingHours branchId isGeoValid distanceFromBranch overtimeMinutes flagged flaggedReason isHalfDay')
       .sort({ date: -1 })
-      .populate('userId', 'empId name');
+      .skip(skip)
+      .limit(limitNum)
+      .populate('branchId', 'code name')
+      .lean();
+    
+    // Get total count for pagination
+    const total = await Attendance.countDocuments(filter);
     
     res.json({
       success: true,
       data: {
         attendance,
-        total: attendance.length
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum)
+        }
       }
     });
   } catch (error) {
@@ -357,12 +544,11 @@ async function getMyAttendance(req, res) {
   }
 }
 
-// Get today's attendance status
+// Get today's attendance status (optimized with lean)
 async function getTodayStatus(req, res) {
   try {
     const userId = req.user._id;
     
-    // Use date-only format to ensure consistency
     const today = new Date(new Date().toISOString().split('T')[0]);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -373,7 +559,10 @@ async function getTodayStatus(req, res) {
         $gte: today,
         $lt: tomorrow
       }
-    });
+    })
+    .select('date checkInTime checkOutTime status workingHours branchId isGeoValid distanceFromBranch overtimeMinutes flagged flaggedReason isHalfDay')
+    .populate('branchId', 'code name')
+    .lean();
     
     res.json({
       success: true,

@@ -10,6 +10,13 @@ This is the backend API for the Geo-Fence Attendance Management System.
 - Report generation (CSV and Excel)
 - Role-based access control
 - Manager dashboard functionality
+- Production-ready authentication system with rotating tokens
+- Device-bound sessions with JTI tracking
+- Unusual login detection and logging
+- Multi-branch geofence support
+- Automated attendance window enforcement
+- Structured logging with Winston
+- Health check endpoints for Cloud Run
 
 ## Tech Stack
 
@@ -18,6 +25,8 @@ This is the backend API for the Geo-Fence Attendance Management System.
 - JWT for authentication
 - bcrypt for password hashing
 - ExcelJS for report generation
+- Winston for structured logging
+- Docker for containerization
 
 ## Setup
 
@@ -48,6 +57,7 @@ This is the backend API for the Geo-Fence Attendance Management System.
 - `POST /api/auth/logout` - User logout
 - `GET /api/auth/profile` - Get user profile
 - `POST /api/auth/register` - Create user (admin only)
+- `POST /api/auth/refresh` - Refresh access token
 
 ### Attendance
 
@@ -76,6 +86,71 @@ This is the backend API for the Geo-Fence Attendance Management System.
 - `GET /api/reports/my` - Get personal reports
 - `GET /api/reports/:id/download` - Download report
 
+### Health Checks
+
+- `GET /health` - General health check
+- `GET /healthz` - Cloud Run health check
+
 ## Environment Variables
 
 See `.env.example` for all required environment variables.
+
+## Production Deployment
+
+### Docker
+
+The application includes a production-ready Dockerfile:
+
+```bash
+# Build the Docker image
+docker build -t sams-backend .
+
+# Run the container
+docker run -p 5000:5000 sams-backend
+```
+
+### Google Cloud Run
+
+1. Build and push to Container Registry:
+   ```bash
+   gcloud builds submit --tag gcr.io/PROJECT_ID/sams-backend
+   ```
+
+2. Deploy to Cloud Run:
+   ```bash
+   gcloud run deploy sams-backend \
+       --image gcr.io/PROJECT_ID/sams-backend \
+       --platform managed \
+       --region us-central1 \
+       --allow-unauthenticated
+   ```
+
+### Database Indexes
+
+Initialize database indexes:
+```bash
+node scripts/init-indexes.js
+```
+
+## Security Features
+
+- Device-bound sessions with JTI tracking
+- Rotating access and refresh tokens
+- Session expiration and cleanup
+- Unusual login detection and logging
+- Rate limiting
+- Input sanitization
+- XSS protection
+- Structured logging for audit trails
+
+## Testing
+
+Run tests with Jest:
+```bash
+npm test
+```
+
+Run tests in watch mode:
+```bash
+npm run test:watch
+```

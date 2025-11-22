@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
@@ -15,6 +14,15 @@ const managerRoutes = require('./routes/manager');
 const reportRoutes = require('./routes/reports');
 const holidayRoutes = require('./routes/holidays');
 const publicHolidayRoutes = require('./routes/publicHolidays'); // Public holiday routes
+const birthdayRoutes = require('./routes/birthdays'); // Birthday routes
+const branchRoutes = require('./routes/branches'); // Branch routes
+
+// Import new routes
+const jobsRoutes = require('./routes/jobs');
+const healthRoutes = require('./routes/health');
+
+// Import error handler
+const { globalErrorHandler } = require('./utils/errorHandler');
 
 // Initialize app
 const app = express();
@@ -40,23 +48,28 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // List of allowed origins
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://192.168.18.210:5173', // Network IP
-      process.env.FRONTEND_URL
-    ].filter(Boolean); // Filter out undefined values
+    // Get allowed origins from environment variable
+    const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL;
+    let allowedOrigins = [];
     
-    // Allow all origins in development
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
+    if (allowedOriginsEnv) {
+      // Split by comma and trim whitespace
+      allowedOrigins = allowedOriginsEnv.split(',').map(origin => origin.trim());
+    } else {
+      // Fallback to default localhost for development
+      allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
     }
     
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
+    // In production, strictly enforce allowed origins
+    if (process.env.NODE_ENV === 'production') {
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // In development, be more permissive but still check against list when present
+      callback(null, true);
     }
   },
   credentials: true
@@ -90,9 +103,6 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Cookie parser
-app.use(cookieParser());
-
 // Data sanitization
 app.use(mongoSanitize());
 app.use(xss());
@@ -109,6 +119,10 @@ console.log("Manager routes:", '/api/manager');
 console.log("Report routes:", '/api/reports');
 console.log("Manager holiday routes:", '/api/manager/holidays');
 console.log("Public holiday routes:", '/api/holidays');
+console.log("Birthday routes:", '/api/birthdays');
+console.log("Branch routes:", '/api/branches');
+console.log("Jobs routes:", '/jobs');
+console.log("Health routes:", '/');
 console.log("=== END REGISTERING ROUTES ===");
 
 // Routes
@@ -118,73 +132,14 @@ app.use('/api/leaves', leaveRoutes);
 app.use('/api/manager', managerRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/holidays', publicHolidayRoutes); // Public holiday routes
+app.use('/api/birthdays', birthdayRoutes); // Birthday routes
+app.use('/api/branches', branchRoutes); // Branch routes
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  console.log("=== HEALTH CHECK ===");
-  res.status(200).json({
-    success: true,
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
-  });
-});
+// Add new routes
+app.use('/jobs', jobsRoutes);
+app.use('/', healthRoutes);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('=== ERROR ===');
-  console.error('Error:', err);
-  console.error('URL:', req.url);
-  console.error('Method:', req.method);
-  console.error('IP:', req.ip);
-  console.error('Timestamp:', new Date().toISOString());
-  
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    const errors = Object.values(err.errors).map(e => e.message);
-    return res.status(400).json({
-      success: false,
-      message: 'Validation Error',
-      errors
-    });
-  }
-  
-  // Mongoose duplicate key error
-  if (err.code === 11000) {
-    return res.status(400).json({
-      success: false,
-      message: 'Duplicate field value entered'
-    });
-  }
-  
-  // Mongoose bad ObjectId
-  if (err.name === 'CastError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Resource not found'
-    });
-  }
-  
-  // Default error
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error'
-  });
-  console.error('=== END ERROR ===');
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-  console.log("=== 404 NOT FOUND ===");
-  console.log("URL:", req.url);
-  console.log("Method:", req.method);
-  console.log("IP:", req.ip);
-  console.log("Timestamp:", new Date().toISOString());
-  console.log("=== END 404 NOT FOUND ===");
-  
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
-});
+// Global error handler
+app.use(globalErrorHandler);
 
 module.exports = app;

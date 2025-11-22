@@ -65,12 +65,130 @@ function haversine(lat1, lon1, lat2, lon2) {
 
 /**
  * Check if time is within office hours (9 AM to 8 PM)
+ * @deprecated Use isWithinAttendanceWindow instead
  * @param {Date} date - Date to check (defaults to now)
  * @returns {boolean}
  */
 function isWithinOfficeHours(date = new Date()) {
   const hour = date.getHours();
   return hour >= 9 && hour < 20; // 9 AM to 8 PM
+}
+
+/**
+ * Check if time is within attendance window (9 AM to 8 PM)
+ * Check-in/out allowed: 9:00 AM → 8:00 PM
+ * @param {Date} date - Date to check (defaults to now)
+ * @returns {boolean}
+ */
+function isWithinAttendanceWindow(date = new Date()) {
+  const hour = date.getHours();
+  return hour >= 9 && hour < 20; // 9 AM to 8 PM (20:00)
+}
+
+/**
+ * Check if time is within core office hours (10 AM to 6 PM)
+ * Official working hours: 10:00 AM → 6:00 PM
+ * @param {Date} date - Date to check (defaults to now)
+ * @returns {boolean}
+ */
+function isWithinCoreOfficeHours(date = new Date()) {
+  const hour = date.getHours();
+  return hour >= 10 && hour < 18; // 10 AM to 6 PM (18:00)
+}
+
+/**
+ * Get overtime flags based on check-in and check-out times
+ * @param {Date} checkInTime - Check-in timestamp
+ * @param {Date} checkOutTime - Check-out timestamp (optional)
+ * @returns {object} { earlyArrival, lateStay, overtimeMinutes, details }
+ */
+function getOvertimeFlags(checkInTime, checkOutTime = null) {
+  const result = {
+    earlyArrival: false,
+    lateStay: false,
+    overtimeMinutes: 0,
+    details: {
+      earlyMinutes: 0,
+      lateMinutes: 0
+    }
+  };
+
+  if (!checkInTime) {
+    return result;
+  }
+
+  const checkInHour = checkInTime.getHours();
+  const checkInMinute = checkInTime.getMinutes();
+  const coreStartHour = 10; // 10 AM
+  const coreEndHour = 18; // 6 PM
+
+  // Check for early arrival (before 10 AM)
+  if (checkInHour < coreStartHour) {
+    result.earlyArrival = true;
+    const coreStart = new Date(checkInTime);
+    coreStart.setHours(coreStartHour, 0, 0, 0);
+    result.details.earlyMinutes = Math.floor((coreStart - checkInTime) / (1000 * 60));
+  } else if (checkInHour === coreStartHour && checkInMinute === 0) {
+    result.earlyArrival = false; // Exactly at 10:00 AM
+  }
+
+  // Check for late stay (after 6 PM) only if checkout time is provided
+  if (checkOutTime) {
+    const checkOutHour = checkOutTime.getHours();
+    const checkOutMinute = checkOutTime.getMinutes();
+
+    if (checkOutHour > coreEndHour || (checkOutHour === coreEndHour && checkOutMinute > 0)) {
+      result.lateStay = true;
+      const coreEnd = new Date(checkOutTime);
+      coreEnd.setHours(coreEndHour, 0, 0, 0);
+      result.details.lateMinutes = Math.floor((checkOutTime - coreEnd) / (1000 * 60));
+    }
+  }
+
+  // Calculate total overtime minutes
+  result.overtimeMinutes = result.details.earlyMinutes + result.details.lateMinutes;
+
+  return result;
+}
+
+/**
+ * Check if check-in time is late (after 10 AM)
+ * @param {Date} checkInTime - Check-in timestamp
+ * @returns {object} { isLate, minutesLate }
+ */
+function isLateCheckIn(checkInTime) {
+  const hour = checkInTime.getHours();
+  const minute = checkInTime.getMinutes();
+  const coreStartHour = 10; // 10 AM
+
+  if (hour > coreStartHour || (hour === coreStartHour && minute > 0)) {
+    const coreStart = new Date(checkInTime);
+    coreStart.setHours(coreStartHour, 0, 0, 0);
+    const minutesLate = Math.floor((checkInTime - coreStart) / (1000 * 60));
+    return { isLate: true, minutesLate };
+  }
+
+  return { isLate: false, minutesLate: 0 };
+}
+
+/**
+ * Check if check-out time is early (before 6 PM)
+ * @param {Date} checkOutTime - Check-out timestamp
+ * @returns {object} { isEarly, minutesEarly }
+ */
+function isEarlyCheckOut(checkOutTime) {
+  const hour = checkOutTime.getHours();
+  const minute = checkOutTime.getMinutes();
+  const coreEndHour = 18; // 6 PM
+
+  if (hour < coreEndHour || (hour === coreEndHour && minute === 0)) {
+    const coreEnd = new Date(checkOutTime);
+    coreEnd.setHours(coreEndHour, 0, 0, 0);
+    const minutesEarly = Math.floor((coreEnd - checkOutTime) / (1000 * 60));
+    return { isEarly: minutesEarly > 0, minutesEarly };
+  }
+
+  return { isEarly: false, minutesEarly: 0 };
 }
 
 /**
@@ -97,7 +215,12 @@ module.exports = {
   calculateDistance,
   isWithinGeofence,
   haversine,
-  isWithinOfficeHours,
+  isWithinOfficeHours, // Deprecated - kept for backward compatibility
+  isWithinAttendanceWindow,
+  isWithinCoreOfficeHours,
+  getOvertimeFlags,
+  isLateCheckIn,
+  isEarlyCheckOut,
   formatWorkingHours,
   getCurrentDateString
 };

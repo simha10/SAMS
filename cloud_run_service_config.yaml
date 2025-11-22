@@ -1,0 +1,34 @@
+# Cloud Run service configuration for SAMS Frontend
+# This file defines the service configuration for Google Cloud Run
+# It is documented for manual deployment - NOT automatically executed
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: sams-frontend
+  labels:
+    cloud.googleapis.com/location: us-central1
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/cpu-throttling: "false"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      containers:
+      - image: gcr.io/PROJECT_ID/sams-frontend:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: NODE_ENV
+          value: production
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "256Mi"
+  traffic:
+  - percent: 100
+    latestRevision: true

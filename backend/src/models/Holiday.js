@@ -22,7 +22,6 @@ const holidaySchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
-holidaySchema.index({ date: 1 });
+// Note: date already has unique index from schema
 
 module.exports = mongoose.model('Holiday', holidaySchema);

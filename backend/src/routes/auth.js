@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { login, logout, getProfile, register, updateProfile, changePassword } = require('../controllers/authController');
+const { login, logout, getProfile, register, updateProfile, changePassword, refresh } = require('../controllers/authController');
 const { protect, restrictTo } = require('../middleware/auth');
 
 console.log("=== REGISTERING AUTH ROUTES ===");
@@ -20,6 +20,7 @@ router.use((req, res, next) => {
 // Public routes
 router.post('/login', login);
 router.post('/logout', logout);
+router.post('/refresh', refresh); // Token refresh endpoint
 
 // Protected routes
 router.get('/profile', protect, getProfile);
