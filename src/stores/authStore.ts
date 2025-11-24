@@ -25,9 +25,9 @@ interface AuthState {
   unusualActions: string[];
   
   // Actions
-  setTokens: (accessToken: string, refreshToken: string) => void;
+  setTokens: (accessToken: string, refreshToken?: string) => void;
   setUser: (user: User | null) => void;
-  login: (user: User, accessToken: string, refreshToken: string, unusual?: boolean, unusualActions?: string[]) => void;
+  login: (user: User, accessToken: string, refreshToken?: string, unusual?: boolean, unusualActions?: string[]) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
   refreshAccessToken: (newAccessToken: string) => void;
@@ -48,7 +48,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   unusualLoginDetected: false,
   unusualActions: [],
   
-  setTokens: (accessToken: string, refreshToken: string) => {
+  setTokens: (accessToken: string, refreshToken?: string) => {
     console.log('[AuthStore] Setting tokens');
     set({ accessToken, refreshToken, isAuthenticated: true });
   },
@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user });
   },
   
-  login: (user: User, accessToken: string, refreshToken: string, unusual = false, unusualActions = []) => {
+  login: (user: User, accessToken: string, refreshToken?: string, unusual = false, unusualActions = []) => {
     console.log('[AuthStore] Login:', user.empId, unusual ? '(UNUSUAL)' : '');
     set({ 
       user, 

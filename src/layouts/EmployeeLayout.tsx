@@ -74,13 +74,12 @@ export default function EmployeeLayout() {
   const handleLogout = async () => {
     try {
       await authAPI.logout();
-      logout();
-      toast.success("Logged out successfully", {
-        description: "You have been successfully logged out.",
-      });
     } catch (error) {
-      console.error("Logout failed:", error);
-      logout(); // Logout locally even if server request fails
+      console.error("Logout API call failed:", error);
+      // Continue with local logout even if server request fails
+    } finally {
+      // Always logout locally to ensure clean state
+      logout();
       toast.success("Logged out successfully", {
         description: "You have been successfully logged out.",
       });

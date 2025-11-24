@@ -148,9 +148,11 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     try {
       await authAPI.logout();
-      logout();
-      navigate("/login");
     } catch (err) {
+      console.error("Logout API call failed:", err);
+      // Continue with local logout even if server request fails
+    } finally {
+      // Always logout locally to ensure clean state
       logout();
       navigate("/login");
     }

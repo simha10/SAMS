@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useEffect } from "react";
+import { toast } from "@/components/ui/sonner";
 import Login from "./pages/Login";
+import { authAPI } from "./services/api";
 
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -178,6 +180,45 @@ const App = () => {
 
     console.log("=== END APP INITIALIZATION ===");
   }, []);
+
+  // Check for existing session on app load
+  useEffect(() => {
+    console.log("=== SESSION CHECK ===");
+    
+    // If already authenticated, no need to check
+    if (isAuthenticated) {
+      console.log("User already authenticated");
+      console.log("=== END SESSION CHECK ===");
+      return;
+    }
+    
+    // Check for existing session (remember me cookie)
+    const checkSession = async () => {
+      try {
+        console.log("Checking for existing session...");
+        const response = await authAPI.refreshSession();
+        
+        if (response.success && response.data) {
+          const { user, accessToken } = response.data;
+          console.log("Found existing session for user:", user.empId);
+          
+          // Store tokens and user in auth store
+          useAuthStore.getState().login(user, accessToken, undefined, false, []);
+          
+          toast.success("Welcome back!", {
+            description: `You have been automatically logged in as ${user.name}.`,
+          });
+        }
+      } catch (error) {
+        console.log("No existing session found or session expired");
+        // Not an error condition - just means no session exists
+      } finally {
+        console.log("=== END SESSION CHECK ===");
+      }
+    };
+    
+    checkSession();
+  }, [isAuthenticated]);
 
   return (
     <QueryClientProvider client={queryClient}>

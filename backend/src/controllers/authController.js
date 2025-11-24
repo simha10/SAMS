@@ -12,7 +12,7 @@ const {
 // Login user with Bearer token authentication and device tracking
 async function login(req, res) {
   try {
-    const { empId, password } = req.body;
+    const { empId, password, rememberMe = false } = req.body;
     const deviceId = req.headers['x-device-id'];
     const userAgent = req.headers['user-agent'];
     const ipAddress = req.ip || req.connection.remoteAddress;
@@ -129,33 +129,50 @@ async function login(req, res) {
     await user.save();
 
     // Prepare response
+    const responseData = {
+      accessToken,
+      expiresAt,
+      user: {
+        _id: user._id,
+        empId: user.empId,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        managerId: user.managerId,
+        officeLocation: user.officeLocation,
+        isActive: user.isActive,
+        dateOfBirth: user.dateOfBirth,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
+    };
+    
+    // Only send refreshToken in response data if not using rememberMe
+    if (!rememberMe) {
+      responseData.refreshToken = refreshToken;
+    }
+    
     const response = {
       success: true,
       message: unusual ? 'Login successful, but unusual activity detected' : 'Login successful',
-      data: {
-        accessToken,
-        refreshToken,
-        expiresAt,
-        user: {
-          _id: user._id,
-          empId: user.empId,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          managerId: user.managerId,
-          officeLocation: user.officeLocation,
-          isActive: user.isActive,
-          dateOfBirth: user.dateOfBirth,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt
-        }
-      }
+      data: responseData
     };
 
     // Add unusual flag if detected
     if (unusual) {
       response.unusual = true;
       response.unusualActions = unusualActions;
+    }
+    
+    // Set secure cookie with refresh token if rememberMe is true
+    if (rememberMe) {
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/'
+      });
     }
     
     res.json(response);
@@ -183,7 +200,12 @@ async function logout(req, res) {
       await invalidateSession(sessionId);
     }
 
-    res.json({
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/'
+    }).json({
       success: true,
       message: 'Logout successful'
     });
@@ -424,7 +446,13 @@ async function changePassword(req, res) {
 // Refresh access token using refresh token
 async function refresh(req, res) {
   try {
-    const { refreshToken } = req.body;
+    // Check for refresh token in body or cookie
+    let refreshToken = req.body.refreshToken;
+    
+    // If not in body, check cookie (for remember me feature)
+    if (!refreshToken && req.cookies && req.cookies.refreshToken) {
+      refreshToken = req.cookies.refreshToken;
+    }
     
     if (!refreshToken) {
       return res.status(400).json({ 

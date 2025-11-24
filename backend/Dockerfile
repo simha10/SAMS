@@ -1,46 +1,33 @@
-# Multi-stage Dockerfile for SAMS Backend
-
-# Build stage
-FROM node:18-alpine AS builder
-
-# Set working directory
+# --- Build Stage ---
+FROM node:18-bullseye AS builder
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies with bcrypt compiled for Linux (Debian)
+RUN npm install --production
 
-# Production stage
-FROM node:18-alpine
-
-# Create app directory
-WORKDIR /app
-
-# Copy dependencies from builder stage
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy application code
+# Copy source
 COPY . .
 
-# Create logs directory
-RUN mkdir -p logs
+# --- Production Stage ---
+FROM node:18-bullseye
+WORKDIR /app
+
+# Copy node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy app code
+COPY --from=builder /app/ ./
+
+# Remove .env if copied
+RUN rm -f .env
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
+RUN useradd -m expressuser
+USER expressuser
 
-# Change ownership of app directory
-RUN chown -R nextjs:nodejs /app
-USER nextjs
+EXPOSE 8080
 
-# Expose port
-EXPOSE 5000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5000/healthz || exit 1
-
-# Start the application
 CMD ["node", "src/server.js"]

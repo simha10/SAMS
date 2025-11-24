@@ -1,14 +1,14 @@
 const jwt = require('jsonwebtoken');
 const Session = require('../models/Session');
 const User = require('../models/User');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 /**
  * Generate a unique token ID
  * @returns {string} UUID v4 string
  */
 function generateTokenId() {
-  return uuidv4();
+  return randomUUID();
 }
 
 /**

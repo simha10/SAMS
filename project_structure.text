@@ -1,0 +1,237 @@
+- .env.example
+- .gitignore
+- backend
+  - .env
+  - .env.example
+  - Backend_Docs
+    - COST_CONTROL_MEASURES.md
+    - DNS_MAPPING_HOSTINGER.md
+    - PRODUCTION_SETUP_GCP.md
+    - README.md
+    - RUNBOOK.md
+    - SCHEDULER_PAYLOAD_TEMPLATES.md
+    - SECRET_MANAGER_LAYOUT.md
+    - SUMMARY_OF_CHANGES.md
+  - cloudbuild.yaml
+  - cloud_run_service_config.yaml
+  - Dockerfile
+  - jest.config.js
+  - logs
+    - combined.log
+    - error.log
+  - package-lock.json
+  - package.json
+  - scripts
+    - add-branches-atlas.js
+    - add-real-branches.js
+    - check-dummy-data.js
+    - clean-database.js
+    - debug-attendance.js
+    - debug-login.js
+    - debug-user-attendance.js
+    - fix-attendance-data.js
+    - fix-flagged-attendance.js
+    - fixUserPasswords.js
+    - init-database.js
+    - init-indexes.js
+    - list-branches.js
+    - list-users.js
+    - README.md
+    - remove-old-branches.js
+    - seed-sample-data.js
+    - seed-users.js
+    - test-api-endpoints.js
+    - test-env.js
+    - test-report-api.js
+    - test-reports.js
+    - trace-attendance.js
+    - verify-seed-data.js
+  - src
+    - App.js
+    - config
+      - database.js
+      - logger.js
+    - controllers
+      - adminController.js
+      - attendanceController.js
+      - authController.js
+      - birthdayController.js
+      - branchController.js
+      - holidayController.js
+      - leaveController.js
+      - managerController.js
+      - notificationsController.js
+      - reportController.js
+      - streamReportController.js
+    - jobs
+      - autoCheckout.js
+      - daily.js
+    - middleware
+      - auth.js
+      - cronAuth.js
+    - models
+      - Attendance.js
+      - Branch.js
+      - Holiday.js
+      - LeaveRequest.js
+      - NotificationLog.js
+      - Report.js
+      - Session.js
+      - UnusualActionLog.js
+      - User.js
+    - routes
+      - admin.js
+      - attendance.js
+      - auth.js
+      - birthdays.js
+      - branches.js
+      - health.js
+      - holidays.js
+      - jobs.js
+      - leaves.js
+      - manager.js
+      - notifications.js
+      - publicHolidays.js
+      - reports.js
+    - server.js
+    - services
+      - notificationService.js
+    - utils
+      - errorHandler.js
+      - excel.js
+      - haversine.js
+      - logger.js
+      - secrets.js
+      - tokenHelper.js
+      - validation.js
+  - tests
+    - userModel.test.js
+  - __tests__
+    - attendance.test.js
+    - auth.test.js
+    - geofence.test.js
+    - leave.test.js
+    - unusualLogin.test.js
+    - user.test.js
+- backend.zip
+- cloudbuild.yaml
+- cloud_run_service_config.yaml
+- Dockerfile
+- eslint.config.js
+- index.html
+- nginx.conf
+- package-lock.json
+- package.json
+- postcss.config.cjs
+- public
+  - vite.svg
+- README.md
+- SETUP.md
+- src
+  - App.css
+  - App.tsx
+  - assets
+    - react.svg
+    - sidebarbg.jpg
+  - components
+    - AttendanceConfirmationDialog.tsx
+    - ReportPreview.tsx
+    - ui
+      - accordion.tsx
+      - alert-dialog.tsx
+      - alert.tsx
+      - aspect-ratio.tsx
+      - avatar.tsx
+      - badge.tsx
+      - breadcrumb.tsx
+      - button.tsx
+      - calendar.tsx
+      - card.tsx
+      - carousel.tsx
+      - chart.tsx
+      - checkbox.tsx
+      - collapsible-sidebar.tsx
+      - collapsible.tsx
+      - command.tsx
+      - context-menu.tsx
+      - dialog.tsx
+      - drawer.tsx
+      - dropdown-menu.tsx
+      - form.tsx
+      - hover-card.tsx
+      - input-otp.tsx
+      - input.tsx
+      - label.tsx
+      - menubar.tsx
+      - navigation-menu.tsx
+      - pagination.tsx
+      - popover.tsx
+      - radio-group.tsx
+      - resizable.tsx
+      - scroll-area.tsx
+      - select.tsx
+      - separator.tsx
+      - sheet.tsx
+      - sidebar.tsx
+      - skeleton.tsx
+      - slider.tsx
+      - sonner.tsx
+      - switch.tsx
+      - table.tsx
+      - tabs.tsx
+      - textarea.tsx
+      - toast.tsx
+      - toaster.tsx
+      - toggle-group.tsx
+      - toggle.tsx
+      - tooltip.tsx
+      - use-toast.ts
+  - config.ts
+  - hooks
+    - use-mobile.tsx
+    - use-toast.ts
+    - useGeolocation.ts
+  - index.css
+  - layouts
+    - AdminManagerLayout.tsx
+    - EmployeeLayout.tsx
+  - lib
+    - deviceId.ts
+    - utils.ts
+  - main.tsx
+  - pages
+    - AdminAttendanceLogs.tsx
+    - AdminDashboard.tsx
+    - employee
+      - ApplyLeave.tsx
+      - Attendance.tsx
+      - Dashboard.tsx
+      - History.tsx
+      - Profile.tsx
+    - Index.tsx
+    - Login.tsx
+    - Manager
+      - AddEmployee.tsx
+      - Analytics.tsx
+      - Attendance.tsx
+      - AttendanceApprovals.tsx
+      - EmployeeTrends.tsx
+      - Holidays.tsx
+      - LeaveApprovals.tsx
+      - Profile.tsx
+      - Reports.tsx
+      - TeamTrends.tsx
+    - NotFound.tsx
+  - README.md
+  - services
+    - api.ts
+  - stores
+    - authStore.ts
+  - types
+    - index.ts
+- tailwind.config.cjs
+- toggle-group.tsx
+- tsconfig.app.json
+- tsconfig.json
+- tsconfig.node.json
+- vite.config.ts

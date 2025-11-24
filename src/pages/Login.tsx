@@ -20,6 +20,7 @@ import { toast } from "@/components/ui/sonner";
 export default function Login() {
   const [empId, setEmpId] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -35,7 +36,7 @@ export default function Login() {
 
     try {
       console.log("[Login] Calling authAPI.login...");
-      const response = await authAPI.login(empId, password);
+      const response = await authAPI.login(empId, password, rememberMe);
       console.log("[Login] API response received:", response);
 
       if (response.success && response.data) {
@@ -138,6 +139,17 @@ export default function Login() {
                 disabled={loading}
                 className="input-modern"
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <Label htmlFor="rememberMe">Remember me</Label>
             </div>
 
             <Button

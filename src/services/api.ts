@@ -12,6 +12,7 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 // Add request interceptor for Bearer token and device ID
@@ -76,20 +77,24 @@ api.interceptors.response.use(
       const { refreshToken, refreshAccessToken, logout } = useAuthStore.getState();
       
       // Check if it's a token expiration that can be refreshed
-      if (error.response?.data?.requireRefresh && refreshToken) {
+      // We'll try to refresh even if refreshToken is not in store (cookie-based refresh)
+      if (error.response?.data?.requireRefresh) {
         console.log('[API] Access token expired, refreshing...');
         originalRequest._retry = true;
         
         try {
           // Call refresh endpoint
+          // Only send refreshToken in body if it exists (non-remember me case)
+          const refreshData = refreshToken ? { refreshToken } : {};
           const response = await axios.post(
             `${API_BASE_URL}/api/auth/refresh`,
-            { refreshToken },
+            refreshData,
             {
               headers: {
                 'Content-Type': 'application/json',
                 'X-Device-Id': getDeviceId()
-              }
+              },
+              withCredentials: true
             }
           );
           
@@ -121,6 +126,13 @@ api.interceptors.response.use(
       }
     }
     
+    // Handle network errors
+    if (!error.response) {
+      console.log('[API] Network error or request failed');
+      // Don't automatically logout on network errors
+      return Promise.reject(error);
+    }
+    
     // Handle forbidden (403)
     if (error.response?.status === 403) {
       console.log('[API] Access forbidden');
@@ -133,16 +145,28 @@ api.interceptors.response.use(
   }
 );
 
+// Check if user has a valid session
+export async function checkExistingSession(): Promise<boolean> {
+  try {
+    // This would be implemented on the backend to check for valid cookies
+    // For now, we'll just return false since we're handling this client-side
+    return false;
+  } catch (error) {
+    console.error('[Auth] Session check failed:', error);
+    return false;
+  }
+}
+
 // Auth API
 export const authAPI = {
-  login: async (empId: string, password: string): Promise<ApiResponse<{ user: User; accessToken: string; refreshToken: string; unusual?: boolean; unusualActions?: string[] }>> => {
+  login: async (empId: string, password: string, rememberMe: boolean = false): Promise<ApiResponse<{ user: User; accessToken: string; refreshToken?: string; unusual?: boolean; unusualActions?: string[] }>> => {
     console.log('[Auth] Login attempt:', empId);
     try {
       // Get device ID
       const deviceId = getDeviceId();
       
       // Make login request
-      const response = await api.post('/auth/login', { empId, password }, {
+      const response = await api.post('/auth/login', { empId, password, rememberMe }, {
         headers: {
           'X-Device-Id': deviceId
         }
@@ -154,6 +178,28 @@ export const authAPI = {
       return response.data;
     } catch (error: any) {
       console.error('[Auth] Login error:', error);
+      throw error;
+    }
+  },
+  
+  refreshSession: async (): Promise<ApiResponse<{ user: User; accessToken: string }>> => {
+    try {
+      // Call refresh endpoint without refresh token (will use cookie if available)
+      const response = await axios.post(
+        `${API_BASE_URL}/api/auth/refresh`,
+        {}, // Empty body, will use cookie
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Device-Id': getDeviceId()
+          },
+          withCredentials: true
+        }
+      );
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('[Auth] Session refresh failed:', error);
       throw error;
     }
   },

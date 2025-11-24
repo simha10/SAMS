@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -28,14 +29,16 @@ const { globalErrorHandler } = require('./utils/errorHandler');
 const app = express();
 
 // Log all incoming requests
+const logger = require('./utils/logger');
+
 app.use((req, res, next) => {
-  console.log("=== INCOMING REQUEST ===");
-  console.log("Method:", req.method);
-  console.log("URL:", req.url);
-  console.log("IP:", req.ip);
-  console.log("User-Agent:", req.get('User-Agent'));
-  console.log("Timestamp:", new Date().toISOString());
-  console.log("=== END INCOMING REQUEST ===");
+  logger.info("=== INCOMING REQUEST ===");
+  logger.info("Method:", { method: req.method });
+  logger.info("URL:", { url: req.url });
+  logger.info("IP:", { ip: req.ip });
+  logger.info("User-Agent:", { userAgent: req.get('User-Agent') });
+  logger.info("Timestamp:", { timestamp: new Date().toISOString() });
+  logger.info("=== END INCOMING REQUEST ===");
   next();
 });
 
@@ -84,13 +87,13 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   // Log when rate limit is hit
   handler: (req, res, next) => {
-    console.log("=== RATE LIMIT HIT ===");
-    console.log("IP:", req.ip);
-    console.log("Method:", req.method);
-    console.log("URL:", req.url);
-    console.log("User-Agent:", req.get('User-Agent'));
-    console.log("Timestamp:", new Date().toISOString());
-    console.log("=== END RATE LIMIT HIT ===");
+    logger.warn("=== RATE LIMIT HIT ===");
+    logger.warn("IP:", { ip: req.ip });
+    logger.warn("Method:", { method: req.method });
+    logger.warn("URL:", { url: req.url });
+    logger.warn("User-Agent:", { userAgent: req.get('User-Agent') });
+    logger.warn("Timestamp:", { timestamp: new Date().toISOString() });
+    logger.warn("=== END RATE LIMIT HIT ===");
     res.status(429).json({
       success: false,
       message: 'Too many requests from this IP, please try again later.'
@@ -103,6 +106,9 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Cookie parser
+app.use(cookieParser());
+
 // Data sanitization
 app.use(mongoSanitize());
 app.use(xss());
@@ -111,19 +117,19 @@ app.use(xss());
 app.use('/reports', express.static(path.join(__dirname, '..', 'reports')));
 
 // Log route registration
-console.log("=== REGISTERING ROUTES ===");
-console.log("Auth routes:", '/api/auth');
-console.log("Attendance routes:", '/api/attendance');
-console.log("Leave routes:", '/api/leaves');
-console.log("Manager routes:", '/api/manager');
-console.log("Report routes:", '/api/reports');
-console.log("Manager holiday routes:", '/api/manager/holidays');
-console.log("Public holiday routes:", '/api/holidays');
-console.log("Birthday routes:", '/api/birthdays');
-console.log("Branch routes:", '/api/branches');
-console.log("Jobs routes:", '/jobs');
-console.log("Health routes:", '/');
-console.log("=== END REGISTERING ROUTES ===");
+logger.info("=== REGISTERING ROUTES ===");
+logger.info("Auth routes:", { route: '/api/auth' });
+logger.info("Attendance routes:", { route: '/api/attendance' });
+logger.info("Leave routes:", { route: '/api/leaves' });
+logger.info("Manager routes:", { route: '/api/manager' });
+logger.info("Report routes:", { route: '/api/reports' });
+logger.info("Manager holiday routes:", { route: '/api/manager/holidays' });
+logger.info("Public holiday routes:", { route: '/api/holidays' });
+logger.info("Birthday routes:", { route: '/api/birthdays' });
+logger.info("Branch routes:", { route: '/api/branches' });
+logger.info("Jobs routes:", { route: '/jobs' });
+logger.info("Health routes:", { route: '/' });
+logger.info("=== END REGISTERING ROUTES ===");
 
 // Routes
 app.use('/api/auth', authRoutes);
