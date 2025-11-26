@@ -4,6 +4,7 @@ const LeaveRequest = require('../models/LeaveRequest');
 const User = require('../models/User');
 const { generateAttendanceReportData, generateLeaveReportData, 
         generateSummaryReportData } = require('../utils/excel');
+const logger = require('../utils/logger');
 
 // Generate report - streamlined to work without file storage
 async function generateReport(req, res) {
@@ -49,11 +50,11 @@ async function previewReport(req, res) {
     const { type, startDate, endDate, filters = {} } = req.body;
     
     // Log incoming data for debugging
-    console.log("=== PREVIEW REPORT REQUEST DATA ===");
-    console.log("Type:", type);
-    console.log("Start Date:", startDate);
-    console.log("End Date:", endDate);
-    console.log("Filters:", filters);
+    logger.debug("=== PREVIEW REPORT REQUEST DATA ===");
+    logger.debug("Type:", { type });
+    logger.debug("Start Date:", { startDate });
+    logger.debug("End Date:", { endDate });
+    logger.debug("Filters:", { filters });
     
     // Validate required fields
     if (!type) {
@@ -165,7 +166,7 @@ async function previewReport(req, res) {
       }
     });
   } catch (error) {
-    console.error('Preview report error:', error);
+    logger.error('Preview report error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }

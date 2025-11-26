@@ -1,6 +1,6 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const app = require('../src/App');
 const User = require('../src/models/User');
 const Session = require('../src/models/Session');

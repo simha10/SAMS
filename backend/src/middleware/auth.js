@@ -6,18 +6,18 @@ const { verifyToken } = require('../utils/tokenHelper');
 // Protect routes - require Bearer token authentication
 async function protect(req, res, next) {
   try {
-    console.log("=== AUTH PROTECT MIDDLEWARE (BEARER TOKEN) ===");
-    console.log("URL:", req.url);
-    console.log("Method:", req.method);
-    console.log("IP:", req.ip);
+    logger.debug("=== AUTH PROTECT MIDDLEWARE (BEARER TOKEN) ===");
+    logger.debug("URL:", { url: req.url });
+    logger.debug("Method:", { method: req.method });
+    logger.debug("IP:", { ip: req.ip });
     
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
-    console.log("Authorization header present:", !!authHeader);
+    logger.debug("Authorization header present:", { hasAuthHeader: !!authHeader });
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log("No valid Bearer token found, returning 401");
-      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      logger.debug("No valid Bearer token found, returning 401");
+      logger.debug("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
         message: 'Not authorized. Please provide a valid Bearer token.' 
@@ -28,18 +28,16 @@ async function protect(req, res, next) {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     
     // Verify and decode token
-    console.log("Verifying access token...");
+    logger.debug("Verifying access token...");
     const decoded = verifyToken(token, 'access');
-    console.log("Token verified, user ID:", decoded.sub);
-    console.log("Session ID:", decoded.sessionId);
-    console.log("Device ID:", decoded.deviceId);
+    logger.debug("Token verified", { userId: decoded.sub, sessionId: decoded.sessionId, deviceId: decoded.deviceId });
     
     // Verify session is active
     const session = await Session.findById(decoded.sessionId);
     
     if (!session) {
-      console.log("Session not found in database");
-      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      logger.debug("Session not found in database");
+      logger.debug("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
         message: 'Session not found. Please log in again.' 
@@ -47,8 +45,8 @@ async function protect(req, res, next) {
     }
 
     if (!session.isActive) {
-      console.log("Session is inactive");
-      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      logger.debug("Session is inactive");
+      logger.debug("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
         message: 'Session is inactive. Please log in again.' 
@@ -57,8 +55,8 @@ async function protect(req, res, next) {
 
     // Verify access token ID matches session
     if (session.accessTokenId !== decoded.tokenId) {
-      console.log("Access token ID mismatch");
-      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      logger.debug("Access token ID mismatch");
+      logger.debug("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid access token. Please log in again.' 
@@ -71,11 +69,11 @@ async function protect(req, res, next) {
     
     // Get user from token
     const user = await User.findById(decoded.sub);
-    console.log("User found:", !!user);
+    logger.debug("User found:", { userExists: !!user });
     
     if (!user) {
-      console.log("User not found in database");
-      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      logger.debug("User not found in database");
+      logger.debug("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
         message: 'User not found. Please log in again.' 
@@ -84,8 +82,8 @@ async function protect(req, res, next) {
     
     // Check if user is active
     if (!user.isActive) {
-      console.log("User account is deactivated");
-      console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+      logger.debug("User account is deactivated");
+      logger.debug("=== END AUTH PROTECT MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
         message: 'Account is deactivated' 
@@ -97,8 +95,8 @@ async function protect(req, res, next) {
     req.user.sessionId = decoded.sessionId;
     req.user.deviceId = decoded.deviceId;
     
-    console.log("Authentication successful for user:", req.user.empId, req.user.name);
-    console.log("=== END AUTH PROTECT MIDDLEWARE ===");
+    logger.debug("Authentication successful", { empId: req.user.empId, name: req.user.name });
+    logger.debug("=== END AUTH PROTECT MIDDLEWARE ===");
     next();
   } catch (error) {
     console.error('=== AUTHENTICATION ERROR ===');
@@ -131,13 +129,13 @@ async function protect(req, res, next) {
 // Restrict to specific roles
 function restrictTo(...roles) {
   return (req, res, next) => {
-    console.log("=== ROLE RESTRICTION MIDDLEWARE ===");
-    console.log("Required roles:", roles);
-    console.log("User role:", req.user?.role);
+    logger.debug("=== ROLE RESTRICTION MIDDLEWARE ===");
+    logger.debug("Required roles:", { roles });
+    logger.debug("User role:", { userRole: req.user?.role });
     
     if (!req.user) {
-      console.log("No user found, returning 401");
-      console.log("=== END ROLE RESTRICTION MIDDLEWARE ===");
+      logger.debug("No user found, returning 401");
+      logger.debug("=== END ROLE RESTRICTION MIDDLEWARE ===");
       return res.status(401).json({ 
         success: false, 
         message: 'Not authorized' 
@@ -145,17 +143,17 @@ function restrictTo(...roles) {
     }
     
     if (!roles.includes(req.user.role)) {
-      console.log("User role not authorized, returning 403");
-      console.log("User has role:", req.user.role, "but needs one of:", roles);
-      console.log("=== END ROLE RESTRICTION MIDDLEWARE ===");
+      logger.debug("User role not authorized, returning 403");
+      logger.debug("User role not authorized", { userRole: req.user.role, requiredRoles: roles });
+      logger.debug("=== END ROLE RESTRICTION MIDDLEWARE ===");
       return res.status(403).json({ 
         success: false, 
         message: 'Not authorized to access this route' 
       });
     }
     
-    console.log("Role authorization successful");
-    console.log("=== END ROLE RESTRICTION MIDDLEWARE ===");
+    logger.debug("Role authorization successful");
+    logger.debug("=== END ROLE RESTRICTION MIDDLEWARE ===");
     next();
   };
 }

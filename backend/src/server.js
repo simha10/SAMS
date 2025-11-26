@@ -50,8 +50,8 @@ process.on('uncaughtException', (err) => {
 });
 
 // Start server
-const PORT = process.env.PORT;
-app.listen(PORT, '0.0.0.0', () => {
+const PORT = process.env.PORT || 8080;
+const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
@@ -61,5 +61,14 @@ process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
   server.close(() => {
     logger.info('Process terminated');
+  });
+});
+
+// Handle SIGINT (Ctrl+C)
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    logger.info('Process terminated');
+    process.exit(0);
   });
 });

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const Session = require('../models/Session');
 const User = require('../models/User');
 const { randomUUID } = require('crypto');
+const logger = require('./logger');
 
 /**
  * Generate a unique token ID
@@ -136,7 +137,7 @@ async function generateTokens(user, deviceId, metadata = {}) {
       expiresAt
     };
   } catch (error) {
-    console.error('Error generating tokens:', error);
+    logger.error('Error generating tokens:', error);
     throw new Error('Failed to generate authentication tokens');
   }
 }
@@ -270,7 +271,7 @@ async function invalidateSession(sessionId) {
     
     return false;
   } catch (error) {
-    console.error('Error invalidating session:', error);
+    logger.error('Error invalidating session:', error);
     return false;
   }
 }

@@ -2,18 +2,19 @@ const express = require('express');
 const router = express.Router();
 const { login, logout, getProfile, register, updateProfile, changePassword, refresh } = require('../controllers/authController');
 const { protect, restrictTo } = require('../middleware/auth');
+const logger = require('../utils/logger');
 
-console.log("=== REGISTERING AUTH ROUTES ===");
+logger.info("=== REGISTERING AUTH ROUTES ===");
 
 // Add logging middleware for auth routes
 router.use((req, res, next) => {
-  console.log("=== AUTH ROUTE REQUEST ===");
-  console.log("Method:", req.method);
-  console.log("URL:", req.url);
-  console.log("IP:", req.ip);
-  console.log("User:", req.user?.empId || 'Not authenticated');
-  console.log("Timestamp:", new Date().toISOString());
-  console.log("=== END AUTH ROUTE REQUEST ===");
+  logger.debug("=== AUTH ROUTE REQUEST ===");
+  logger.debug("Method:", { method: req.method });
+  logger.debug("URL:", { url: req.url });
+  logger.debug("IP:", { ip: req.ip });
+  logger.debug("User:", { empId: req.user?.empId || 'Not authenticated' });
+  logger.debug("Timestamp:", { timestamp: new Date().toISOString() });
+  logger.debug("=== END AUTH ROUTE REQUEST ===");
   next();
 });
 
@@ -28,6 +29,6 @@ router.put('/profile', protect, updateProfile);
 router.put('/change-password', protect, changePassword);
 router.post('/register', protect, restrictTo('director'), register);
 
-console.log("=== AUTH ROUTES REGISTERED ===");
+logger.info("=== AUTH ROUTES REGISTERED ===");
 
 module.exports = router;

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Session = require('../models/Session');
 const UnusualActionLog = require('../models/UnusualActionLog');
 const jwt = require('jsonwebtoken');
+const logger = require('../utils/logger');
 const { 
   generateTokens, 
   refreshAccessToken, 
@@ -177,7 +178,7 @@ async function login(req, res) {
     
     res.json(response);
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -210,7 +211,7 @@ async function logout(req, res) {
       message: 'Logout successful'
     });
   } catch (error) {
-    console.error('Logout error:', error);
+    logger.error('Logout error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -234,7 +235,7 @@ async function getProfile(req, res) {
       data: { user }
     });
   } catch (error) {
-    console.error('Get profile error:', error);
+    logger.error('Get profile error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -319,7 +320,7 @@ async function register(req, res) {
       }
     });
   } catch (error) {
-    console.error('Register error:', error);
+    logger.error('Register error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -376,7 +377,7 @@ async function updateProfile(req, res) {
       }
     });
   } catch (error) {
-    console.error('Update profile error:', error);
+    logger.error('Update profile error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -438,7 +439,7 @@ async function changePassword(req, res) {
       message: 'Password changed successfully'
     });
   } catch (error) {
-    console.error('Change password error:', error);
+    logger.error('Change password error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
@@ -483,7 +484,7 @@ async function refresh(req, res) {
       }
     });
   } catch (error) {
-    console.error('Token refresh error:', error);
+    logger.error('Token refresh error:', error);
     
     // Handle specific errors
     if (error.message.includes('expired') || error.message.includes('invalid') || error.message.includes('inactive')) {
