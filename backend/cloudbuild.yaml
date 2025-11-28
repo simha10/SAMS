@@ -4,7 +4,7 @@ steps:
   args: [
     'build', 
     '-t', 
-    'us-central1-docker.pkg.dev/$669666300924/sams-repo/sams-backend:latest', 
+    'us-central1-docker.pkg.dev/$lams-478911/sams-repo/sams-backend:latest', 
     '.'
   ]
   # Note: The context '.' tells the builder to look for the Dockerfile in the current directory.
