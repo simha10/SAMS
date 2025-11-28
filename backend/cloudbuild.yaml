@@ -1,0 +1,14 @@
+steps:
+# 1. Use the official Docker builder to execute the build command
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'build', 
+    '-t', 
+    'us-central1-docker.pkg.dev/$669666300924/sams-repo/sams-backend:latest', 
+    '.'
+  ]
+  # Note: The context '.' tells the builder to look for the Dockerfile in the current directory.
+
+# 2. Configure the options to use Cloud Logging only
+options:
+  logging: CLOUD_LOGGING_ONLY
