@@ -3,16 +3,6 @@
 - backend
   - .env
   - .env.example
-  - Backend_Docs
-    - COST_CONTROL_MEASURES.md
-    - DNS_MAPPING_HOSTINGER.md
-    - PRODUCTION_SETUP_GCP.md
-    - README.md
-    - RUNBOOK.md
-    - SCHEDULER_PAYLOAD_TEMPLATES.md
-    - SECRET_MANAGER_LAYOUT.md
-    - SUMMARY_OF_CHANGES.md
-  - cloudbuild.yaml
   - cloud_run_service_config.yaml
   - Dockerfile
   - jest.config.js
@@ -21,27 +11,17 @@
     - error.log
   - package-lock.json
   - package.json
+  - README.md
   - scripts
-    - add-branches-atlas.js
-    - add-real-branches.js
-    - check-dummy-data.js
-    - clean-database.js
     - debug-attendance.js
     - debug-login.js
     - debug-user-attendance.js
     - fix-attendance-data.js
     - fix-flagged-attendance.js
     - fixUserPasswords.js
-    - init-database.js
-    - init-indexes.js
-    - list-branches.js
     - list-users.js
-    - README.md
-    - remove-old-branches.js
-    - seed-sample-data.js
     - seed-users.js
     - test-api-endpoints.js
-    - test-env.js
     - test-report-api.js
     - test-reports.js
     - trace-attendance.js
@@ -113,7 +93,15 @@
     - leave.test.js
     - unusualLogin.test.js
     - user.test.js
-- backend.zip
+- Backend_Docs
+  - COST_CONTROL_MEASURES.md
+  - DNS_MAPPING_HOSTINGER.md
+  - PRODUCTION_SETUP_GCP.md
+  - README.md
+  - RUNBOOK.md
+  - SCHEDULER_PAYLOAD_TEMPLATES.md
+  - SECRET_MANAGER_LAYOUT.md
+  - SUMMARY_OF_CHANGES.md
 - cloudbuild.yaml
 - cloud_run_service_config.yaml
 - Dockerfile
@@ -123,6 +111,7 @@
 - package-lock.json
 - package.json
 - postcss.config.cjs
+- project_structure.text
 - public
   - vite.svg
 - README.md

@@ -1,32 +1,31 @@
-# Use Node.js 18 on Debian Bullseye (non-alpine for better compatibility)
-FROM node:18-bullseye-slim
-
-# Set working directory
+# Stage 1: Builder (For installing dependencies, including native ones)
+FROM node:18-slim AS builder
 WORKDIR /app
 
-# Create non-root user for security
-RUN useradd -m expressuser
+# Install build tools needed for packages like bcryptjs
+# This is crucial for a smooth npm install
+RUN apt-get update && apt-get install -y python3 make g++
 
-# Copy package files
 COPY package*.json ./
+# npm ci ensures exact dependency versions from package-lock.json
+RUN npm ci 
 
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy app code
 COPY . .
 
-# Remove .env file if present (security)
-RUN rm -f .env
+# Stage 2: Production (A clean, minimal runtime environment)
+FROM node:18-slim
+WORKDIR /app
 
-# Change ownership to non-root user
-RUN chown -R expressuser:expressuser /app
+# Copy only the necessary files for runtime from the builder stage
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/package.json ./package.json
 
-# Switch to non-root user
-USER expressuser
+# Environment variables
+ENV NODE_ENV=production
 
-# Expose port for Cloud Run
+# Cloud Run listens on 8080 by default
 EXPOSE 8080
 
-# Start the application
+# This is your application's start command
 CMD ["node", "src/server.js"]
