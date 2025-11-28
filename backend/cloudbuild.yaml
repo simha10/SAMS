@@ -4,11 +4,10 @@ steps:
   args: [
     'build', 
     '-t', 
-    'us-central1-docker.pkg.dev/$lams-478911/sams-repo/sams-backend:latest', 
+    'us-central1-docker.pkg.dev/${PROJECT_ID}/sams-repo/sams-backend:latest', # <<-- USE ${PROJECT_ID}
     '.'
   ]
-  # Note: The context '.' tells the builder to look for the Dockerfile in the current directory.
 
-# 2. Configure the options to use Cloud Logging only
+# 2. Configure the options to resolve the log issue
 options:
   logging: CLOUD_LOGGING_ONLY
