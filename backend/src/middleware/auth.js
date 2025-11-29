@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Session = require('../models/Session');
 const { verifyToken } = require('../utils/tokenHelper');
+const logger = require('../utils/logger');
 
 // Protect routes - require Bearer token authentication
 async function protect(req, res, next) {

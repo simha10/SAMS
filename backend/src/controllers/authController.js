@@ -73,7 +73,7 @@ async function login(req, res) {
       userId: { $ne: user._id }
     }).populate('userId', 'empId name');
 
-    if (existingDeviceSession) {
+    if (existingDeviceSession && existingDeviceSession.userId) {
       unusual = true;
       await UnusualActionLog.logAction({
         userId: user._id,
