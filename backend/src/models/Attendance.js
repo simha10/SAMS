@@ -73,8 +73,8 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
-attendanceSchema.index({ userId: 1, date: 1 });
+// Index for faster queries - explicitly set unique to false
+attendanceSchema.index({ userId: 1, date: 1 }, { unique: false });
 attendanceSchema.index({ branch: 1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

@@ -24,11 +24,16 @@ describe('Multi-Branch Attendance Validation', () => {
     }, 15000);
 
     beforeEach(async () => {
+        // Clear collections before each test to ensure isolation
+        await User.deleteMany({});
+        await Attendance.deleteMany({});
+        await Branch.deleteMany({});
+
         // Create test user with unique empId
         user = new User({
-            empId: 'EMP_MULTI_' + Date.now(),
+            empId: 'EMP_MULTI_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
             name: 'Test User',
-            email: 'test.multi@example.com',
+            email: 'test.multi.' + Date.now() + '@example.com',
             password: 'password123',
             role: 'employee',
             officeLatitude: 26.913595,
@@ -84,15 +89,19 @@ describe('Multi-Branch Attendance Validation', () => {
         expect(savedAttendance1.branch.toString()).toBe(branch1._id.toString());
         expect(savedAttendance1.distanceFromBranch).toBe(10);
 
-        // Check in from branch 2 on same day (should be separate record)
+        // Check in from branch 2 on same day (should update the existing record with new branch info)
         const attendance2 = new Attendance({
             userId: user._id,
-            date: new Date(),
+            date: new Date(), // Same date
             status: 'present',
             checkInTime: new Date(),
             branch: branch2._id,
             distanceFromBranch: 15
         });
+
+        // Since we're directly creating records, we need to handle the fact that 
+        // the second save will overwrite the first due to the unique index on userId + date
+        // In real usage, the controller prevents multiple check-ins on the same day
         const savedAttendance2 = await attendance2.save();
 
         expect(savedAttendance2._id).toBeDefined();
@@ -101,6 +110,7 @@ describe('Multi-Branch Attendance Validation', () => {
     }, 15000);
 
     it('should support multiple branches for same employee on different days', async () => {
+        // Use different dates to ensure separate records
         const date1 = new Date('2023-01-01T10:00:00Z');
         const date2 = new Date('2023-01-02T10:00:00Z');
 
@@ -126,10 +136,16 @@ describe('Multi-Branch Attendance Validation', () => {
         });
         await attendance2.save();
 
+        // Wait a bit to ensure saves are complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         // Verify both records exist with correct branches
         const attendances = await Attendance.find({ userId: user._id })
             .sort({ date: 1 })
-            .populate({ path: 'branch', options: { strictPopulate: false } });
+            .populate('branch');
+
+        console.log('Found attendances:', attendances.length);
+        console.log('Expected 2, got:', attendances.length);
 
         expect(attendances.length).toBe(2);
         expect(attendances[0].branch._id.toString()).toBe(branch1._id.toString());

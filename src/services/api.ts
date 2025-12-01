@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { User, AttendanceRecord, LeaveRequest, ApiResponse, RegisterData, LeaveRequestData, ApiError } from '@/types';
 import { toast } from '@/components/ui/sonner';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // Create axios instance with default config
 export const api = axios.create({
@@ -24,22 +24,22 @@ api.interceptors.request.use(
     console.log("URL:", config.url);
     console.log("Data:", config.data);
     console.log("Timestamp:", new Date().toISOString());
-    
+
     // Ensure credentials are included
     config.withCredentials = true;
-    
+
     // Add delay between requests to prevent rate limiting
     const now = Date.now();
     const timeSinceLastRequest = now - lastRequestTime;
     console.log(`Time since last request: ${timeSinceLastRequest}ms`);
-    
+
     if (timeSinceLastRequest < minRequestInterval) {
       const delay = minRequestInterval - timeSinceLastRequest;
       console.log(`Adding delay of ${delay}ms to prevent rate limiting`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
     lastRequestTime = Date.now();
-    
+
     console.log("=== END API REQUEST ===");
     return config;
   },
@@ -70,7 +70,7 @@ api.interceptors.response.use(
     console.error("Config:", error.config);
     console.error("Request:", error.request);
     console.error("Timestamp:", new Date().toISOString());
-    
+
     // Handle rate limiting (429)
     if (error.response?.status === 429) {
       console.log("RATE LIMIT EXCEEDED - Setting error flag");
@@ -83,12 +83,12 @@ api.interceptors.response.use(
       });
       return Promise.reject(error);
     }
-    
+
     // Handle authentication errors (401)
     if (error.response?.status === 401) {
       console.log("AUTHENTICATION ERROR - Redirecting to login");
       console.log("Error message:", error.response?.data?.message);
-      
+
       // Check if it's a token/user not found error
       if (error.response?.data?.message?.includes('user not found')) {
         console.log("User not found in database - clearing auth state");
@@ -96,7 +96,7 @@ api.interceptors.response.use(
         localStorage.removeItem('auth-storage');
         sessionStorage.removeItem('auth-storage');
       }
-      
+
       // Handle unauthorized - redirect to login
       console.log("Redirecting to login page");
       window.location.href = '/login';
@@ -104,7 +104,7 @@ api.interceptors.response.use(
         description: "Please log in again to continue.",
       });
     }
-    
+
     if (error.response?.status === 403) {
       console.log("FORBIDDEN ACCESS - Possible authentication issue");
       console.log("Error message:", error.response?.data?.message);
@@ -113,7 +113,7 @@ api.interceptors.response.use(
       });
       // Don't redirect automatically for 403, let the component handle it
     }
-    
+
     console.log("=== END API RESPONSE ERROR ===");
     return Promise.reject(error);
   }
@@ -121,10 +121,10 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  login: async (empId: string, password: string): Promise<ApiResponse<{ user: User }>> => {
-    console.log("Calling login API with:", { empId, password });
+  login: async (empId: string, password: string, rememberMe: boolean = false): Promise<ApiResponse<{ user: User }>> => {
+    console.log("Calling login API with:", { empId, password, rememberMe });
     try {
-      const response = await api.post('/auth/login', { empId, password });
+      const response = await api.post('/auth/login', { empId, password, rememberMe });
       console.log("Login API response:", response.data);
       return response.data;
     } catch (error) {
@@ -132,7 +132,7 @@ export const authAPI = {
       throw error;
     }
   },
-  
+
   logout: async (): Promise<ApiResponse> => {
     try {
       const response = await api.post('/auth/logout');
@@ -147,12 +147,12 @@ export const authAPI = {
       throw error;
     }
   },
-  
+
   getProfile: async (): Promise<ApiResponse<{ user: User }>> => {
     const response = await api.get('/auth/profile');
     return response.data;
   },
-  
+
   updateProfile: async (userData: { name?: string; email?: string }): Promise<ApiResponse<{ user: User }>> => {
     try {
       const response = await api.put('/auth/profile', userData);
@@ -167,11 +167,11 @@ export const authAPI = {
       throw error;
     }
   },
-  
-  changePassword: async (passwordData: { 
-    currentPassword: string; 
-    newPassword: string; 
-    confirmPassword: string 
+
+  changePassword: async (passwordData: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string
   }): Promise<ApiResponse> => {
     try {
       const response = await api.put('/auth/change-password', passwordData);
@@ -186,7 +186,7 @@ export const authAPI = {
       throw error;
     }
   },
-  
+
   register: async (userData: RegisterData): Promise<ApiResponse<{ user: User }>> => {
     try {
       const response = await api.post('/auth/register', userData);
@@ -222,7 +222,7 @@ export const attendanceAPI = {
       throw error;
     }
   },
-  
+
   checkout: async (lat: number, lng: number): Promise<ApiResponse<{ checkOutTime: string; distance: number; workingHours: number } | GeofenceErrorData>> => {
     try {
       const response = await api.post('/attendance/checkout', { lat, lng });
@@ -234,7 +234,7 @@ export const attendanceAPI = {
       throw error;
     }
   },
-  
+
   getMyAttendance: async (from?: string, to?: string): Promise<ApiResponse<{ attendance: AttendanceRecord[]; total: number }>> => {
     const params = new URLSearchParams();
     if (from) params.append('from', from);
@@ -245,7 +245,7 @@ export const attendanceAPI = {
     });
     return response.data;
   },
-  
+
   getTodayStatus: async (): Promise<ApiResponse<{ date: string; attendance: AttendanceRecord }>> => {
     const response = await api.get('/attendance/today', {
       timeout: 5000,
@@ -271,17 +271,17 @@ export const leaveAPI = {
       throw error;
     }
   },
-  
+
   getMyLeaveRequests: async (): Promise<ApiResponse<{ leaveRequests: LeaveRequest[]; total: number }>> => {
     const response = await api.get('/leaves/me');
     return response.data;
   },
-  
+
   cancelLeaveRequest: async (id: string): Promise<ApiResponse> => {
     const response = await api.delete(`/leaves/${id}`);
     return response.data;
   },
-  
+
   // Add delete method for deleting leave requests
   deleteLeaveRequest: async (id: string): Promise<ApiResponse> => {
     const response = await api.delete(`/leaves/${id}`);
@@ -305,13 +305,13 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   getFlaggedAttendance: async (from?: string, to?: string) => {
     try {
       const params = new URLSearchParams();
       if (from) params.append('from', from);
       if (to) params.append('to', to);
-      
+
       const response = await api.get(`/manager/team/flagged?${params}`);
       return response.data;
     } catch (error) {
@@ -321,7 +321,7 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   getTeamLeaveRequests: async () => {
     try {
       const response = await api.get('/manager/team/leaves');
@@ -333,12 +333,12 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   updateLeaveRequest: async (id: string, status: string, rejectionReason?: string) => {
     try {
-      const response = await api.put(`/manager/leaves/${id}`, { 
-        status, 
-        rejectionReason 
+      const response = await api.put(`/manager/leaves/${id}`, {
+        status,
+        rejectionReason
       });
       toast.success(`Leave request ${status}`, {
         description: `Leave request has been ${status} successfully.`,
@@ -351,12 +351,12 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   // New method for updating attendance status
   updateAttendanceStatus: async (id: string, status: string, approvalReason?: string, checkOutTime?: string) => {
     try {
-      const response = await api.put(`/manager/attendance/${id}`, { 
-        status, 
+      const response = await api.put(`/manager/attendance/${id}`, {
+        status,
         approvalReason,
         checkOutTime
       });
@@ -371,7 +371,7 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   getRecentActivities: async (period: string) => {
     try {
       const response = await api.get(`/manager/team/activities?period=${period}`);
@@ -383,7 +383,7 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   // Holiday management methods
   createHoliday: async (date: string, name: string, description?: string) => {
     try {
@@ -399,13 +399,13 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   getHolidays: async (year?: string, month?: string) => {
     try {
       const params = new URLSearchParams();
       if (year) params.append('year', year);
       if (month) params.append('month', month);
-      
+
       const response = await api.get(`/manager/holidays?${params}`);
       return response.data;
     } catch (error) {
@@ -415,7 +415,7 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   updateHoliday: async (id: string, date: string, name: string, description?: string) => {
     try {
       const response = await api.put(`/manager/holidays/${id}`, { date, name, description });
@@ -430,7 +430,7 @@ export const managerAPI = {
       throw error;
     }
   },
-  
+
   deleteHoliday: async (id: string) => {
     try {
       const response = await api.delete(`/manager/holidays/${id}`);
@@ -487,37 +487,37 @@ export const reportAPI = {
       console.log("Start Date:", reportData.startDate);
       console.log("End Date:", reportData.endDate);
       console.log("Filters:", reportData.filters);
-      
+
       // Validate required fields
       if (!reportData.type) {
         throw new Error("Report type is required");
       }
-      
+
       if (!reportData.startDate) {
         throw new Error("Start date is required");
       }
-      
+
       if (!reportData.endDate) {
         throw new Error("End date is required");
       }
-      
+
       // Validate dates
       const start = new Date(reportData.startDate);
       const end = new Date(reportData.endDate);
-      
+
       // Check if dates are valid
       if (isNaN(start.getTime())) {
         throw new Error("Invalid start date format");
       }
-      
+
       if (isNaN(end.getTime())) {
         throw new Error("Invalid end date format");
       }
-      
+
       if (end < start) {
         throw new Error("End date must be after start date");
       }
-      
+
       const response = await api.post('/reports/preview', reportData);
       return response.data;
     } catch (error: any) {
@@ -543,13 +543,13 @@ export const adminAPI = {
       throw error;
     }
   },
-  
+
   getAllUsers: async (role?: string, active?: string) => {
     try {
       const params = new URLSearchParams();
       if (role) params.append('role', role);
       if (active) params.append('active', active);
-      
+
       const response = await api.get(`/admin/users?${params}`);
       return response.data;
     } catch (error) {
@@ -559,7 +559,7 @@ export const adminAPI = {
       throw error;
     }
   },
-  
+
   updateUser: async (id: string, userData: Partial<User>) => {
     try {
       const response = await api.put(`/admin/users/${id}`, userData);
@@ -574,14 +574,14 @@ export const adminAPI = {
       throw error;
     }
   },
-  
+
   exportAttendance: async (from: string, to: string, userId?: string): Promise<Blob> => {
     try {
       const params = new URLSearchParams();
       params.append('from', from);
       params.append('to', to);
       if (userId) params.append('userId', userId);
-      
+
       const response = await api.get(`/admin/export/attendance?${params}`, {
         responseType: 'blob'
       });

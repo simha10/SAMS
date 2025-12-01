@@ -4,10 +4,10 @@ const jwt = require('jsonwebtoken');
 // Generate JWT token
 function generateToken(user) {
   return jwt.sign(
-    { 
-      id: user._id, 
-      empId: user.empId, 
-      role: user.role 
+    {
+      id: user._id,
+      empId: user.empId,
+      role: user.role
     },
     process.env.JWT_SECRET,
     { expiresIn: '24h' }
@@ -18,54 +18,58 @@ function generateToken(user) {
 async function login(req, res) {
   try {
     const { empId, password } = req.body;
-    
+
     // Validate input
     if (!empId || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Employee ID and password are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Employee ID and password are required'
       });
     }
-    
+
     // Find user by empId
     const user = await User.findOne({ empId });
-    
+
     if (!user) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid credentials' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
     }
-    
+
     // Check if user is active
     if (!user.isActive) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Account is deactivated' 
+      return res.status(401).json({
+        success: false,
+        message: 'Account is deactivated'
       });
     }
-    
+
     // Compare password
     const isMatch = await user.comparePassword(password);
-    
+
     if (!isMatch) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid credentials' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
     }
-    
+
     // Generate token
     const token = generateToken(user);
-    
-    // Set cookie
+
+    // Set cookie with extended expiration if "remember me" is selected
+    const maxAge = req.body.rememberMe
+      ? 30 * 24 * 60 * 60 * 1000 // 30 days
+      : 24 * 60 * 60 * 1000; // 24 hours (default)
+
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: maxAge
     });
-    
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -108,14 +112,14 @@ async function logout(req, res) {
 async function getProfile(req, res) {
   try {
     const user = await User.findById(req.user._id);
-    
+
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -144,45 +148,45 @@ async function register(req, res) {
   try {
     // Check if user is manager or director
     if (req.user.role !== 'manager' && req.user.role !== 'director') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Only managers and directors can register new users' 
+      return res.status(403).json({
+        success: false,
+        message: 'Only managers and directors can register new users'
       });
     }
-    
+
     const { empId, name, email, password, role, managerId, officeLocation } = req.body;
-    
+
     // Validate required fields
     if (!empId || !name || !email || !password || !role) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Employee ID, name, email, password, and role are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Employee ID, name, email, password, and role are required'
       });
     }
-    
+
     // Managers can only register employees, not other managers or directors
     if (req.user.role === 'manager' && role !== 'employee') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Managers can only register employees' 
+      return res.status(403).json({
+        success: false,
+        message: 'Managers can only register employees'
       });
     }
-    
+
     // If manager is registering an employee, set the managerId to the current manager
     const effectiveManagerId = req.user.role === 'manager' ? req.user._id : managerId;
-    
+
     // Check if user already exists
-    const existingUser = await User.findOne({ 
-      $or: [{ empId }, { email }] 
+    const existingUser = await User.findOne({
+      $or: [{ empId }, { email }]
     });
-    
+
     if (existingUser) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User with this Employee ID or Email already exists' 
+      return res.status(400).json({
+        success: false,
+        message: 'User with this Employee ID or Email already exists'
       });
     }
-    
+
     // Create user
     const user = new User({
       empId,
@@ -197,9 +201,9 @@ async function register(req, res) {
         radius: process.env.OFFICE_DEFAULT_RADIUS || 50
       }
     });
-    
+
     await user.save();
-    
+
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -229,34 +233,34 @@ async function updateProfile(req, res) {
   try {
     const { name, email } = req.body;
     const userId = req.user._id;
-    
+
     // Validate input
     if (!name && !email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Name or email is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Name or email is required'
       });
     }
-    
+
     // Build update object
     const updateData = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
-    
+
     // Update user
     const user = await User.findByIdAndUpdate(
       userId,
       updateData,
       { new: true, runValidators: true }
     );
-    
+
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
-    
+
     res.json({
       success: true,
       message: 'Profile updated successfully',
@@ -286,53 +290,53 @@ async function changePassword(req, res) {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body;
     const userId = req.user._id;
-    
+
     // Validate input
     if (!currentPassword || !newPassword || !confirmPassword) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'All password fields are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'All password fields are required'
       });
     }
-    
+
     if (newPassword !== confirmPassword) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'New password and confirm password do not match' 
+      return res.status(400).json({
+        success: false,
+        message: 'New password and confirm password do not match'
       });
     }
-    
+
     if (newPassword.length < 6) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'New password must be at least 6 characters long' 
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
       });
     }
-    
+
     // Find user
     const user = await User.findById(userId);
-    
+
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
-    
+
     // Check current password
     const isMatch = await user.comparePassword(currentPassword);
-    
+
     if (!isMatch) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Current password is incorrect' 
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
       });
     }
-    
+
     // Update password
     user.password = newPassword;
     await user.save();
-    
+
     res.json({
       success: true,
       message: 'Password changed successfully'

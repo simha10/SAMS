@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -20,6 +21,7 @@ import { toast } from "@/components/ui/sonner";
 export default function Login() {
   const [empId, setEmpId] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +34,8 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await authAPI.login(empId, password);
+      // Use the authAPI service which is properly configured with the correct baseURL
+      const response = await authAPI.login(empId, password, rememberMe);
 
       if (response.success && response.data) {
         login(response.data.user);
@@ -120,6 +123,17 @@ export default function Login() {
                 disabled={loading}
                 className="input-modern h-12"
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="remember"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              />
+              <Label htmlFor="remember" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Remember me
+              </Label>
             </div>
 
             <Button
