@@ -7,5 +7,6 @@ module.exports = {
     '!src/app.js'
   ],
   coverageDirectory: 'coverage',
-  verbose: true
+  verbose: true,
+  setupFiles: ['<rootDir>/test-env-config.js']
 };

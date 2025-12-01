@@ -13,6 +13,10 @@ const holidaySchema = new mongoose.Schema({
   description: {
     type: String
   },
+  isRecurringSunday: {
+    type: Boolean,
+    default: false
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

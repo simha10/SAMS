@@ -34,7 +34,7 @@ const attendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['present', 'absent', 'half-day', 'on-leave', 'outside-duty'],
+    enum: ['present', 'absent', 'half-day', 'on-leave', 'outside-duty', 'flagged'],
     default: 'absent'
   },
   workingHours: {
@@ -46,7 +46,12 @@ const attendanceSchema = new mongoose.Schema({
     default: false
   },
   flaggedReason: {
-    type: String
+    type: {
+      type: String,
+      enum: ['location_breach', 'late_checkin', 'early_checkout', 'other']
+    },
+    distance: Number,
+    message: String
   },
   isHalfDay: {
     type: Boolean,
@@ -55,6 +60,14 @@ const attendanceSchema = new mongoose.Schema({
   halfDayType: {
     type: String,
     enum: ['morning', 'afternoon']
+  },
+  // Multi-branch support
+  branch: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch'
+  },
+  distanceFromBranch: {
+    type: Number
   }
 }, {
   timestamps: true
@@ -62,5 +75,6 @@ const attendanceSchema = new mongoose.Schema({
 
 // Index for faster queries
 attendanceSchema.index({ userId: 1, date: 1 });
+attendanceSchema.index({ branch: 1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

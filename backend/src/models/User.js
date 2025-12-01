@@ -29,6 +29,9 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  dob: {
+    type: Date
+  },
   officeLocation: {
     lat: {
       type: Number,
@@ -52,10 +55,10 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) return next();
-  
+
   try {
     // Generate a salt and hash the password
     const salt = await bcrypt.genSalt(10);
@@ -67,7 +70,7 @@ userSchema.pre('save', async function(next) {
 });
 
 // Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   try {
     // Check if both candidatePassword and this.password exist
     if (!candidatePassword || !this.password) {
@@ -83,5 +86,6 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 userSchema.index({ empId: 1 });
 userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
+userSchema.index({ dob: 1 }); // Index for birthday queries
 
 module.exports = mongoose.model('User', userSchema);

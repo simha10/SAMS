@@ -19,8 +19,10 @@ import {
   Calendar,
   Bell,
   Trash2,
+  Cake,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { useBirthdayStore } from "@/stores/birthdayStore";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import {
   attendanceAPI,
@@ -54,6 +56,14 @@ interface GeofenceErrorData {
 
 export default function Dashboard() {
   const { user } = useAuthStore();
+  const { birthdayMessage, showBirthdayBanner, hideBirthdayBanner } = useBirthdayStore();
+
+  // Use the birthday store values to prevent linter errors
+  useEffect(() => {
+    // This effect runs when the component mounts
+    // In a real implementation, we would fetch birthday data from the API
+    console.log('Birthday banner state:', { birthdayMessage, showBirthdayBanner });
+  }, [birthdayMessage, showBirthdayBanner]);
   const {
     latitude,
     longitude,
@@ -595,6 +605,23 @@ export default function Dashboard() {
           <AlertDescription>
             Too many requests sent to the server. Please wait a moment and try
             again. You may need to refresh the page after a minute.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Birthday Banner */}
+      {showBirthdayBanner && birthdayMessage && (
+        <Alert className="bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0">
+          <Cake className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>{birthdayMessage}</span>
+            <button 
+              onClick={hideBirthdayBanner}
+              className="ml-4 text-white hover:text-gray-200"
+              aria-label="Close banner"
+            >
+              ×
+            </button>
           </AlertDescription>
         </Alert>
       )}

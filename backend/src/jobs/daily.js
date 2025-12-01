@@ -2,21 +2,48 @@ const cron = require('node-cron');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
+const Holiday = require('../models/Holiday');
 const notificationService = require('../services/notificationService');
 const { getCurrentDateString } = require('../utils/haversine');
 const logger = require('../config/logger');
+
+// Check if date is a Sunday
+function isSunday(dateString) {
+  const date = new Date(dateString);
+  return date.getDay() === 0;
+}
 
 // Mark absentees at 11:00 AM daily
 cron.schedule('0 11 * * *', async () => {
   try {
     logger.info('Running daily absentee marking job...');
-    
+
     const today = getCurrentDateString();
-    
+    const todayDate = new Date(today);
+
+    // Check if today is Sunday
+    const isTodaySunday = isSunday(today);
+
+    // Check for declared holidays
+    const holiday = await Holiday.findOne({ date: todayDate });
+    const isDeclaredHoliday = !!holiday;
+
+    // Check for recurring Sundays
+    let isRecurringSunday = false;
+    if (isTodaySunday) {
+      const sundayHoliday = await Holiday.findOne({
+        date: todayDate,
+        isRecurringSunday: true
+      });
+      isRecurringSunday = !!sundayHoliday;
+    }
+
+    const isHoliday = isDeclaredHoliday || isRecurringSunday || isTodaySunday;
+
     // Get all active employees
-    const employees = await User.find({ 
-      isActive: true, 
-      role: 'employee' 
+    const employees = await User.find({
+      isActive: true,
+      role: 'employee'
     }).select('_id empId name');
 
     // Get approved leaves for today
@@ -31,8 +58,8 @@ cron.schedule('0 11 * * *', async () => {
     );
 
     // Get existing attendance records for today
-    const existingAttendance = await Attendance.find({ 
-      date: today 
+    const existingAttendance = await Attendance.find({
+      date: today
     }).select('userId status');
 
     const employeesWithAttendance = new Set(
@@ -43,7 +70,7 @@ cron.schedule('0 11 * * *', async () => {
     const absentees = [];
     for (const employee of employees) {
       const employeeId = employee._id.toString();
-      
+
       // Skip if employee is on approved leave
       if (employeesOnLeave.has(employeeId)) {
         continue;
@@ -55,17 +82,24 @@ cron.schedule('0 11 * * *', async () => {
       }
 
       // Mark as absent
-      await Attendance.create({
+      const attendanceRecord = await Attendance.create({
         userId: employee._id,
         date: today,
         status: 'absent'
       });
 
+      // If today is a holiday, flag the record
+      if (isHoliday) {
+        attendanceRecord.flagged = true;
+        attendanceRecord.flaggedReason = isTodaySunday ? 'Sunday holiday' : 'Declared holiday';
+        await attendanceRecord.save();
+      }
+
       absentees.push(employee);
     }
 
     logger.info(`Marked ${absentees.length} employees as absent for ${today}`);
-    
+
   } catch (error) {
     logger.error('Daily absentee marking job error:', error);
   }
@@ -75,20 +109,20 @@ cron.schedule('0 11 * * *', async () => {
 cron.schedule('30 18 * * *', async () => {
   try {
     logger.info('Running daily summary job...');
-    
+
     const today = getCurrentDateString();
-    
+
     // Get all managers and directors
-    const managers = await User.find({ 
+    const managers = await User.find({
       role: { $in: ['manager', 'director'] },
-      isActive: true 
+      isActive: true
     });
 
     for (const manager of managers) {
       // Get team members for this manager
-      const teamMembers = await User.find({ 
+      const teamMembers = await User.find({
         managerId: manager._id,
-        isActive: true 
+        isActive: true
       }).select('_id');
 
       if (teamMembers.length === 0) {
@@ -150,7 +184,7 @@ cron.schedule('30 18 * * *', async () => {
     }
 
     logger.info('Daily summary job completed');
-    
+
   } catch (error) {
     logger.error('Daily summary job error:', error);
   }
