@@ -18,6 +18,7 @@ A production-ready, zero-cost Geo-Fence Attendance Management System for offices
 - **Advanced Flagged Attendance**: Detailed reasons with distance reporting
 - **Progressive Web App (PWA)**: Installable on mobile devices with offline support
 - **Mobile-First Design**: LinkedIn-style responsive UI optimized for mobile devices
+- **Persistent Login Sessions**: "Remember Me" functionality for extended sessions
 
 ## 🏗️ Architecture
 
@@ -147,7 +148,7 @@ attendance/
    Create `.env.local`:
 
    ```env
-   VITE_API_URL=http://localhost:5000
+   VITE_API_URL=http://localhost:8080
    ```
 
 3. **Start Development Server:**
@@ -256,6 +257,16 @@ Benefits of the PWA:
 - **Responsive Layout**: Adapts to all screen sizes
 - **Bottom Navigation**: Easy access to key features on mobile
 - **Quick Actions**: One-tap check-in/check-out functionality
+
+### Persistent Login Sessions
+
+The application now supports persistent login sessions through the "Remember Me" functionality:
+
+- Users can choose to stay logged in for extended periods (up to 30 days)
+- Session duration is configurable (24 hours by default, 30 days with "Remember Me")
+- Secure JWT tokens stored in HTTP-only cookies
+- Automatic re-authentication without requiring password entry
+- Perfect for mobile users who access the application frequently
 
 ## 🔧 Configuration
 

@@ -15,6 +15,7 @@ This is the backend API for the Geo-Fence Attendance Management System.
 - Holiday Management with Recurring Sundays
 - Birthday Notification System
 - Advanced Flagged Attendance with Distance Reporting
+- Persistent Login Sessions with "Remember Me" Functionality
 
 ## Tech Stack
 
@@ -67,7 +68,7 @@ The test files will automatically use the `MONGO_URI` from your `.env` file, or 
 
 ### Authentication
 
-- `POST /api/auth/login` - User login
+- `POST /api/auth/login` - User login (supports rememberMe parameter)
 - `POST /api/auth/logout` - User logout
 - `GET /api/auth/profile` - Get user profile
 - `POST /api/auth/register` - Create user (admin only)
@@ -148,6 +149,12 @@ See `.env.example` for all required environment variables.
 - Enhanced flaggedReason with detailed information including distance
 - Distance from branch is stored in attendance records
 - Distance is included in CSV/Excel reports and manager dashboard
+
+### ✅ Persistent Login Sessions
+- Added "Remember Me" functionality for extended session duration
+- Users can choose between 24-hour (default) or 30-day sessions
+- Backend supports the rememberMe parameter in login requests
+- Cookie expiration time dynamically adjusted based on user preference
 
 ## Current Achievements
 
