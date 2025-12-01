@@ -20,6 +20,8 @@ import {
   Bell,
   Trash2,
   Cake,
+  Navigation,
+  Timer,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useBirthdayStore } from "@/stores/birthdayStore";
@@ -42,6 +44,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface TodayStatus {
   date: string;
@@ -58,12 +61,6 @@ export default function Dashboard() {
   const { user } = useAuthStore();
   const { birthdayMessage, showBirthdayBanner, hideBirthdayBanner } = useBirthdayStore();
 
-  // Use the birthday store values to prevent linter errors
-  useEffect(() => {
-    // This effect runs when the component mounts
-    // In a real implementation, we would fetch birthday data from the API
-    console.log('Birthday banner state:', { birthdayMessage, showBirthdayBanner });
-  }, [birthdayMessage, showBirthdayBanner]);
   const {
     latitude,
     longitude,
@@ -83,9 +80,8 @@ export default function Dashboard() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [pendingAction, setPendingAction] = useState<
-    "checkin" | "checkout" | null
-  >(null);
+  const [pendingAction, setPendingAction] =
+    useState<"checkin" | "checkout" | null>(null);
   const [coordinates, setCoordinates] = useState<{
     lat: number;
     lng: number;
@@ -98,74 +94,55 @@ export default function Dashboard() {
   const [rateLimitError, setRateLimitError] = useState(false);
 
   useEffect(() => {
-    console.log("=== DASHBOARD COMPONENT MOUNTED ===");
-    console.log("Timestamp:", new Date().toISOString());
-
     let mounted = true;
 
     const loadData = async () => {
-      console.log("=== STARTING TO LOAD DASHBOARD DATA ===");
-
       if (mounted) {
-        console.log("Fetching today status...");
         await fetchTodayStatus();
       }
 
       // Add delay between requests to avoid rate limiting
       if (mounted) {
-        console.log("Adding delay before fetching attendance...");
         await new Promise((resolve) => setTimeout(resolve, 500));
-        console.log("Fetching recent attendance...");
         await fetchRecentAttendance();
       }
 
       // Add delay between requests to avoid rate limiting
       if (mounted) {
-        console.log("Adding delay before fetching leaves...");
         await new Promise((resolve) => setTimeout(resolve, 500));
-        console.log("Fetching recent leaves...");
         await fetchRecentLeaves();
       }
 
       // Add delay between requests to avoid rate limiting
       if (mounted) {
-        console.log("Adding delay before fetching notifications...");
         await new Promise((resolve) => setTimeout(resolve, 500));
-        console.log("Fetching recent notifications...");
         await fetchRecentNotifications();
       }
-
-      console.log("=== FINISHED LOADING DASHBOARD DATA ===");
     };
 
     loadData();
 
     // Check if there was a rate limit error in previous requests
     if (localStorage.getItem("rateLimitError") === "true") {
-      console.log("Rate limit error detected from previous requests");
       setRateLimitError(true);
       // Clear the flag
       localStorage.removeItem("rateLimitError");
     }
 
     return () => {
-      console.log("=== DASHBOARD COMPONENT UNMOUNTING ===");
       mounted = false;
     };
   }, []);
 
   const fetchTodayStatus = async () => {
-    console.log("=== FETCH TODAY STATUS STARTED ===");
     try {
       const response = await attendanceAPI.getTodayStatus();
-      console.log("Today status response:", response);
       if (response.success && response.data) {
         setTodayStatus(response.data);
       }
       setRateLimitError(false);
       // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
-      console.log("=== FETCH TODAY STATUS COMPLETED ===");
     } catch (err: unknown) {
       console.error("Failed to fetch today status:", err);
       // Check if it's a rate limit error
@@ -176,12 +153,10 @@ export default function Dashboard() {
           description: "Please wait a moment and try again.",
         });
       }
-      console.log("=== FETCH TODAY STATUS FAILED ===");
     }
   };
 
   const fetchRecentAttendance = async () => {
-    console.log("=== FETCH RECENT ATTENDANCE STARTED ===");
     setLoading(true);
     try {
       const endDate = new Date();
@@ -193,14 +168,12 @@ export default function Dashboard() {
         endDate.toISOString().split("T")[0]
       );
 
-      console.log("Recent attendance response:", response);
       if (response.success && response.data) {
         setRecentAttendance(response.data.attendance);
       }
       setRateLimitError(false);
       // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
-      console.log("=== FETCH RECENT ATTENDANCE COMPLETED ===");
     } catch (err: unknown) {
       console.error("Failed to fetch attendance history:", err);
       // Check if it's a rate limit error
@@ -211,24 +184,20 @@ export default function Dashboard() {
           description: "Please wait a moment and try again.",
         });
       }
-      console.log("=== FETCH RECENT ATTENDANCE FAILED ===");
     } finally {
       setLoading(false);
     }
   };
 
   const fetchRecentLeaves = async () => {
-    console.log("=== FETCH RECENT LEAVES STARTED ===");
     try {
       const response = await leaveAPI.getMyLeaveRequests();
-      console.log("Recent leaves response:", response);
       if (response.success && response.data) {
         setRecentLeaves(response.data.leaveRequests.slice(0, 5)); // Get last 5 leave requests
       }
       setRateLimitError(false);
       // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
-      console.log("=== FETCH RECENT LEAVES COMPLETED ===");
     } catch (err: unknown) {
       console.error("Failed to fetch leave requests:", err);
       // Check if it's a rate limit error
@@ -239,7 +208,6 @@ export default function Dashboard() {
           description: "Please wait a moment and try again.",
         });
       }
-      console.log("=== FETCH RECENT LEAVES FAILED ===");
     }
   };
 
@@ -266,17 +234,14 @@ export default function Dashboard() {
   };
 
   const fetchRecentNotifications = async () => {
-    console.log("=== FETCH RECENT NOTIFICATIONS STARTED ===");
     try {
       const response = await notificationsAPI.getNotifications(10, 0); // Get last 10 notifications
-      console.log("Recent notifications response:", response);
       if (response.success && response.data) {
         setRecentNotifications(response.data.notifications.slice(0, 5)); // Get last 5 notifications
       }
       setRateLimitError(false);
       // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
-      console.log("=== FETCH RECENT NOTIFICATIONS COMPLETED ===");
     } catch (err: unknown) {
       console.error("Failed to fetch notifications:", err);
       // Check if it's a rate limit error
@@ -287,7 +252,6 @@ export default function Dashboard() {
           description: "Please wait a moment and try again.",
         });
       }
-      console.log("=== FETCH RECENT NOTIFICATIONS FAILED ===");
     }
   };
 
@@ -593,7 +557,7 @@ export default function Dashboard() {
     !todayStatus?.attendance?.checkOutTime;
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Welcome back, {user?.name}!</p>
@@ -625,6 +589,45 @@ export default function Dashboard() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="card-modern">
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <div className="rounded-full bg-primary/10 p-2 mr-3">
+                <Timer className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Today's Status</p>
+                <p className="font-bold">
+                  {todayStatus?.attendance?.status === "present" ? "Present" : 
+                   todayStatus?.attendance?.status === "absent" ? "Absent" : 
+                   "Not Marked"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="card-modern">
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <div className="rounded-full bg-primary/10 p-2 mr-3">
+                <Navigation className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Location</p>
+                <p className="font-bold">
+                  {geoLoading ? "Loading..." : 
+                   geoError ? "Error" : 
+                   latitude && longitude ? "Available" : "Not Available"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Location Status */}
       <Card className="card-modern">
@@ -739,7 +742,7 @@ export default function Dashboard() {
                 geoError !== null ||
                 !isWithinOfficeHours()
               }
-              className="flex-1 bg-green-500 border-2 border-white"
+              className="flex-1 bg-green-500 border-2 border-white h-12"
             >
               {actionLoading && pendingAction === "checkin" && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -751,7 +754,7 @@ export default function Dashboard() {
               onClick={() => prepareAttendanceAction("checkout")}
               variant="outline"
               disabled={!canCheckout || actionLoading || geoError !== null}
-              className="flex-1 bg-red-400 border-2 border-white hover:bg-white hover:text-red-400"
+              className="flex-1 bg-red-400 border-2 border-white hover:bg-white hover:text-red-400 h-12"
             >
               {actionLoading && pendingAction === "checkout" && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

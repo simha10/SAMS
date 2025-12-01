@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 import { authAPI } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
 import type { ApiError } from "@/types";
@@ -31,40 +31,26 @@ export default function Login() {
     setError("");
     setLoading(true);
 
-    console.log("Login form submitted with:", { empId, password });
-
     try {
-      console.log("Calling authAPI.login...");
       const response = await authAPI.login(empId, password);
-      console.log("API response received:", response);
 
       if (response.success && response.data) {
-        console.log("Login successful, user data:", response.data.user);
-        console.log("Calling auth store login...");
         login(response.data.user);
-        console.log("Auth store updated, navigating to dashboard...");
         toast.success("Login successful", {
           description: "Welcome back! You have been successfully logged in.",
         });
 
         // Check user role and navigate accordingly
         if (response.data.user.role === "employee") {
-          console.log("User is employee, navigating to /employee/dashboard");
           navigate("/employee/dashboard");
         } else if (response.data.user.role === "manager") {
-          console.log("User is manager, navigating to /manager");
           navigate("/manager");
         } else if (response.data.user.role === "director") {
-          console.log("User is director, navigating to /admin");
           navigate("/admin");
         } else {
-          console.log(
-            "User role not recognized, navigating to default dashboard"
-          );
           navigate("/dashboard");
         }
       } else {
-        console.log("Login failed with message:", response.message);
         setError(response.message || "Login failed");
         toast.error("Login failed", {
           description:
@@ -72,11 +58,9 @@ export default function Login() {
         });
       }
     } catch (err: unknown) {
-      console.error("Login error caught:", err);
       const error = err as ApiError;
       const errorMessage =
         error.response?.data?.message || "Login failed. Please try again.";
-      console.log("Setting error message:", errorMessage);
       setError(errorMessage);
       toast.error("Login failed", {
         description:
@@ -84,19 +68,21 @@ export default function Login() {
           "Please check your credentials and try again.",
       });
     } finally {
-      console.log("Login process completed");
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-blue-orange p-4">
-      <Card className="w-full max-w-md card-modern">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            LRMC Staff Attendance System
+      <Card className="w-full max-w-md card-modern shadow-2xl">
+        <CardHeader className="space-y-1 text-center">
+          <div className="mx-auto bg-primary/10 p-3 rounded-full mb-4">
+            <Lock className="h-8 w-8 text-primary mx-auto" />
+          </div>
+          <CardTitle className="text-2xl font-bold">
+            LRMC Staff Login
           </CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription>
             Sign in to your account to continue
           </CardDescription>
         </CardHeader>
@@ -118,7 +104,7 @@ export default function Login() {
                 onChange={(e) => setEmpId(e.target.value)}
                 required
                 disabled={loading}
-                className="input-modern"
+                className="input-modern h-12"
               />
             </div>
 
@@ -132,19 +118,24 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
-                className="input-modern"
+                className="input-modern h-12"
               />
             </div>
 
             <Button
               type="submit"
-              className="w-full btn-primary"
+              className="w-full btn-primary h-12 text-base"
               disabled={loading}
             >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
               Sign In
             </Button>
           </form>
+          
+          <div className="mt-6 text-center text-sm text-muted-foreground">
+            <p>© {new Date().getFullYear()} LRMC Staff Attendance System</p>
+            <p className="mt-1">All rights reserved</p>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -16,6 +16,8 @@ A production-ready, zero-cost Geo-Fence Attendance Management System for offices
 - **Enhanced Holiday Management**: Recurring Sunday holidays and custom holiday declarations
 - **Birthday Notifications**: Daily birthday alerts for team members
 - **Advanced Flagged Attendance**: Detailed reasons with distance reporting
+- **Progressive Web App (PWA)**: Installable on mobile devices with offline support
+- **Mobile-First Design**: LinkedIn-style responsive UI optimized for mobile devices
 
 ## 🏗️ Architecture
 
@@ -229,6 +231,32 @@ pnpm run lint
 - Top performers leaderboard
 - Manage branches and holidays
 
+## 📱 Mobile App Features
+
+### Progressive Web App (PWA)
+
+The application can be installed as a Progressive Web App on any modern device:
+
+1. Open the application in Chrome, Edge, Safari, or Firefox
+2. Look for the install prompt at the top of the screen
+3. Click "Install" to add to your home screen
+4. Launch like a native app with full offline capabilities
+
+Benefits of the PWA:
+- Works offline for basic functionality
+- Loads instantly even on slow networks
+- Sends push notifications for important updates
+- Takes minimal device storage
+- Always up-to-date with latest features
+
+### Mobile-First Design
+
+- **LinkedIn-Style UI**: Modern interface with intuitive navigation
+- **Touch Optimized**: Gestures and touch-friendly controls
+- **Responsive Layout**: Adapts to all screen sizes
+- **Bottom Navigation**: Easy access to key features on mobile
+- **Quick Actions**: One-tap check-in/check-out functionality
+
 ## 🔧 Configuration
 
 ### Office Location
@@ -435,6 +463,7 @@ Successfully populated database with:
 - ✅ Database properly seeded with realistic sample data
 - ✅ All authentication and authorization working correctly
 - ✅ Zero-cost deployment configuration verified
+- ✅ PWA implementation with mobile-first design
 
 ### Phase 2: Short-term Enhancements (Next 2-3 Months)
 - [ ] Implement Redis caching layer for improved performance

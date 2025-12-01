@@ -44,7 +44,8 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
-      'http://192.168.18.210:5173', // Network IP
+      'http://192.168.18.210:5173',
+      'http://192.168.18.168:5174', // Network IP
       process.env.FRONTEND_URL
     ].filter(Boolean); // Filter out undefined values
     

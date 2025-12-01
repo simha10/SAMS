@@ -37,18 +37,6 @@ const queryClient = new QueryClient();
 // Set dark theme by default
 document.documentElement.classList.add("dark");
 
-// Log all route changes
-const logRouteChange = (location: any, action: any) => {
-  console.log("=== ROUTE CHANGE ===");
-  console.log("Action:", action);
-  console.log("Location:", location);
-  console.log("Pathname:", location.pathname);
-  console.log("Search:", location.search);
-  console.log("Hash:", location.hash);
-  console.log("Timestamp:", new Date().toISOString());
-  console.log("=== END ROUTE CHANGE ===");
-};
-
 // Protected Route Component
 const ProtectedRoute = ({
   children,
@@ -59,26 +47,14 @@ const ProtectedRoute = ({
 }) => {
   const { isAuthenticated, user } = useAuthStore();
 
-  console.log("=== PROTECTED ROUTE CHECK ===");
-  console.log("isAuthenticated:", isAuthenticated);
-  console.log("user:", user);
-  console.log("allowedRoles:", allowedRoles);
-  console.log("Timestamp:", new Date().toISOString());
-
   if (!isAuthenticated) {
-    console.log("User not authenticated, redirecting to login");
-    console.log("=== END PROTECTED ROUTE CHECK ===");
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    console.log("User role not allowed, redirecting to dashboard");
-    console.log("=== END PROTECTED ROUTE CHECK ===");
     return <Navigate to="/dashboard" replace />;
   }
 
-  console.log("Access granted to protected route");
-  console.log("=== END PROTECTED ROUTE CHECK ===");
   return <>{children}</>;
 };
 
@@ -86,35 +62,20 @@ const ProtectedRoute = ({
 const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, user } = useAuthStore();
 
-  console.log("=== EMPLOYEE ROUTE CHECK ===");
-  console.log("isAuthenticated:", isAuthenticated);
-  console.log("user:", user);
-  console.log("Timestamp:", new Date().toISOString());
-
   if (!isAuthenticated) {
-    console.log("User not authenticated, redirecting to login");
-    console.log("=== END EMPLOYEE ROUTE CHECK ===");
     return <Navigate to="/login" replace />;
   }
 
   if (user && user.role !== "employee") {
     // Redirect to appropriate dashboard based on role
     if (user.role === "manager") {
-      console.log("User is manager, redirecting to manager dashboard");
-      console.log("=== END EMPLOYEE ROUTE CHECK ===");
       return <Navigate to="/manager" replace />;
     } else if (user.role === "director") {
-      console.log("User is director, redirecting to admin dashboard");
-      console.log("=== END EMPLOYEE ROUTE CHECK ===");
       return <Navigate to="/admin" replace />;
     }
-    console.log("User role not recognized, redirecting to default dashboard");
-    console.log("=== END EMPLOYEE ROUTE CHECK ===");
     return <Navigate to="/dashboard" replace />;
   }
 
-  console.log("Access granted to employee route");
-  console.log("=== END EMPLOYEE ROUTE CHECK ===");
   return <>{children}</>;
 };
 
@@ -122,61 +83,36 @@ const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, user } = useAuthStore();
 
-  console.log("=== ADMIN ROUTE CHECK ===");
-  console.log("isAuthenticated:", isAuthenticated);
-  console.log("user:", user);
-  console.log("Timestamp:", new Date().toISOString());
-
   if (!isAuthenticated) {
-    console.log("User not authenticated, redirecting to login");
-    console.log("=== END ADMIN ROUTE CHECK ===");
     return <Navigate to="/login" replace />;
   }
 
   if (user && user.role !== "director") {
     // Redirect to appropriate dashboard based on role
     if (user.role === "manager") {
-      console.log("User is manager, redirecting to manager dashboard");
-      console.log("=== END ADMIN ROUTE CHECK ===");
       return <Navigate to="/manager" replace />;
     } else if (user.role === "employee") {
-      console.log("User is employee, redirecting to employee dashboard");
-      console.log("=== END ADMIN ROUTE CHECK ===");
       return <Navigate to="/employee/dashboard" replace />;
     }
-    console.log("User role not recognized, redirecting to default dashboard");
-    console.log("=== END ADMIN ROUTE CHECK ===");
     return <Navigate to="/dashboard" replace />;
   }
 
-  console.log("Access granted to admin route");
-  console.log("=== END ADMIN ROUTE CHECK ===");
   return <>{children}</>;
 };
 
 const App = () => {
   const { isAuthenticated, user } = useAuthStore();
 
-  console.log("=== APP RENDER ===");
-  console.log("isAuthenticated:", isAuthenticated);
-  console.log("user:", user);
-  console.log("Timestamp:", new Date().toISOString());
-
   // Check for authentication errors on app load
   useEffect(() => {
-    console.log("=== APP INITIALIZATION ===");
-
     // Check if there was an authentication error
     const urlParams = new URLSearchParams(window.location.search);
     const authError = urlParams.get("authError");
 
     if (authError) {
-      console.log("Authentication error detected:", authError);
       // Clear auth state
       useAuthStore.getState().logout();
     }
-
-    console.log("=== END APP INITIALIZATION ===");
   }, []);
 
   return (
