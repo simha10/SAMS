@@ -1,7 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendTelegramMessage } = require('../utils/telegram');
 
 // Generate JWT token
 const generateToken = (user) => {
