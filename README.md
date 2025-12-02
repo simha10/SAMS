@@ -156,6 +156,40 @@ attendance/
    pnpm run dev
    ```
 
+## 🔄 Multi-Branch Migration (Production Systems)
+
+This system has been migrated from a single-office geofencing model to a multi-branch system. For production systems with existing data:
+
+### Migration Process
+
+1. **Assessment**: The system automatically detects existing user data with `officeLocation` fields
+2. **Branch Creation**: Automatically creates branches from existing user location data
+3. **Data Preservation**: All existing data is preserved during migration
+4. **System Transition**: The system operates in dual-mode, supporting both legacy and new approaches
+
+### Running Migration
+
+```bash
+cd backend
+node scripts/migrate-users.js
+```
+
+### Verification
+
+```bash
+cd backend
+node scripts/verify-migration.js
+```
+
+### Benefits
+
+- Zero downtime migration
+- No data loss
+- Backward compatibility maintained
+- Rollback capability available
+
+See [Migration Guide](DOCS/MIGRATION_GUIDE.md) for detailed information.
+
 ## 🧪 Testing
 
 ### Backend Tests

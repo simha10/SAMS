@@ -57,11 +57,6 @@ const seedUsers = async () => {
       email: 'lim.rao@company.com',
       password: 'director123',
       role: 'director',
-      officeLocation: {
-        lat: 26.913662872166825,
-        lng: 80.95351830268484,
-        radius: 50
-      },
       dob: new Date('1980-05-15'),
       isActive: true
     });
@@ -77,11 +72,6 @@ const seedUsers = async () => {
       password: 'manager123',
       role: 'manager',
       managerId: director._id,
-      officeLocation: {
-        lat: 26.913662872166825,
-        lng: 80.95351830268484,
-        radius: 50
-      },
       dob: new Date('1985-08-22'),
       isActive: true
     });
@@ -98,11 +88,6 @@ const seedUsers = async () => {
         password: 'employee123',
         role: 'employee',
         managerId: manager._id,
-        officeLocation: {
-          lat: 26.913662872166825,
-          lng: 80.95351830268484,
-          radius: 50
-        },
         dob: new Date('1990-03-10'),
         isActive: true
       },
@@ -113,11 +98,6 @@ const seedUsers = async () => {
         password: 'employee123',
         role: 'employee',
         managerId: manager._id,
-        officeLocation: {
-          lat: 26.914835918849107,
-          lng: 80.94982919387432,
-          radius: 50
-        },
         dob: new Date('1992-11-25'),
         isActive: true
       },
@@ -128,11 +108,6 @@ const seedUsers = async () => {
         password: 'employee123',
         role: 'employee',
         managerId: manager._id,
-        officeLocation: {
-          lat: 26.913662872166825,
-          lng: 80.95351830268484,
-          radius: 50
-        },
         dob: new Date('1988-07-18'),
         isActive: true
       }

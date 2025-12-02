@@ -33,6 +33,8 @@ const userSchema = new mongoose.Schema({
   dob: {
     type: Date
   },
+  // Note: officeLocation is deprecated but kept for backward compatibility
+  // New multi-branch system uses Branch model instead
   officeLocation: {
     lat: {
       type: Number,

@@ -34,7 +34,6 @@ import {
 } from "@/services/api";
 import { format } from "date-fns";
 import type { AttendanceRecord, LeaveRequest, ApiError } from "@/types";
-import { haversine } from "@/config";
 import {
   Dialog,
   DialogContent,
@@ -85,10 +84,6 @@ export default function Dashboard() {
   const [coordinates, setCoordinates] = useState<{
     lat: number;
     lng: number;
-  } | null>(null);
-  const [distanceInfo, setDistanceInfo] = useState<{
-    distance: number;
-    allowedRadius: number;
   } | null>(null);
   const [showGeofenceWarning, setShowGeofenceWarning] = useState(false);
   const [rateLimitError, setRateLimitError] = useState(false);
@@ -314,32 +309,8 @@ export default function Dashboard() {
         return;
       }
 
-      // Calculate distance from office using environment variables
-      const officeLat =
-        parseFloat(import.meta.env.VITE_OFFICE_LAT) || 26.913595;
-      const officeLng =
-        parseFloat(import.meta.env.VITE_OFFICE_LNG) || 80.953481;
-      const allowedRadius = parseInt(import.meta.env.VITE_OFFICE_RADIUS) || 50;
-
-      const distance = haversine(coords.lat, coords.lng, officeLat, officeLng);
-
-      if (distance > allowedRadius) {
-        // User is outside geofence - show confirmation dialog
-        setDistanceInfo({
-          distance: Math.round(distance),
-          allowedRadius: allowedRadius,
-        });
-        setShowGeofenceWarning(true);
-        setError(
-          `You are ${Math.round(
-            distance
-          )}m away from the office location. Your attendance will be marked as flagged for manager review.`
-        );
-        setPendingAction(action);
-        return;
-      }
-
-      // User is within geofence - proceed with normal confirmation
+      // Instead of doing local geofence validation, proceed directly to confirmation
+      // The backend will handle all geofence validation with the new multi-branch system
       setPendingAction(action);
       setShowConfirmation(true);
       setError(""); // Clear any previous error
@@ -389,7 +360,6 @@ export default function Dashboard() {
         // Refresh today's status after successful action
         await fetchTodayStatus();
         setShowGeofenceWarning(false);
-        setDistanceInfo(null);
         setRateLimitError(false);
       } else {
         setError(response.message || `${action} failed`);
@@ -448,7 +418,6 @@ export default function Dashboard() {
         await fetchTodayStatus();
         setShowConfirmation(false);
         setPendingAction(null);
-        setDistanceInfo(null);
         setRateLimitError(false);
       } else {
         // Handle the case where the user is outside the geofence
@@ -461,13 +430,11 @@ export default function Dashboard() {
           "allowedRadius" in response.data
         ) {
           const geofenceData = response.data as GeofenceErrorData;
-          setDistanceInfo({
-            distance: geofenceData.distance,
-            allowedRadius: geofenceData.allowedRadius,
-          });
+          setError(`You are ${geofenceData.distance}m away from the nearest branch. Your attendance will be flagged for manager review.`);
           setShowGeofenceWarning(true);
+        } else {
+          setError(response.message || `${pendingAction} failed`);
         }
-        setError(response.message || `${pendingAction} failed`);
         toast.error(
           pendingAction === "checkin" ? "Check-in failed" : "Check-out failed",
           {
@@ -485,12 +452,8 @@ export default function Dashboard() {
         "allowedRadius" in error.response.data
       ) {
         const geofenceData = error.response.data as GeofenceErrorData;
-        setDistanceInfo({
-          distance: geofenceData.distance,
-          allowedRadius: geofenceData.allowedRadius,
-        });
+        setError(`You are ${geofenceData.distance}m away from the nearest branch. Your attendance will be flagged for manager review.`);
         setShowGeofenceWarning(true);
-        setError(error.response.data.message || `${pendingAction} failed`);
         toast.error("Geofence restriction", {
           description:
             error.response.data.message || "You are outside the allowed area.",
@@ -704,7 +667,7 @@ export default function Dashboard() {
             </Alert>
           )}
 
-          {error && !distanceInfo && (
+          {error && !showGeofenceWarning && (
             <Alert variant="destructive" className="alert-modern">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
@@ -962,33 +925,9 @@ export default function Dashboard() {
             </DialogDescription>
           </DialogHeader>
 
-          {error && !distanceInfo && (
+          {error && !showGeofenceWarning && (
             <Alert variant="destructive" className="alert-modern">
               <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {distanceInfo && (
-            <Alert variant="destructive" className="alert-modern">
-              <AlertDescription>
-                <div className="space-y-2">
-                  <p className="font-semibold text-orange-500">
-                    ⚠️ You are {distanceInfo.distance}m away from the office
-                    location!
-                  </p>
-
-                  <p className="text-sm">
-                    Allowed radius:{" "}
-                    <span className="font-bold">
-                      {distanceInfo.allowedRadius}m
-                    </span>
-                  </p>
-                  <p className="text-sm text-orange-500">
-                    If you believe this is incorrect, please check your location
-                    services and try again.
-                  </p>
-                </div>
-              </AlertDescription>
             </Alert>
           )}
 
@@ -1029,7 +968,6 @@ export default function Dashboard() {
               variant="outline"
               onClick={() => {
                 setShowConfirmation(false);
-                setDistanceInfo(null);
               }}
               disabled={actionLoading}
               className="btn-secondary"
@@ -1064,23 +1002,12 @@ export default function Dashboard() {
             </DialogDescription>
           </DialogHeader>
 
-          {distanceInfo && (
+          {error && (
             <Alert variant="destructive" className="alert-modern">
               <AlertDescription>
                 <div className="space-y-2">
                   <p className="font-semibold text-orange-500">
-                    ⚠️ You are {distanceInfo.distance}m away from the office
-                    location!
-                  </p>
-                  <p className="text-sm">
-                    Coordinates: {coordinates?.lat.toFixed(6)},{" "}
-                    {coordinates?.lng.toFixed(6)}
-                  </p>
-                  <p className="text-sm">
-                    Allowed radius:{" "}
-                    <span className="font-bold">
-                      {distanceInfo.allowedRadius}m
-                    </span>
+                    ⚠️ {error}
                   </p>
                   <p className="text-sm text-orange-500">
                     Your attendance will be marked as "Outside Duty" and flagged
