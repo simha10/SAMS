@@ -42,3 +42,16 @@ backend/dist/
 backend/dist-ssr/
 backend/logs/
 backend/*.log
+
+
+# Vite PWA development build directory
+dev-dist/
+dist/
+
+# Service worker files (auto-generated)
+dev-dist/sw.js
+dev-dist/workbox-*.js
+dev-dist/registerSW.js
+
+# Production build artifacts
+dist/**

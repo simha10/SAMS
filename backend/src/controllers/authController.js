@@ -39,7 +39,7 @@ async function login(req, res) {
     }
 
     // Check if password matches
-    const isMatch = await user.matchPassword(password);
+    const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
       return res.status(401).json({
@@ -335,7 +335,7 @@ async function changePassword(req, res) {
     }
 
     // Check if current password matches
-    const isMatch = await user.matchPassword(currentPassword);
+    const isMatch = await user.comparePassword(currentPassword);
 
     if (!isMatch) {
       return res.status(400).json({
