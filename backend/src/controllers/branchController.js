@@ -57,14 +57,14 @@ async function findNearestBranch(lat, lng) {
     }
 }
 
-// Create a new branch (admin only)
+// Create a new branch (managers and directors)
 async function createBranch(req, res) {
     try {
-        // Check if user is admin/director
-        if (req.user.role !== 'director') {
+        // Check if user is manager or director
+        if (req.user.role !== 'manager' && req.user.role !== 'director') {
             return res.status(403).json({
                 success: false,
-                message: 'Only directors can create branches'
+                message: 'Only managers and directors can create branches'
             });
         }
 
@@ -101,14 +101,14 @@ async function createBranch(req, res) {
     }
 }
 
-// Update a branch (admin only)
+// Update a branch (managers and directors)
 async function updateBranch(req, res) {
     try {
-        // Check if user is admin/director
-        if (req.user.role !== 'director') {
+        // Check if user is manager or director
+        if (req.user.role !== 'manager' && req.user.role !== 'director') {
             return res.status(403).json({
                 success: false,
-                message: 'Only directors can update branches'
+                message: 'Only managers and directors can update branches'
             });
         }
 
@@ -145,14 +145,14 @@ async function updateBranch(req, res) {
     }
 }
 
-// Delete a branch (admin only)
+// Delete a branch (managers and directors)
 async function deleteBranch(req, res) {
     try {
-        // Check if user is admin/director
-        if (req.user.role !== 'director') {
+        // Check if user is manager or director
+        if (req.user.role !== 'manager' && req.user.role !== 'director') {
             return res.status(403).json({
                 success: false,
-                message: 'Only directors can delete branches'
+                message: 'Only managers and directors can delete branches'
             });
         }
 

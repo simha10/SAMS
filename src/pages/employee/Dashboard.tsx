@@ -43,8 +43,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
 interface TodayStatus {
   date: string;
   attendance: AttendanceRecord;

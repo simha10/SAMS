@@ -15,6 +15,7 @@ const managerRoutes = require('./routes/manager');
 const reportRoutes = require('./routes/reports');
 const holidayRoutes = require('./routes/holidays');
 const publicHolidayRoutes = require('./routes/publicHolidays'); // Public holiday routes
+const branchesRoutes = require('./routes/branches'); // Branches route
 
 // Initialize app
 const app = express();
@@ -39,7 +40,7 @@ const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     // List of allowed origins
     const allowedOrigins = [
       'http://localhost:5173',
@@ -49,12 +50,12 @@ const corsOptions = {
       'https://sams-frontend-sq6o.onrender.com', //frontend URL
       process.env.FRONTEND_URL
     ].filter(Boolean); // Filter out undefined values
-    
+
     // Allow all origins in development
     if (process.env.NODE_ENV === 'development') {
       return callback(null, true);
     }
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -112,6 +113,7 @@ console.log("Manager routes:", '/api/manager');
 console.log("Report routes:", '/api/reports');
 console.log("Manager holiday routes:", '/api/manager/holidays');
 console.log("Public holiday routes:", '/api/holidays');
+console.log("Branches routes:", '/api/branches'); // Added branches route
 console.log("=== END REGISTERING ROUTES ===");
 
 // Routes
@@ -121,6 +123,7 @@ app.use('/api/leaves', leaveRoutes);
 app.use('/api/manager', managerRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/holidays', publicHolidayRoutes); // Public holiday routes
+app.use('/api/branches', branchesRoutes); // Branches route
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -140,7 +143,7 @@ app.use((err, req, res, next) => {
   console.error('Method:', req.method);
   console.error('IP:', req.ip);
   console.error('Timestamp:', new Date().toISOString());
-  
+
   // Mongoose validation error
   if (err.name === 'ValidationError') {
     const errors = Object.values(err.errors).map(e => e.message);
@@ -150,7 +153,7 @@ app.use((err, req, res, next) => {
       errors
     });
   }
-  
+
   // Mongoose duplicate key error
   if (err.code === 11000) {
     return res.status(400).json({
@@ -158,7 +161,7 @@ app.use((err, req, res, next) => {
       message: 'Duplicate field value entered'
     });
   }
-  
+
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
     return res.status(400).json({
@@ -166,7 +169,7 @@ app.use((err, req, res, next) => {
       message: 'Resource not found'
     });
   }
-  
+
   // Default error
   res.status(err.statusCode || 500).json({
     success: false,
@@ -183,7 +186,7 @@ app.use('*', (req, res) => {
   console.log("IP:", req.ip);
   console.log("Timestamp:", new Date().toISOString());
   console.log("=== END 404 NOT FOUND ===");
-  
+
   res.status(404).json({
     success: false,
     message: 'Route not found'

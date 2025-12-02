@@ -29,6 +29,8 @@ import LeaveApprovals from "./pages/Manager/LeaveApprovals";
 import AttendanceApprovals from "./pages/Manager/AttendanceApprovals";
 import AddEmployee from "./pages/Manager/AddEmployee";
 import ManagerHolidays from "./pages/Manager/Holidays"; // Added Holidays import
+import BranchManagement from "./pages/Manager/BranchManagement"; // Added BranchManagement import
+
 // Admin pages
 import AdminAttendanceLogs from "./pages/AdminAttendanceLogs";
 
@@ -175,6 +177,8 @@ const App = () => {
                 />
                 <Route path="holidays" element={<ManagerHolidays />} />{" "}
                 {/* Added Holidays route */}
+                <Route path="branches" element={<BranchManagement />} />{" "}
+                {/* Added BranchManagement route */}
                 <Route path="reports" element={<ManagerReports />} />
                 <Route path="analytics" element={<ManagerAnalytics />} />
                 <Route path="analytics/team" element={<TeamTrends />} />

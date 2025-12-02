@@ -1,8 +1,8 @@
 import axios from 'axios';
-import type { User, AttendanceRecord, LeaveRequest, ApiResponse, RegisterData, LeaveRequestData, ApiError } from '@/types';
+import type { User, AttendanceRecord, LeaveRequest, ApiResponse, RegisterData, LeaveRequestData, } from '@/types';
 import { toast } from '@/components/ui/sonner';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 // Create axios instance with default config
 export const api = axios.create({
@@ -663,6 +663,76 @@ export const holidayAPI = {
     } catch (error) {
       toast.error("Failed to check holiday status", {
         description: "Could not check if date is a holiday. Please try again.",
+      });
+      throw error;
+    }
+  }
+};
+
+// Branch API
+export const branchAPI = {
+  getBranches: async () => {
+    try {
+      const response = await api.get('/branches');
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to load branches", {
+        description: "Could not load branches. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  createBranch: async (branchData: {
+    name: string;
+    location: { lat: number; lng: number };
+    radius?: number;
+    isActive?: boolean;
+  }) => {
+    try {
+      const response = await api.post('/branches', branchData);
+      toast.success("Branch created", {
+        description: "Branch has been created successfully.",
+      });
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to create branch", {
+        description: "Could not create branch. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  updateBranch: async (id: string, branchData: {
+    name?: string;
+    location?: { lat: number; lng: number };
+    radius?: number;
+    isActive?: boolean;
+  }) => {
+    try {
+      const response = await api.put(`/branches/${id}`, branchData);
+      toast.success("Branch updated", {
+        description: "Branch has been updated successfully.",
+      });
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to update branch", {
+        description: "Could not update branch. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  deleteBranch: async (id: string) => {
+    try {
+      const response = await api.delete(`/branches/${id}`);
+      toast.success("Branch deleted", {
+        description: "Branch has been deleted successfully.",
+      });
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to delete branch", {
+        description: "Could not delete branch. Please try again.",
       });
       throw error;
     }

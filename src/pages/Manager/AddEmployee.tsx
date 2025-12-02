@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,24 +11,50 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
-import { authAPI } from "@/services/api";
+import { authAPI, branchAPI } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
-import type { RegisterData } from "@/types";
+import type { RegisterData, Branch } from "@/types";
 
 export default function AddEmployee() {
   const { user } = useAuthStore();
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
   const [formData, setFormData] = useState({
     empId: "",
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
+    dob: "",
+    branchId: ""
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Fetch branches for selection
+  const fetchBranches = async () => {
+    if (user?.role !== "director") return;
+    
+    setBranchesLoading(true);
+    try {
+      const response = await branchAPI.getBranches();
+      if (response.success) {
+        setBranches(response.data.branches);
+      }
+    } catch (err) {
+      console.error("Failed to fetch branches:", err);
+    } finally {
+      setBranchesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBranches();
+  }, [user?.role]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -78,6 +104,11 @@ export default function AddEmployee() {
         managerId: user?._id,
       };
 
+      // Add branch assignment for directors
+      if (user?.role === "director" && formData.branchId) {
+        // We'll handle branch assignment on the backend
+      }
+
       const response = await authAPI.register(registerData);
 
       if (response.success) {
@@ -89,6 +120,8 @@ export default function AddEmployee() {
           email: "",
           password: "",
           confirmPassword: "",
+          dob: "",
+          branchId: ""
         });
       } else {
         setError(response.message || "Failed to add employee");
@@ -166,6 +199,16 @@ export default function AddEmployee() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="dob">Date of Birth</Label>
+                <Input
+                  id="dob"
+                  type="date"
+                  value={formData.dob}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="password">Initial Password *</Label>
                 <Input
                   id="password"
@@ -186,6 +229,33 @@ export default function AddEmployee() {
                   placeholder="Confirm password"
                 />
               </div>
+
+              {user?.role === "director" && (
+                <div className="space-y-2">
+                  <Label htmlFor="branchId">Assign Branch</Label>
+                  {branchesLoading ? (
+                    <div className="flex items-center justify-center p-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  ) : (
+                    <select
+                      id="branchId"
+                      value={formData.branchId}
+                      onChange={handleChange}
+                      className="w-full p-2 border rounded-md bg-background text-foreground"
+                    >
+                      <option value="">Select a branch (optional)</option>
+                      {branches
+                        .filter(branch => branch.isActive)
+                        .map((branch) => (
+                          <option key={branch._id} value={branch._id}>
+                            {branch.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end">
@@ -206,13 +276,22 @@ export default function AddEmployee() {
         </CardHeader>
         <CardContent>
           <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
-
             <li>
               Employee will be required to change their password on first login
             </li>
             <li>Employee ID must be unique across the system</li>
             <li>Email address must be unique across the system</li>
             <li>Password must be at least 6 characters long</li>
+            {user?.role === "director" && (
+              <>
+                <li>
+                  Directors can assign employees to specific branches (optional)
+                </li>
+                <li>
+                  Date of Birth is used for birthday notifications
+                </li>
+              </>
+            )}
           </ul>
         </CardContent>
       </Card>

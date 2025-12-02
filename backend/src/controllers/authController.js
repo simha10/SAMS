@@ -92,6 +92,7 @@ async function login(req, res) {
           email: user.email,
           role: user.role,
           managerId: user.managerId,
+          dob: user.dob,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
           createdAt: user.createdAt,
@@ -141,6 +142,7 @@ async function getProfile(req, res) {
           email: user.email,
           role: user.role,
           managerId: user.managerId,
+          dob: user.dob,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
           createdAt: user.createdAt,
@@ -165,7 +167,7 @@ async function register(req, res) {
       });
     }
 
-    const { empId, name, email, password, role, managerId, officeLocation } = req.body;
+    const { empId, name, email, password, role, managerId, officeLocation, dob } = req.body;
 
     // Validate required fields
     if (!empId || !name || !email || !password || !role) {
@@ -199,7 +201,7 @@ async function register(req, res) {
     }
 
     // Create user
-    const user = new User({
+    const userData = {
       empId,
       name,
       email,
@@ -211,7 +213,14 @@ async function register(req, res) {
         lng: process.env.OFFICE_DEFAULT_LNG || 80.953481,
         radius: process.env.OFFICE_DEFAULT_RADIUS || 50
       }
-    });
+    };
+
+    // Add DOB if provided
+    if (dob) {
+      userData.dob = dob;
+    }
+
+    const user = new User(userData);
 
     await user.save();
 
@@ -226,6 +235,7 @@ async function register(req, res) {
           email: user.email,
           role: user.role,
           managerId: user.managerId,
+          dob: user.dob,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
           createdAt: user.createdAt,
@@ -242,14 +252,14 @@ async function register(req, res) {
 // Update user profile
 async function updateProfile(req, res) {
   try {
-    const { name, email } = req.body;
+    const { name, email, dob } = req.body;
     const userId = req.user._id;
 
     // Validate input
-    if (!name && !email) {
+    if (!name && !email && !dob) {
       return res.status(400).json({
         success: false,
-        message: 'Name or email is required'
+        message: 'Name, email, or date of birth is required'
       });
     }
 
@@ -257,6 +267,7 @@ async function updateProfile(req, res) {
     const updateData = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
+    if (dob !== undefined) updateData.dob = dob;
 
     // Update user
     const user = await User.findByIdAndUpdate(
@@ -283,6 +294,7 @@ async function updateProfile(req, res) {
           email: user.email,
           role: user.role,
           managerId: user.managerId,
+          dob: user.dob,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
           createdAt: user.createdAt,

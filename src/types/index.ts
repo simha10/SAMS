@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: 'employee' | 'manager' | 'director';
   managerId?: string;
+  dob?: string; // Add DOB field
   officeLocation: {
     lat: number;
     lng: number;
@@ -95,6 +96,7 @@ export interface RegisterData {
   password: string;
   role: 'employee' | 'manager' | 'director';
   managerId?: string;
+  dob?: string; // Add DOB field
   officeLocation?: {
     lat: number;
     lng: number;
@@ -124,4 +126,18 @@ export interface ApiError {
     };
   };
   message?: string;
+}
+
+// Branch interface
+export interface Branch {
+  _id: string;
+  name: string;
+  location: {
+    lat: number;
+    lng: number;
+  };
+  radius?: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

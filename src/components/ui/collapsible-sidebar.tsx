@@ -14,6 +14,7 @@ import {
   CheckCircle,
   AlertTriangle,
   PlusCircle,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -25,6 +26,7 @@ interface SidebarItem {
   href: string;
   icon: ReactNode;
   subItems?: SidebarItem[];
+  roles?: string[]; // Add roles property to control visibility
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -52,6 +54,12 @@ const sidebarItems: SidebarItem[] = [
     title: "Holidays",
     href: "/manager/holidays",
     icon: <Calendar className="h-4 w-4" />,
+  },
+  {
+    title: "Branch Management",
+    href: "/manager/branches",
+    icon: <MapPin className="h-4 w-4" />,
+    roles: ["manager", "director"], // Allow both managers and directors
   },
   {
     title: "Reports",
@@ -135,6 +143,14 @@ export function CollapsibleSidebar({
     return false;
   };
 
+  // Filter sidebar items based on user role
+  const filteredSidebarItems = sidebarItems.filter(item => {
+    // If no roles specified, show to everyone
+    if (!item.roles) return true;
+    // If user role is in the allowed roles, show the item
+    return user && item.roles.includes(user.role);
+  });
+
   const toggleSidebar = () => {
     const newCollapsed = !collapsed;
     setCollapsed(newCollapsed);
@@ -168,6 +184,7 @@ export function CollapsibleSidebar({
             user={user}
             onClose={() => setOpen(false)}
             collapsed={false}
+            sidebarItems={filteredSidebarItems}
           />
         </SheetContent>
       </Sheet>
@@ -211,6 +228,7 @@ export function CollapsibleSidebar({
             isSubItemActive={isSubItemActive}
             user={user}
             collapsed={collapsed}
+            sidebarItems={filteredSidebarItems}
           />
         </div>
       </div>
@@ -224,6 +242,7 @@ function SidebarContent({
   isSubItemActive,
   onClose,
   collapsed = false,
+  sidebarItems,
 }: {
   logout: () => void;
   isActive: (href: string) => boolean;
@@ -231,6 +250,7 @@ function SidebarContent({
   user: any;
   onClose?: () => void;
   collapsed?: boolean;
+  sidebarItems: SidebarItem[];
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -250,7 +270,8 @@ function SidebarContent({
                 }}
               >
                 {item.icon}
-                {!collapsed && <span className="flex-1">{item.title}</span>}
+                {!collapsed && <span className="flex-1">{item.title}</span>
+}
               </Link>
               {!collapsed && item.subItems && (
                 <ul className="ml-8 mt-1 space-y-1">
