@@ -1,23 +1,25 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { sendTelegramMessage } = require('../utils/telegram');
 
 // Generate JWT token
-function generateToken(user) {
+const generateToken = (user) => {
   return jwt.sign(
     {
       id: user._id,
-      empId: user.empId,
-      role: user.role
+      role: user.role,
+      empId: user.empId
     },
     process.env.JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: process.env.NODE_ENV === 'production' ? '7d' : '1d' }
   );
-}
+};
 
 // Login user
 async function login(req, res) {
   try {
-    const { empId, password } = req.body;
+    const { empId, password, rememberMe } = req.body;
 
     // Validate input
     if (!empId || !password) {
@@ -27,10 +29,20 @@ async function login(req, res) {
       });
     }
 
-    // Find user by empId
-    const user = await User.findOne({ empId });
+    // Find user by empId and select password
+    const user = await User.findOne({ empId }).select('+password');
 
     if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if password matches
+    const isMatch = await user.matchPassword(password);
+
+    if (!isMatch) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -45,30 +57,30 @@ async function login(req, res) {
       });
     }
 
-    // Compare password
-    const isMatch = await user.comparePassword(password);
-
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
     // Generate token
     const token = generateToken(user);
 
     // Set cookie with extended expiration if "remember me" is selected
-    const maxAge = req.body.rememberMe
+    const maxAge = rememberMe
       ? 30 * 24 * 60 * 60 * 1000 // 30 days
       : 24 * 60 * 60 * 1000; // 24 hours (default)
 
-    res.cookie('token', token, {
+    // Configure cookie options for production
+    const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      secure: process.env.NODE_ENV === 'production', // true in production
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-origin in production
       maxAge: maxAge
-    });
+    };
+
+    // Add domain option for production
+    if (process.env.NODE_ENV === 'production') {
+      // Don't set domain for Render deployment as it can cause issues
+      // The cookie will be set for the current domain automatically
+      console.log('Setting production cookie options');
+    }
+
+    res.cookie('token', token, cookieOptions);
 
     res.json({
       success: true,
@@ -309,12 +321,12 @@ async function changePassword(req, res) {
     if (newPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'New password must be at least 6 characters long'
+        message: 'Password must be at least 6 characters long'
       });
     }
 
-    // Find user
-    const user = await User.findById(userId);
+    // Find user and select password
+    const user = await User.findById(userId).select('+password');
 
     if (!user) {
       return res.status(404).json({
@@ -323,11 +335,11 @@ async function changePassword(req, res) {
       });
     }
 
-    // Check current password
-    const isMatch = await user.comparePassword(currentPassword);
+    // Check if current password matches
+    const isMatch = await user.matchPassword(currentPassword);
 
     if (!isMatch) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: 'Current password is incorrect'
       });

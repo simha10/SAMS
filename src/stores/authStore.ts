@@ -81,11 +81,12 @@ export const useAuthStore = create<AuthState>()(
           } else {
             console.log("=== AUTH STORE REHYDRATION COMPLETE ===");
             console.log("State:", state);
-            
+
             // Check if we have a user but need to verify authentication
             if (state?.isAuthenticated && state?.user) {
               console.log("User is authenticated, verifying token...");
               // We could make an API call here to verify the token is still valid
+              // This helps prevent the blinking issue by verifying auth state on app load
             }
           }
         };

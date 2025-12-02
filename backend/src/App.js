@@ -44,8 +44,9 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
-      'http://192.168.18.210:5173',
-      'http://192.168.18.168:5174', // Network IP
+      'http://192.168.18.210:5173',// Network IP
+      'http://192.168.18.168:5174',
+      'https://sams-frontend-sq6o.onrender.com', //frontend URL
       process.env.FRONTEND_URL
     ].filter(Boolean); // Filter out undefined values
     
@@ -60,6 +61,7 @@ const corsOptions = {
       callback(new Error('Not allowed by CORS'));
     }
   },
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true
 };
 

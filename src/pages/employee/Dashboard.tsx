@@ -92,9 +92,11 @@ export default function Dashboard() {
   } | null>(null);
   const [showGeofenceWarning, setShowGeofenceWarning] = useState(false);
   const [rateLimitError, setRateLimitError] = useState(false);
+  const [notificationErrorCount, setNotificationErrorCount] = useState(0); // Track notification errors
 
   useEffect(() => {
     let mounted = true;
+    let notificationInterval: ReturnType<typeof setInterval>;
 
     const loadData = async () => {
       if (mounted) {
@@ -122,6 +124,16 @@ export default function Dashboard() {
 
     loadData();
 
+    // Set up periodic polling for notifications only (every 5 minutes)
+    // But only if we haven't hit the error limit
+    if (notificationErrorCount < 3) {
+      notificationInterval = setInterval(() => {
+        if (mounted) {
+          fetchRecentNotifications();
+        }
+      }, 5 * 60 * 1000); // 5 minutes
+    }
+
     // Check if there was a rate limit error in previous requests
     if (localStorage.getItem("rateLimitError") === "true") {
       setRateLimitError(true);
@@ -131,8 +143,11 @@ export default function Dashboard() {
 
     return () => {
       mounted = false;
+      if (notificationInterval) {
+        clearInterval(notificationInterval);
+      }
     };
-  }, []);
+  }, [notificationErrorCount]);
 
   const fetchTodayStatus = async () => {
     try {
@@ -234,16 +249,28 @@ export default function Dashboard() {
   };
 
   const fetchRecentNotifications = async () => {
+    // Implement fallback mechanism to prevent continuous reloading
+    if (notificationErrorCount >= 3) {
+      console.warn("Too many notification errors, using fallback data");
+      setRecentNotifications([]); // Set to empty array to stop polling
+      return;
+    }
+
     try {
       const response = await notificationsAPI.getNotifications(10, 0); // Get last 10 notifications
       if (response.success && response.data) {
         setRecentNotifications(response.data.notifications.slice(0, 5)); // Get last 5 notifications
+        // Reset error count on success
+        setNotificationErrorCount(0);
       }
       setRateLimitError(false);
       // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
     } catch (err: unknown) {
       console.error("Failed to fetch notifications:", err);
+      // Increment error count
+      setNotificationErrorCount(prev => prev + 1);
+      
       // Check if it's a rate limit error
       const error = err as any;
       if (error.response?.status === 429) {

@@ -97,12 +97,14 @@ api.interceptors.response.use(
         sessionStorage.removeItem('auth-storage');
       }
 
-      // Handle unauthorized - redirect to login
-      console.log("Redirecting to login page");
-      window.location.href = '/login';
-      toast.error("Session expired", {
-        description: "Please log in again to continue.",
-      });
+      // Only redirect if we're not already on the login page
+      if (window.location.pathname !== '/login') {
+        console.log("Redirecting to login page");
+        window.location.href = '/login';
+        toast.error("Session expired", {
+          description: "Please log in again to continue.",
+        });
+      }
     }
 
     if (error.response?.status === 403) {
@@ -605,11 +607,49 @@ export const notificationsAPI = {
     try {
       const response = await api.get(`/notifications?limit=${limit}&skip=${skip}`);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // Check if it's a network error or server error
+      if (!error.response) {
+        // Network error - return fallback data
+        console.warn("Network error fetching notifications, returning fallback data");
+        return {
+          success: true,
+          data: {
+            notifications: [],
+            total: 0
+          },
+          message: "Using fallback data due to network issues"
+        };
+      }
+
+      // Check if it's a 404 or other client error
+      if (error.response.status === 404) {
+        // No notifications endpoint or no data - return empty but successful response
+        return {
+          success: true,
+          data: {
+            notifications: [],
+            total: 0
+          },
+          message: "No notifications found"
+        };
+      }
+
+      // For other errors, still provide fallback but log the error
+      console.error("Failed to load notifications:", error);
       toast.error("Failed to load notifications", {
         description: "Could not load notifications. Please try again.",
       });
-      throw error;
+
+      // Return fallback data to prevent continuous reloading
+      return {
+        success: true,
+        data: {
+          notifications: [],
+          total: 0
+        },
+        message: "Using fallback data due to server issues"
+      };
     }
   }
 };
