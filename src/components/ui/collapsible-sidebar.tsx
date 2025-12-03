@@ -3,12 +3,10 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Users,
   FileText,
-  BarChart3,
   User,
   LogOut,
   Menu,
   Calendar,
-  TrendingUp,
   ChevronLeft,
   ChevronRight,
   CheckCircle,
@@ -65,23 +63,6 @@ const sidebarItems: SidebarItem[] = [
     title: "Reports",
     href: "/manager/reports",
     icon: <FileText className="h-4 w-4" />,
-  },
-  {
-    title: "Analytics",
-    href: "/manager/analytics",
-    icon: <BarChart3 className="h-3 w-3" />,
-    subItems: [
-      {
-        title: "Team Trends",
-        href: "/manager/analytics/team",
-        icon: <TrendingUp className="h-3 w-3" />,
-      },
-      {
-        title: "Employee Trends",
-        href: "/manager/analytics/employee",
-        icon: <Calendar className="h-4 w-4 text-blue-200" />,
-      },
-    ],
   },
   {
     title: "Profile",

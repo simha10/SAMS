@@ -451,30 +451,6 @@ export const managerAPI = {
 
 // Report API
 export const reportAPI = {
-  // New streaming report function
-  streamReport: async (reportData: {
-    type: string;
-    format?: string;
-    startDate: string;
-    endDate: string;
-    filters?: Record<string, any>;
-  }): Promise<Blob> => {
-    try {
-      const response = await api.post('/reports/stream', reportData, {
-        responseType: 'blob'
-      });
-      toast.success("Report downloaded", {
-        description: "Your report has been downloaded successfully.",
-      });
-      return response.data;
-    } catch (error) {
-      toast.error("Failed to download report", {
-        description: "Could not download report. Please try again.",
-      });
-      throw error;
-    }
-  },
-
   // Preview report functionality
   previewReport: async (reportData: {
     type: string;

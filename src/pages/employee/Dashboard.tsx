@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,6 +21,7 @@ import {
   Cake,
   Navigation,
   Timer,
+  RefreshCw,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useBirthdayStore } from "@/stores/birthdayStore";
@@ -71,6 +72,7 @@ export default function Dashboard() {
   );
   const [recentLeaves, setRecentLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -84,40 +86,34 @@ export default function Dashboard() {
   const [showGeofenceWarning, setShowGeofenceWarning] = useState(false);
   const [rateLimitError, setRateLimitError] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const loadData = async () => {
-      if (mounted) {
-        await fetchTodayStatus();
-      }
-
+  // Remove auto-fetch useEffect and replace with manual refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchTodayStatus();
       // Add delay between requests to avoid rate limiting
-      if (mounted) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        await fetchRecentAttendance();
-      }
-
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await fetchRecentAttendance();
       // Add delay between requests to avoid rate limiting
-      if (mounted) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        await fetchRecentLeaves();
-      }
-    };
-
-    loadData();
-
-    // Check if there was a rate limit error in previous requests
-    if (localStorage.getItem("rateLimitError") === "true") {
-      setRateLimitError(true);
-      // Clear the flag
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await fetchRecentLeaves();
+      setRateLimitError(false);
+      // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
+    } catch (err) {
+      console.error("Failed to refresh data:", err);
+      // Check if it's a rate limit error
+      const error = err as any;
+      if (error.response?.status === 429) {
+        setRateLimitError(true);
+        toast.error("Too many requests", {
+          description: "Please wait a moment and try again.",
+        });
+      }
+    } finally {
+      setRefreshing(false);
     }
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  };
 
   const fetchTodayStatus = async () => {
     try {
@@ -489,9 +485,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back, {user?.name}!</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back, {user?.name}!</p>
+        </div>
+        <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Rate Limit Error Message */}
@@ -591,9 +593,14 @@ export default function Dashboard() {
       {/* Today's Status */}
       <Card className="card-modern">
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Clock className="w-5 h-5 mr-2" />
-            Today's Attendance
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Clock className="w-5 h-5 mr-2" />
+              Today's Attendance
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchTodayStatus} disabled={refreshing}>
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </CardTitle>
           <CardDescription>
             {format(new Date(), "EEEE, MMMM d, yyyy")}
@@ -705,7 +712,12 @@ export default function Dashboard() {
       {/* Recent Attendance */}
       <Card className="card-modern">
         <CardHeader>
-          <CardTitle>Recent Attendance (Last 7 Days)</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Recent Attendance (Last 7 Days)</span>
+            <Button variant="outline" size="sm" onClick={fetchRecentAttendance} disabled={refreshing || loading}>
+              <RefreshCw className={`w-4 h-4 ${refreshing || loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -757,9 +769,14 @@ export default function Dashboard() {
       {/* Recent Leaves */}
       <Card className="card-modern">
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Calendar className="w-5 h-5 mr-2 text-blue-200" />
-            Recent Leave Requests
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Calendar className="w-5 h-5 mr-2 text-blue-200" />
+              Recent Leave Requests
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchRecentLeaves} disabled={refreshing}>
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -56,7 +56,8 @@ interface Holiday {
 
 export default function ManagerHolidays() {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [loading, setLoading] = useState(false);
+
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [selectedYear, setSelectedYear] = useState(
     new Date().getFullYear().toString()
@@ -78,13 +79,9 @@ export default function ManagerHolidays() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [holidayToDelete, setHolidayToDelete] = useState<Holiday | null>(null);
 
-  // Fetch holidays on component mount and when filters change
-  useEffect(() => {
-    fetchHolidays();
-  }, [selectedYear, selectedMonth]);
-
-  const fetchHolidays = async () => {
-    setLoading(true);
+  // Remove auto-fetch useEffect and replace with manual refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
     setError("");
     try {
       const response = await managerAPI.getHolidays(
@@ -101,7 +98,7 @@ export default function ManagerHolidays() {
         description: "Could not load holidays. Please try again.",
       });
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -139,7 +136,7 @@ export default function ManagerHolidays() {
       resetForm();
 
       // Refresh holidays list
-      fetchHolidays();
+      handleRefresh();
     } catch (err: any) {
       console.error("Failed to save holiday:", err);
       setError(err.response?.data?.message || "Failed to save holiday");
@@ -169,7 +166,7 @@ export default function ManagerHolidays() {
       // Close dialog and refresh holidays list
       setIsDeleteDialogOpen(false);
       setHolidayToDelete(null);
-      fetchHolidays();
+      handleRefresh();
     } catch (err: any) {
       console.error("Failed to delete holiday:", err);
       setError(err.response?.data?.message || "Failed to delete holiday");
@@ -255,8 +252,8 @@ export default function ManagerHolidays() {
               </select>
             </div>
             <div className="flex items-end">
-              <Button onClick={fetchHolidays} disabled={loading}>
-                {loading ? (
+              <Button onClick={handleRefresh} disabled={refreshing}>
+                {refreshing ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : null}
                 Refresh
@@ -328,11 +325,14 @@ export default function ManagerHolidays() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={closeDialog}>
+                <Button type="button" variant="outline" onClick={() => {
+                  closeDialog();
+                  handleRefresh();
+                }}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={formLoading}>
-                  {formLoading ? (
+                <Button type="submit" disabled={formLoading || refreshing}>
+                  {formLoading || refreshing ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : null}
                   {isEditing ? "Update" : "Create"}
@@ -345,14 +345,16 @@ export default function ManagerHolidays() {
 
       {/* Holidays Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Holidays</CardTitle>
-          <CardDescription>
-            List of holidays for the selected period
-          </CardDescription>
-        </CardHeader>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <CardTitle className="text-2xl font-bold px-4 py-2">Holidays</CardTitle>
+            <CardDescription className="text-sm text-gray-500 px-4">
+              List of holidays for the selected period
+            </CardDescription>
+          </div>
+        </div>
         <CardContent>
-          {loading ? (
+          {refreshing ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin" />
               <span className="ml-2">Loading holidays...</span>

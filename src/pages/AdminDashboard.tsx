@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,7 +33,6 @@ import {
 } from "recharts";
 import {
   Users,
-  TrendingUp,
   Calendar,
   Download,
   LogOut,
@@ -43,6 +42,7 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { adminAPI, authAPI } from "@/services/api";
@@ -90,13 +90,22 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedRange, setSelectedRange] = useState("30");
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    fetchInsights();
-    fetchUsers();
-  }, [selectedRange]);
+  // Remove auto-refresh useEffect and replace with manual refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchInsights();
+      await fetchUsers();
+    } catch (err) {
+      setError("Failed to refresh data");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const fetchInsights = async () => {
     setLoading(true);
@@ -232,6 +241,10 @@ export default function AdminDashboard() {
               </p>
             </div>
             <div className="flex space-x-4">
+              <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
               <Button variant="outline" onClick={() => navigate("/manager")}>
                 Manager View
               </Button>
@@ -283,6 +296,9 @@ export default function AdminDashboard() {
                     <SelectItem value="365">Last year</SelectItem>
                   </SelectContent>
                 </Select>
+                <Button onClick={handleRefresh} disabled={refreshing} variant="outline" size="sm">
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                </Button>
               </div>
             </div>
 
@@ -312,7 +328,6 @@ export default function AdminDashboard() {
                       <CardTitle className="text-sm font-medium">
                         Attendance Rate
                       </CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -537,31 +552,6 @@ export default function AdminDashboard() {
                       onClick={() => navigate("/manager/reports")}
                     >
                       Generate Reports
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Analytics Dashboard</CardTitle>
-                  <CardDescription>
-                    View detailed analytics and trends
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <TrendingUp className="w-12 h-12 mx-auto text-gray-400" />
-                    <h3 className="mt-4 text-lg font-medium">Analytics</h3>
-                    <p className="mt-2 text-gray-600">
-                      Analyze attendance patterns, trends, and performance
-                      metrics.
-                    </p>
-                    <Button
-                      className="mt-4"
-                      onClick={() => navigate("/manager/analytics")}
-                    >
-                      View Analytics
                     </Button>
                   </div>
                 </CardContent>

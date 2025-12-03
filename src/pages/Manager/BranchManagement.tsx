@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,6 +18,7 @@ import type { Branch } from "@/types";
 export default function BranchManagement() {
   const { user } = useAuthStore();
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -35,11 +36,11 @@ export default function BranchManagement() {
   // Check if user is manager or director
   const isAuthorized = user?.role === "manager" || user?.role === "director";
 
-  // Fetch branches
-  const fetchBranches = async () => {
+  // Remove auto-fetch useEffect and replace with manual refresh
+  const handleRefresh = async () => {
     if (!isAuthorized) return;
     
-    setLoading(true);
+    setRefreshing(true);
     setError("");
     
     try {
@@ -53,13 +54,14 @@ export default function BranchManagement() {
       setError("Failed to fetch branches. Please try again.");
       console.error("Failed to fetch branches:", err);
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchBranches();
-  }, [isAuthorized]);
+  // Initial load when component mounts
+  useState(() => {
+    handleRefresh();
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target as HTMLInputElement;
@@ -113,7 +115,7 @@ export default function BranchManagement() {
         });
         setIsEditing(false);
         setEditingId(null);
-        fetchBranches(); // Refresh the list
+        handleRefresh(); // Refresh the list
       } else {
         setError(response.message || (isEditing ? "Failed to update branch" : "Failed to create branch"));
       }
@@ -149,7 +151,7 @@ export default function BranchManagement() {
       const response = await branchAPI.deleteBranch(id);
       if (response.success) {
         setSuccess("Branch deleted successfully!");
-        fetchBranches(); // Refresh the list
+        handleRefresh(); // Refresh the list
       } else {
         setError(response.message || "Failed to delete branch");
       }
@@ -286,15 +288,22 @@ export default function BranchManagement() {
               </div>
 
               <div className="flex space-x-3">
-                <Button type="submit" disabled={loading} className="flex-1">
-                  {loading ? (
+                <Button type="submit" disabled={loading || refreshing} className="flex-1">
+                  {loading || refreshing ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : null}
                   {isEditing ? "Update Branch" : "Add Branch"}
                 </Button>
                 
                 {isEditing && (
-                  <Button type="button" variant="outline" onClick={handleCancel}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      handleCancel();
+                      handleRefresh();
+                    }}
+                  >
                     Cancel
                   </Button>
                 )}
@@ -304,14 +313,16 @@ export default function BranchManagement() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Existing Branches</CardTitle>
-            <CardDescription>
-              Manage all office locations for attendance tracking
-            </CardDescription>
-          </CardHeader>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <CardTitle className="text-2xl font-bold px-6 pt-4">Existing Branches</CardTitle>
+              <CardDescription className="px-6">
+                Manage all office locations for attendance tracking
+              </CardDescription>
+            </div>
+          </div>
           <CardContent>
-            {loading && branches.length === 0 ? (
+            {loading || refreshing && branches.length === 0 ? (
               <div className="flex justify-center items-center h-32">
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>

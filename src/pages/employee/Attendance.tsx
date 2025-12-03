@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -38,22 +38,45 @@ export default function Attendance() {
     AttendanceRecord[]
   >([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
 
-  useEffect(() => {
-    console.log("=== ATTENDANCE COMPONENT MOUNTED ===");
+  // Remove auto-fetch useEffect and replace with manual refresh
+  const handleRefresh = async () => {
+    console.log("=== FETCH ATTENDANCE RECORDS STARTED ===");
     console.log("Current month:", currentMonth);
-    console.log("Timestamp:", new Date().toISOString());
+    setRefreshing(true);
+    setError("");
 
-    fetchAttendanceRecords();
+    try {
+      const startDate = format(startOfMonth(currentMonth), "yyyy-MM-dd");
+      const endDate = format(endOfMonth(currentMonth), "yyyy-MM-dd");
 
-    return () => {
-      console.log("=== ATTENDANCE COMPONENT UNMOUNTING ===");
-      console.log("Timestamp:", new Date().toISOString());
-    };
-  }, [currentMonth]);
+      console.log("Fetching attendance records from", startDate, "to", endDate);
+
+      const response = await attendanceAPI.getMyAttendance(startDate, endDate);
+      console.log("Attendance API response:", response);
+
+      if (response.success && response.data) {
+        setAttendanceRecords(response.data.attendance);
+        console.log(
+          "Set attendance records count:",
+          response.data.attendance.length
+        );
+      }
+    } catch (err) {
+      console.error("=== FETCH ATTENDANCE RECORDS ERROR ===");
+      console.error("Error:", err);
+      setError("Failed to fetch attendance records");
+      console.error("Error fetching attendance:", err);
+      console.log("=== END FETCH ATTENDANCE RECORDS ERROR ===");
+    } finally {
+      setRefreshing(false);
+      console.log("=== FETCH ATTENDANCE RECORDS COMPLETED ===");
+    }
+  };
 
   const fetchAttendanceRecords = async () => {
     console.log("=== FETCH ATTENDANCE RECORDS STARTED ===");
@@ -315,11 +338,21 @@ export default function Attendance() {
               >
                 Next
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleRefresh} 
+                disabled={loading || refreshing}
+                className="flex items-center btn-secondary"
+              >
+                <Loader2 className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {loading || refreshing ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin" />
               <span className="ml-2">Loading attendance records...</span>

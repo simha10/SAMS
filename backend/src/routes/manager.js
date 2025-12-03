@@ -3,16 +3,16 @@ const router = express.Router();
 const {
   getTeamAttendance,
   getFlaggedAttendance,
-  getRecentActivities,
   updateAttendanceStatus,
   getTeamMembers,
   createHoliday,
   getHolidays,
   updateHoliday,
-  deleteHoliday
+  deleteHoliday,
+  getManagerSummary
 } = require('../controllers/managerController');
-const { protect, restrictTo } = require('../middleware/auth');
 const { getTeamLeaveRequests, updateLeaveRequest } = require('../controllers/leaveController');
+const { protect, restrictTo } = require('../middleware/auth');
 const cacheMiddleware = require('../middleware/cache');
 
 // Manager routes with caching for read-heavy endpoints
@@ -30,13 +30,6 @@ router.get('/team/flagged', protect, restrictTo('manager', 'director'), cacheMid
   keyGenerator: (req) => `team:${req.user._id}:flagged:${req.query.from || ''}:${req.query.to || ''}`
 }), getFlaggedAttendance);
 
-// Recent activities - cached for 60 seconds
-router.get('/team/activities', protect, restrictTo('manager', 'director'), cacheMiddleware({
-  ttl: 60,
-  prefix: 'manager',
-  keyGenerator: (req) => `team:${req.user._id}:activities:${req.query.period || 'week'}`
-}), getRecentActivities);
-
 // Team leaves - cached for 30 seconds
 router.get('/team/leaves', protect, restrictTo('manager', 'director'), cacheMiddleware({
   ttl: 30,
@@ -50,6 +43,13 @@ router.get('/team/members', protect, restrictTo('manager', 'director'), cacheMid
   prefix: 'manager',
   keyGenerator: (req) => `team:${req.user._id}:members`
 }), getTeamMembers);
+
+// Lightweight summary - cached for 30 seconds
+router.get('/summary', protect, restrictTo('manager', 'director'), cacheMiddleware({
+  ttl: 30,
+  prefix: 'manager',
+  keyGenerator: (req) => `team:${req.user._id}:summary:${req.query.period || 'month'}`
+}), getManagerSummary);
 
 // Write operations (no caching)
 router.put('/leaves/:id', protect, restrictTo('manager', 'director'), updateLeaveRequest);

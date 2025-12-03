@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -70,18 +70,15 @@ export default function ManagerAttendance() {
   const [selectedDate, setSelectedDate] = useState(defaultDate);
   const [teamAttendance, setTeamAttendance] =
     useState<TeamAttendanceData | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<
     "all" | "present" | "absent" | "flagged"
   >("all");
 
-  useEffect(() => {
-    fetchTeamAttendance();
-  }, [selectedDate]);
-
-  const fetchTeamAttendance = async () => {
-    setLoading(true);
+  // Remove auto-fetch useEffect and replace with manual refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
     setError("");
     try {
       console.log("Fetching attendance for date:", selectedDate);
@@ -120,7 +117,7 @@ export default function ManagerAttendance() {
         description: "Could not load attendance data. Please try again.",
       });
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -238,8 +235,8 @@ export default function ManagerAttendance() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button onClick={fetchTeamAttendance} disabled={loading}>
-                {loading ? (
+              <Button onClick={handleRefresh} disabled={refreshing}>
+                {refreshing ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : null}
                 Refresh Data
@@ -321,7 +318,7 @@ export default function ManagerAttendance() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {refreshing ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin" />
               <span className="ml-2">Loading attendance data...</span>

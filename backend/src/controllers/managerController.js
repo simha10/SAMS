@@ -144,84 +144,6 @@ async function getFlaggedAttendance(req, res) {
   }
 }
 
-// Get recent activities
-async function getRecentActivities(req, res) {
-  try {
-    const { period = '7' } = req.query; // Default to last 7 days
-    const managerId = req.user._id;
-
-    // Find all employees under this manager
-    const teamMembers = await User.find({
-      managerId: managerId,
-      isActive: true
-    });
-
-    const teamMemberIds = teamMembers.map(member => member._id);
-
-    // Calculate date range
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(period));
-
-    // Get recent attendance records (check-ins and check-outs)
-    const recentAttendance = await Attendance.find({
-      userId: { $in: teamMemberIds },
-      $or: [
-        { checkInTime: { $gte: startDate } },
-        { checkOutTime: { $gte: startDate } }
-      ]
-    })
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .populate('userId', 'empId name');
-
-    // Transform attendance records into activities
-    const activities = recentAttendance.map(record => {
-      const activities = [];
-
-      if (record.checkInTime && record.checkInTime >= startDate) {
-        activities.push({
-          id: `${record._id}-checkin`,
-          userId: record.userId._id,
-          userName: record.userId.name,
-          userEmpId: record.userId.empId,
-          action: 'checkin',
-          timestamp: record.checkInTime,
-          location: record.location?.checkIn || null
-        });
-      }
-
-      if (record.checkOutTime && record.checkOutTime >= startDate) {
-        activities.push({
-          id: `${record._id}-checkout`,
-          userId: record.userId._id,
-          userName: record.userId.name,
-          userEmpId: record.userId.empId,
-          action: 'checkout',
-          timestamp: record.checkOutTime,
-          location: record.location?.checkOut || null
-        });
-      }
-
-      return activities;
-    }).flat();
-
-    // Sort by timestamp descending
-    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    res.json({
-      success: true,
-      data: {
-        activities: activities.slice(0, 50), // Limit to 50 most recent
-        total: activities.length
-      }
-    });
-  } catch (error) {
-    console.error('Get recent activities error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
 // Get team members for a manager
 async function getTeamMembers(req, res) {
   try {
@@ -496,14 +418,174 @@ async function updateAttendanceStatus(req, res) {
   }
 }
 
+// Get lightweight summary for manager dashboard
+async function getManagerSummary(req, res) {
+  try {
+    const { period = 'month' } = req.query;
+    const managerId = req.user._id;
+
+    // Calculate date range based on period
+    const endDate = new Date();
+    let startDate;
+
+    switch (period) {
+      case 'week':
+        startDate = new Date();
+        startDate.setDate(endDate.getDate() - 7);
+        break;
+      case 'month':
+        startDate = new Date();
+        startDate.setMonth(endDate.getMonth() - 1);
+        break;
+      case 'quarter':
+        startDate = new Date();
+        startDate.setMonth(endDate.getMonth() - 3);
+        break;
+      default:
+        startDate = new Date();
+        startDate.setMonth(endDate.getMonth() - 1);
+    }
+
+    const startDateString = startDate.toISOString().split('T')[0];
+    const endDateString = endDate.toISOString().split('T')[0];
+
+    // Find all employees under this manager
+    const teamMembers = await User.find({
+      managerId: managerId,
+      isActive: true
+    });
+
+    const teamMemberIds = teamMembers.map(member => member._id);
+
+    // Get attendance stats for the period
+    const attendanceStats = await Attendance.aggregate([
+      {
+        $match: {
+          userId: { $in: teamMemberIds },
+          date: { $gte: startDateString, $lte: endDateString }
+        }
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Convert to object
+    const statsObject = {};
+    let totalAttendanceRecords = 0;
+    attendanceStats.forEach(stat => {
+      statsObject[stat._id] = stat.count;
+      totalAttendanceRecords += stat.count;
+    });
+
+    // Get leave counts for the period
+    const leaveStats = await LeaveRequest.aggregate([
+      {
+        $match: {
+          userId: { $in: teamMemberIds },
+          startDate: { $gte: startDate, $lte: endDate },
+          status: 'approved'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const leaveCounts = leaveStats.length > 0 ? leaveStats[0].total : 0;
+
+    // Get working days (business days excluding weekends and holidays)
+    const workingDays = await calculateWorkingDays(startDate, endDate, managerId);
+
+    // Get simple attendance graph array (daily present count for last 30 days)
+    const graphStartDate = new Date();
+    graphStartDate.setDate(graphStartDate.getDate() - 30);
+    const graphStartDateString = graphStartDate.toISOString().split('T')[0];
+
+    const dailyAttendance = await Attendance.aggregate([
+      {
+        $match: {
+          userId: { $in: teamMemberIds },
+          date: { $gte: graphStartDateString, $lte: endDateString },
+          status: 'present'
+        }
+      },
+      {
+        $group: {
+          _id: '$date',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ]);
+
+    // Format the response
+    res.json({
+      success: true,
+      data: {
+        totalPresent: statsObject.present || 0,
+        totalAbsent: statsObject.absent || 0,
+        totalFlagged: statsObject.flagged || 0,
+        leaveCounts,
+        workingDays,
+        attendanceGraph: dailyAttendance.map(item => ({
+          date: item._id,
+          present: item.count
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Get manager summary error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+// Helper function to calculate working days
+async function calculateWorkingDays(startDate, endDate, managerId) {
+  // For simplicity, we'll calculate business days (Monday-Friday) minus holidays
+  let workingDays = 0;
+  const currentDate = new Date(startDate);
+
+  // Get holidays for the period
+  const holidays = await Holiday.find({
+    date: { $gte: startDate, $lte: endDate }
+  });
+
+  const holidayDates = holidays.map(holiday => holiday.date.toISOString().split('T')[0]);
+
+  // Count business days
+  while (currentDate <= endDate) {
+    const dayOfWeek = currentDate.getDay();
+    // Monday to Friday (1-5), excluding weekends (0, 6)
+    if (dayOfWeek > 0 && dayOfWeek < 6) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      // Exclude holidays
+      if (!holidayDates.includes(dateString)) {
+        workingDays++;
+      }
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return workingDays;
+}
+
 module.exports = {
   getTeamAttendance,
   getFlaggedAttendance,
-  getRecentActivities,
   updateAttendanceStatus,
   getTeamMembers,  // Add this export
   createHoliday,   // Add holiday management exports
   getHolidays,
   updateHoliday,
-  deleteHoliday
+  deleteHoliday,
+  getManagerSummary  // Add the new summary function
 };

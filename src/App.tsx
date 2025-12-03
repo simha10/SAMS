@@ -21,9 +21,6 @@ import History from "./pages/employee/History";
 import AdminManagerLayout from "./layouts/AdminManagerLayout";
 import ManagerAttendance from "./pages/Manager/Attendance";
 import ManagerReports from "./pages/Manager/Reports";
-import ManagerAnalytics from "./pages/Manager/Analytics";
-import TeamTrends from "./pages/Manager/TeamTrends";
-import EmployeeTrends from "./pages/Manager/EmployeeTrends";
 import ManagerProfile from "./pages/Manager/Profile";
 import LeaveApprovals from "./pages/Manager/LeaveApprovals";
 import AttendanceApprovals from "./pages/Manager/AttendanceApprovals";
@@ -180,9 +177,6 @@ const App = () => {
                 <Route path="branches" element={<BranchManagement />} />{" "}
                 {/* Added BranchManagement route */}
                 <Route path="reports" element={<ManagerReports />} />
-                <Route path="analytics" element={<ManagerAnalytics />} />
-                <Route path="analytics/team" element={<TeamTrends />} />
-                <Route path="analytics/employee" element={<EmployeeTrends />} />
                 <Route path="profile" element={<ManagerProfile />} />
               </Route>
 
