@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const app = require('./App');
+const { connectRedis, disconnectRedis } = require('./config/redis');
 require('dotenv').config();
 
 // Initialize cron jobs
@@ -19,31 +20,55 @@ mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => {
-  console.log('=== MONGODB CONNECTED ===');
-  console.log('MongoDB connected successfully');
-  console.log('=== END MONGODB CONNECTED ===');
-})
-.catch((err) => {
-  console.error('=== MONGODB CONNECTION ERROR ===');
-  console.error('MongoDB connection error:', err);
-  console.error('=== END MONGODB CONNECTION ERROR ===');
-  process.exit(1);
+  .then(() => {
+    console.log('=== MONGODB CONNECTED ===');
+    console.log('MongoDB connected successfully');
+    console.log('=== END MONGODB CONNECTED ===');
+  })
+  .catch((err) => {
+    console.error('=== MONGODB CONNECTION ERROR ===');
+    console.error('MongoDB connection error:', err);
+    console.error('=== END MONGODB CONNECTION ERROR ===');
+    process.exit(1);
+  });
+
+// Connect to Redis
+connectRedis().catch((err) => {
+  console.error('=== REDIS CONNECTION ERROR ===');
+  console.error('Redis connection error:', err);
+  console.error('=== END REDIS CONNECTION ERROR ===');
+  // Don't exit here - allow the app to run without Redis if needed
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
+process.on('unhandledRejection', async (err) => {
   console.error('=== UNHANDLED PROMISE REJECTION ===');
   console.error('Unhandled Promise Rejection:', err);
   console.error('=== END UNHANDLED PROMISE REJECTION ===');
+
+  // Attempt graceful shutdown
+  try {
+    await disconnectRedis();
+  } catch (e) {
+    console.error('Error during Redis disconnection:', e);
+  }
+
   process.exit(1);
 });
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', async (err) => {
   console.error('=== UNCAUGHT EXCEPTION ===');
   console.error('Uncaught Exception:', err);
   console.error('=== END UNCAUGHT EXCEPTION ===');
+
+  // Attempt graceful shutdown
+  try {
+    await disconnectRedis();
+  } catch (e) {
+    console.error('Error during Redis disconnection:', e);
+  }
+
   process.exit(1);
 });
 
@@ -57,11 +82,42 @@ const server = app.listen(PORT, () => {
 });
 
 // Handle graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('=== SIGTERM RECEIVED ===');
   console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
+
+  // Close server
+  server.close(async () => {
+    console.log('HTTP server closed');
+
+    // Disconnect from Redis
+    try {
+      await disconnectRedis();
+    } catch (e) {
+      console.error('Error during Redis disconnection:', e);
+    }
+
     console.log('Process terminated');
     console.log('=== END SIGTERM RECEIVED ===');
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('=== SIGINT RECEIVED ===');
+  console.log('SIGINT received, shutting down gracefully');
+
+  // Close server
+  server.close(async () => {
+    console.log('HTTP server closed');
+
+    // Disconnect from Redis
+    try {
+      await disconnectRedis();
+    } catch (e) {
+      console.error('Error during Redis disconnection:', e);
+    }
+
+    console.log('Process terminated');
+    console.log('=== END SIGINT RECEIVED ===');
   });
 });

@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { 
-  getTeamAttendance, 
-  getFlaggedAttendance, 
-  getRecentActivities, 
-  updateAttendanceStatus, 
+const {
+  getTeamAttendance,
+  getFlaggedAttendance,
+  getRecentActivities,
+  updateAttendanceStatus,
   getTeamMembers,
   createHoliday,
   getHolidays,
@@ -13,17 +13,49 @@ const {
 } = require('../controllers/managerController');
 const { protect, restrictTo } = require('../middleware/auth');
 const { getTeamLeaveRequests, updateLeaveRequest } = require('../controllers/leaveController');
+const cacheMiddleware = require('../middleware/cache');
 
-// Manager routes
-router.get('/team/attendance', protect, restrictTo('manager', 'director'), getTeamAttendance);
-router.get('/team/flagged', protect, restrictTo('manager', 'director'), getFlaggedAttendance);
-router.get('/team/activities', protect, restrictTo('manager', 'director'), getRecentActivities);
-router.get('/team/leaves', protect, restrictTo('manager', 'director'), getTeamLeaveRequests);
-router.get('/team/members', protect, restrictTo('manager', 'director'), getTeamMembers); // Add this route
+// Manager routes with caching for read-heavy endpoints
+// Team attendance - cached for 30 seconds
+router.get('/team/attendance', protect, restrictTo('manager', 'director'), cacheMiddleware({
+  ttl: 30,
+  prefix: 'manager',
+  keyGenerator: (req) => `team:${req.user._id}:attendance:${req.query.date || 'today'}`
+}), getTeamAttendance);
+
+// Flagged attendance - cached for 60 seconds
+router.get('/team/flagged', protect, restrictTo('manager', 'director'), cacheMiddleware({
+  ttl: 60,
+  prefix: 'manager',
+  keyGenerator: (req) => `team:${req.user._id}:flagged:${req.query.from || ''}:${req.query.to || ''}`
+}), getFlaggedAttendance);
+
+// Recent activities - cached for 60 seconds
+router.get('/team/activities', protect, restrictTo('manager', 'director'), cacheMiddleware({
+  ttl: 60,
+  prefix: 'manager',
+  keyGenerator: (req) => `team:${req.user._id}:activities:${req.query.period || 'week'}`
+}), getRecentActivities);
+
+// Team leaves - cached for 30 seconds
+router.get('/team/leaves', protect, restrictTo('manager', 'director'), cacheMiddleware({
+  ttl: 30,
+  prefix: 'manager',
+  keyGenerator: (req) => `team:${req.user._id}:leaves`
+}), getTeamLeaveRequests);
+
+// Team members - cached for 5 minutes (less frequent updates)
+router.get('/team/members', protect, restrictTo('manager', 'director'), cacheMiddleware({
+  ttl: 300,
+  prefix: 'manager',
+  keyGenerator: (req) => `team:${req.user._id}:members`
+}), getTeamMembers);
+
+// Write operations (no caching)
 router.put('/leaves/:id', protect, restrictTo('manager', 'director'), updateLeaveRequest);
 router.put('/attendance/:id', protect, restrictTo('manager', 'director'), updateAttendanceStatus);
 
-// Holiday management routes
+// Holiday management routes (less frequent, no caching for now)
 router.post('/holidays', protect, restrictTo('manager', 'director'), createHoliday);
 router.get('/holidays', protect, restrictTo('manager', 'director'), getHolidays);
 router.put('/holidays/:id', protect, restrictTo('manager', 'director'), updateHoliday);

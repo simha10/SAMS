@@ -2,10 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const path = require('path');
+
+// Import our custom Redis rate limiter
+const redisRateLimiter = require('./middleware/redisRateLimiter');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -20,12 +22,16 @@ const branchesRoutes = require('./routes/branches'); // Branches route
 // Initialize app
 const app = express();
 
+// Trust proxy - essential for getting real client IPs in proxy environments like Render
+app.set('trust proxy', true);
+
 // Log all incoming requests
 app.use((req, res, next) => {
   console.log("=== INCOMING REQUEST ===");
   console.log("Method:", req.method);
   console.log("URL:", req.url);
   console.log("IP:", req.ip);
+  console.log("Real IP:", req.headers['x-forwarded-for'] || req.connection.remoteAddress);
   console.log("User-Agent:", req.get('User-Agent'));
   console.log("Timestamp:", new Date().toISOString());
   console.log("=== END INCOMING REQUEST ===");
@@ -68,27 +74,50 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Increased from 100 to 200 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  // Log when rate limit is hit
-  handler: (req, res, next) => {
-    console.log("=== RATE LIMIT HIT ===");
-    console.log("IP:", req.ip);
-    console.log("Method:", req.method);
-    console.log("URL:", req.url);
-    console.log("User-Agent:", req.get('User-Agent'));
-    console.log("Timestamp:", new Date().toISOString());
-    console.log("=== END RATE LIMIT HIT ===");
-    res.status(429).json({
-      success: false,
-      message: 'Too many requests from this IP, please try again later.'
-    });
+// Granular rate limiting based on endpoint sensitivity
+// High-security endpoints (login, register, etc.)
+const authLimiter = redisRateLimiter({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 5, // 5 attempts per window
+  prefix: 'auth_limit',
+  message: 'Too many authentication attempts, please try again later.',
+  keyGenerator: (req) => {
+    // Use IP for authentication endpoints
+    let ip = req.ip || req.connection.remoteAddress;
+
+    // Handle X-Forwarded-For header
+    if (req.headers['x-forwarded-for']) {
+      ip = req.headers['x-forwarded-for'].split(',')[0].trim();
+    } else if (req.headers['x-real-ip']) {
+      ip = req.headers['x-real-ip'];
+    }
+
+    return ip;
   }
 });
-app.use(limiter);
+
+// Regular endpoints (most API calls)
+const apiLimiter = redisRateLimiter({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 200, // 200 requests per minute per user
+  prefix: 'api_limit',
+  message: 'Too many requests, please try again later.'
+});
+
+// High-volume endpoints (attendance)
+const highVolumeLimiter = redisRateLimiter({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 500, // 500 requests per minute per user
+  prefix: 'high_volume_limit',
+  message: 'Too many requests, please try again later.'
+});
+
+// Apply rate limiters to routes
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/manager', highVolumeLimiter);
+app.use('/api/attendance', highVolumeLimiter);
+app.use('/api', apiLimiter); // Catch-all for other API routes
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

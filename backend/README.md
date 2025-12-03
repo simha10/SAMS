@@ -16,6 +16,9 @@ This is the backend API for the Geo-Fence Attendance Management System.
 - Birthday Notification System
 - Advanced Flagged Attendance with Distance Reporting
 - Persistent Login Sessions with "Remember Me" Functionality
+- **Industrial-Grade Rate Limiting with Redis**
+- **Distributed Caching with Redis**
+- **Database Connection Pooling**
 
 ## Tech Stack
 
@@ -26,6 +29,7 @@ This is the backend API for the Geo-Fence Attendance Management System.
 - ExcelJS for report generation
 - node-cron for scheduled jobs
 - Winston for logging
+- **Redis for Rate Limiting and Caching**
 
 ## Setup
 
@@ -35,18 +39,58 @@ This is the backend API for the Geo-Fence Attendance Management System.
    npm install
    ```
 
-2. Create a `.env` file based on `.env.example`:
+2. Install Redis:
+   - **On macOS**: `brew install redis`
+   - **On Ubuntu/Debian**: `sudo apt-get install redis-server`
+   - **Using Docker**: `docker run -d -p 6379:6379 redis`
+
+3. Create a `.env` file based on `.env.example`:
 
    ```bash
    cp .env.example .env
    ```
 
-3. Update the environment variables in `.env` with your configurations.
+4. Update the environment variables in `.env` with your configurations, including Redis settings.
 
-4. Start the development server:
+5. Start the development server with Redis:
    ```bash
+   npm run start:dev
+   ```
+   
+   Or start services separately:
+   ```bash
+   # Terminal 1 - Start Redis
+   redis-server
+   
+   # Terminal 2 - Start the application
    npm run dev
    ```
+
+## Redis Configuration
+
+The system now supports both legacy and modern Redis configuration approaches:
+
+### Modern Approach (Recommended for Production)
+Set a single `REDIS_URL` environment variable:
+```bash
+REDIS_URL=redis://default:<password>@<host>:<port>
+```
+
+For secure connections (Upstash, Redis Cloud, etc.):
+```bash
+REDIS_URL=rediss://default:<password>@<host>:<port>
+REDIS_USE_TLS=true
+```
+
+### Legacy Approach (Backward Compatible)
+Separate environment variables (will show deprecation warning):
+```bash
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=
+```
+
+**Note**: The modern REDIS_URL approach is recommended for production deployments as it's the standard used by all major Redis providers.
 
 ## Testing
 
@@ -60,6 +104,11 @@ This is the backend API for the Geo-Fence Attendance Management System.
 3. Run tests in watch mode:
    ```bash
    npm run test:watch
+   ```
+
+4. Test Redis configuration:
+   ```bash
+   npm run test:redis
    ```
 
 The test files will automatically use the `MONGO_URI` from your `.env` file, or fall back to `mongodb://localhost:27017/test` if not set.
@@ -119,7 +168,7 @@ The test files will automatically use the `MONGO_URI` from your `.env` file, or 
 
 ## Environment Variables
 
-See `.env.example` for all required environment variables.
+See `.env.example` for all required environment variables, including Redis configuration.
 
 ## New Features Implementation Status
 
@@ -156,6 +205,18 @@ See `.env.example` for all required environment variables.
 - Backend supports the rememberMe parameter in login requests
 - Cookie expiration time dynamically adjusted based on user preference
 
+### ✅ Industrial-Grade Rate Limiting
+- Implemented Redis-based distributed rate limiting
+- Per-user rate limiting using JWT user IDs
+- Granular limits based on endpoint sensitivity
+- Sliding window log algorithm for accuracy
+
+### ✅ Distributed Caching
+- Redis-based caching for high-traffic endpoints
+- Cache-aside pattern implementation
+- Configurable TTL for different data types
+- Intelligent cache key generation
+
 ## Current Achievements
 
 ### ✅ Core Functionality
@@ -178,10 +239,11 @@ See `.env.example` for all required environment variables.
 - **Zero-Cost Deployment**: Compatible with free tiers of Render, Vercel, and MongoDB Atlas
 - **Comprehensive Testing**: 35+ unit tests covering all new functionality
 - **Proper Error Handling**: Graceful error responses with detailed logging
+- **Connection Pooling**: Optimized database connections with pooling
 
 ### ✅ Recent Database Seeding
 Successfully seeded database with:
-- **2 Branches**: Old Office (26.913662872166825, 80.95351830268484) and New Office (26.914835918849107, 80.94982919387432)
+- **2 Branches**: Old Office (26.913662872166825, 80.95341830268484) and New Office (26.914835918849107, 80.94982919387432)
 - **5 Users**: 
   - Director: LIM Rao (LRMC001)
   - Manager: Vikhas Gupta (LRMC002)
@@ -191,16 +253,14 @@ Successfully seeded database with:
 ## Future Improvements
 
 ### 🚀 Performance Enhancements
-- **Caching Layer**: Implement Redis for frequently accessed data (user profiles, branch information)
-- **Database Optimization**: Add compound indexes for complex queries
-- **Pagination**: Implement pagination for large dataset responses
 - **Background Jobs**: Move heavy processing to background workers
+- **Pagination**: Implement pagination for large dataset responses
+- **Advanced Caching**: Write-through caching for frequently updated data
 
 ### 🛡️ Advanced Security Features
 - **Two-Factor Authentication**: Add 2FA support for enhanced security
 - **Session Management**: Implement session tracking and invalidation
 - **Audit Logging**: Detailed logs for all user actions
-- **Rate Limiting Per Endpoint**: More granular rate limiting based on endpoint sensitivity
 
 ### 📊 Enhanced Analytics & Reporting
 - **Real-time Dashboards**: Live attendance monitoring with WebSocket updates
@@ -239,9 +299,9 @@ Successfully seeded database with:
 - ✅ Database properly seeded with sample data
 - ✅ All login tests passing
 - ✅ Zero-cost deployment ready
+- ✅ Industrial-grade rate limiting and caching implemented
 
 ### Phase 2: Short-term Improvements
-- [ ] Implement caching layer for performance
 - [ ] Add comprehensive error tracking
 - [ ] Enhance security with 2FA
 - [ ] Improve mobile responsiveness

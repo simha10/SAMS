@@ -85,10 +85,13 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   }
 };
 
-// Index for faster queries
+// Indexes for faster queries
 userSchema.index({ empId: 1 });
 userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ dob: 1 }); // Index for birthday queries
+userSchema.index({ managerId: 1 }); // Index for team queries
+userSchema.index({ isActive: 1 }); // Index for active user queries
+userSchema.index({ createdAt: -1 }); // Index for sorting by creation time
 
 module.exports = mongoose.model('User', userSchema);

@@ -73,8 +73,12 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries - explicitly set unique to false
+// Indexes for faster queries
 attendanceSchema.index({ userId: 1, date: 1 }, { unique: false });
 attendanceSchema.index({ branch: 1 });
+attendanceSchema.index({ date: 1 });
+attendanceSchema.index({ status: 1 });
+attendanceSchema.index({ flagged: 1 });
+attendanceSchema.index({ createdAt: -1 }); // For sorting by creation time
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

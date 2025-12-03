@@ -3,7 +3,6 @@ const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const Holiday = require('../models/Holiday');
-const notificationService = require('../services/notificationService');
 const { getCurrentDateString } = require('../utils/haversine');
 const logger = require('../config/logger');
 
@@ -179,8 +178,8 @@ cron.schedule('30 18 * * *', async () => {
         summaryData.absent += (summaryData.total - totalRecorded);
       }
 
-      // Send summary notification
-      await notificationService.sendDailySummary(manager, summaryData);
+      // Log summary instead of sending notification
+      logger.info(`Daily summary for manager ${manager.name}:`, summaryData);
     }
 
     logger.info('Daily summary job completed');

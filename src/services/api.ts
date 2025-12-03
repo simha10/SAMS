@@ -601,59 +601,6 @@ export const adminAPI = {
 
 };
 
-// Notifications API
-export const notificationsAPI = {
-  getNotifications: async (limit: number = 20, skip: number = 0) => {
-    try {
-      const response = await api.get(`/notifications?limit=${limit}&skip=${skip}`);
-      return response.data;
-    } catch (error: any) {
-      // Check if it's a network error or server error
-      if (!error.response) {
-        // Network error - return fallback data
-        console.warn("Network error fetching notifications, returning fallback data");
-        return {
-          success: true,
-          data: {
-            notifications: [],
-            total: 0
-          },
-          message: "Using fallback data due to network issues"
-        };
-      }
-
-      // Check if it's a 404 or other client error
-      if (error.response.status === 404) {
-        // No notifications endpoint or no data - return empty but successful response
-        return {
-          success: true,
-          data: {
-            notifications: [],
-            total: 0
-          },
-          message: "No notifications found"
-        };
-      }
-
-      // For other errors, still provide fallback but log the error
-      console.error("Failed to load notifications:", error);
-      toast.error("Failed to load notifications", {
-        description: "Could not load notifications. Please try again.",
-      });
-
-      // Return fallback data to prevent continuous reloading
-      return {
-        success: true,
-        data: {
-          notifications: [],
-          total: 0
-        },
-        message: "Using fallback data due to server issues"
-      };
-    }
-  }
-};
-
 // Holiday API
 export const holidayAPI = {
   isHoliday: async (date: string) => {

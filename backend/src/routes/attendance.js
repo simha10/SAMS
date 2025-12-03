@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { checkin, checkout, getMyAttendance, getTodayStatus } = require('../controllers/attendanceController');
 const { protect } = require('../middleware/auth');
+const cacheMiddleware = require('../middleware/cache');
 
 console.log("=== REGISTERING ATTENDANCE ROUTES ===");
 
@@ -20,8 +21,19 @@ router.use((req, res, next) => {
 // Protected routes
 router.post('/checkin', protect, checkin);
 router.post('/checkout', protect, checkout);
-router.get('/me', protect, getMyAttendance);
-router.get('/today', protect, getTodayStatus);
+
+// Cached routes - 30 seconds TTL for attendance data
+router.get('/me', protect, cacheMiddleware({
+  ttl: 30,
+  prefix: 'attendance',
+  keyGenerator: (req) => `user:${req.user._id}:me:${req.query.from || ''}:${req.query.to || ''}`
+}), getMyAttendance);
+
+router.get('/today', protect, cacheMiddleware({
+  ttl: 30,
+  prefix: 'attendance',
+  keyGenerator: (req) => `user:${req.user._id}:today`
+}), getTodayStatus);
 
 console.log("=== ATTENDANCE ROUTES REGISTERED ===");
 

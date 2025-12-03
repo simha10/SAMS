@@ -1,6 +1,5 @@
 const cron = require('node-cron');
 const User = require('../models/User');
-const notificationService = require('../services/notificationService');
 const logger = require('../config/logger');
 
 // Export the function for testing
@@ -34,7 +33,7 @@ async function runBirthdayNotifications() {
             isActive: true
         }).select('_id name empId');
 
-        // Send birthday notification to all employees
+        // Log birthday notifications instead of sending them
         for (const birthdayEmployee of employeesWithBirthdayToday) {
             const message = `🎉 Hey team, today is ${birthdayEmployee.name}'s birthday! Make sure to contribute for the celebration 🥳🎂`;
 
@@ -46,20 +45,17 @@ async function runBirthdayNotifications() {
                 }
 
                 try {
-                    // Try to send via Telegram if user has chat ID
-                    if (employee.telegramChatId) {
-                        await notificationService.sendTelegram(message, employee.telegramChatId);
-                    }
-                    // Note: We could also send email notifications here if needed
+                    // Log the notification instead of sending it
+                    logger.info(`Birthday notification for ${employee.name}: ${message}`);
                 } catch (error) {
-                    logger.error(`Failed to send birthday notification to ${employee.name}:`, error);
+                    logger.error(`Failed to process birthday notification for ${employee.name}:`, error);
                 }
             }
 
-            logger.info(`Birthday notifications sent for ${birthdayEmployee.name}`);
+            logger.info(`Birthday notifications processed for ${birthdayEmployee.name}`);
         }
 
-        logger.info(`Birthday notification job completed. Notified about ${employeesWithBirthdayToday.length} birthday(s).`);
+        logger.info(`Birthday notification job completed. Processed ${employeesWithBirthdayToday.length} birthday(s).`);
 
     } catch (error) {
         logger.error('Birthday notification job error:', error);
