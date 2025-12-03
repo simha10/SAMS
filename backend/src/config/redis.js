@@ -13,7 +13,7 @@ const getRedisConfig = () => {
     logger.info(`REDIS_PORT: ${process.env.REDIS_PORT ? 'SET' : 'NOT SET'}`);
     logger.info(`REDIS_USERNAME: ${process.env.REDIS_USERNAME ? 'SET' : 'NOT SET'}`);
     logger.info(`REDIS_PASSWORD: ${process.env.REDIS_PASSWORD ? 'SET' : 'NOT SET'}`);
-    
+
     // If REDIS_URL is provided, parse it and use modern configuration
     if (process.env.REDIS_URL) {
         logger.info('Using REDIS_URL for connection');
@@ -47,23 +47,23 @@ const redisConfig = getRedisConfig();
 if (redisConfig) {
     logger.info('Creating Redis client with configuration');
     redisClient = redis.createClient(redisConfig);
-    
+
     redisClient.on('connect', () => {
         logger.info('Connected to Redis');
     });
-    
+
     redisClient.on('ready', () => {
         logger.info('Redis client ready');
     });
-    
+
     redisClient.on('error', (err) => {
         logger.error('Redis error:', err);
     });
-    
+
     redisClient.on('reconnecting', () => {
         logger.info('Redis reconnecting...');
     });
-    
+
     redisClient.on('end', () => {
         logger.info('Redis connection ended');
     });
