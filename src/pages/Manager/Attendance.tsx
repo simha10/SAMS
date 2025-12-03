@@ -329,7 +329,7 @@ export default function ManagerAttendance() {
                 No attendance records found for the selected date and filters.
               </p>
               <p className="text-sm text-gray-400 mt-2">
-                Try selecting a different date or filter.
+                Try to refresh the data.
               </p>
             </div>
           ) : (

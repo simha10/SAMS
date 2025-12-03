@@ -14,14 +14,44 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { authAPI } from "@/services/api";
 import type { ApiResponse } from "@/types";
+// Added Dialog components for confirmation
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+// Helper function to format date for input field
+const formatDateForInput = (dateString?: string): string => {
+  if (!dateString) return "";
+  try {
+    // Create a Date object from the dateString
+    const date = new Date(dateString);
+    // Check if the date is valid
+    if (isNaN(date.getTime())) return "";
+    // Format as YYYY-MM-DD for input[type="date"]
+    return date.toISOString().split('T')[0];
+  } catch {
+    return "";
+  }
+};
 
 export default function Profile() {
   const { user, setUser } = useAuthStore();
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
+  // Format DOB for the date input field
+  const [dob, setDob] = useState(formatDateForInput(user?.dob));
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  
+  // Confirmation dialog states
+  const [showProfileConfirm, setShowProfileConfirm] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -31,14 +61,21 @@ export default function Profile() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  // Handle profile update submission with confirmation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setShowProfileConfirm(true);
+  };
+
+  // Actual profile update function
+  const performProfileUpdate = async () => {
     setLoading(true);
     setMessage("");
     setError("");
+    setShowProfileConfirm(false);
 
     try {
-      const response = await authAPI.updateProfile({ name, email });
+      const response = await authAPI.updateProfile({ name, email, dob });
       if (response.success) {
         setMessage(response.message || "Profile updated successfully");
         // Update the user in the store
@@ -55,11 +92,18 @@ export default function Profile() {
     }
   };
 
+  // Handle password change submission with confirmation
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
+    setShowPasswordConfirm(true);
+  };
+
+  // Actual password change function
+  const performPasswordChange = async () => {
     setPasswordLoading(true);
     setPasswordMessage("");
     setPasswordError("");
+    setShowPasswordConfirm(false);
 
     try {
       const response: ApiResponse = await authAPI.changePassword({
@@ -136,6 +180,16 @@ export default function Profile() {
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dob">Date of Birth</Label>
+                <Input
+                  id="dob"
+                  type="date"
+                  value={dob || ""}
+                  onChange={(e) => setDob(e.target.value)}
                 />
               </div>
 
@@ -219,6 +273,42 @@ export default function Profile() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Profile Update Confirmation Dialog */}
+      <Dialog open={showProfileConfirm} onOpenChange={setShowProfileConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Profile Update</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to update your profile information?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowProfileConfirm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={performProfileUpdate}>Confirm Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Change Confirmation Dialog */}
+      <Dialog open={showPasswordConfirm} onOpenChange={setShowPasswordConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Password Change</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to change your password?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordConfirm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={performPasswordChange}>Confirm Change</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -155,7 +155,7 @@ export const authAPI = {
     return response.data;
   },
 
-  updateProfile: async (userData: { name?: string; email?: string }): Promise<ApiResponse<{ user: User }>> => {
+  updateProfile: async (userData: { name?: string; email?: string; dob?: string }): Promise<ApiResponse<{ user: User }>> => {
     try {
       const response = await api.put('/auth/profile', userData);
       toast.success("Profile updated", {

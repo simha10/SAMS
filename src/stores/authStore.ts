@@ -8,6 +8,7 @@ interface User {
   email: string;
   role: 'employee' | 'manager' | 'director';
   managerId?: string;
+  dob?: string; // Added DOB field
   officeLocation: {
     lat: number;
     lng: number;

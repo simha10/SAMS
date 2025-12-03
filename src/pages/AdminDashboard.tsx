@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import {
   BarChart,
   Bar,
@@ -38,7 +37,6 @@ import {
   LogOut,
   UserPlus,
   FileText,
-  Loader2,
   CheckCircle,
   XCircle,
   AlertTriangle,
@@ -80,8 +78,6 @@ interface InsightsData {
     totalDays: number;
   }>;
 }
-
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
 export default function AdminDashboard() {
   const { user, logout } = useAuthStore();
