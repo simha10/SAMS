@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,7 +17,8 @@ import type { User as FullUser } from "@/types";
 import { authAPI } from "@/services/api";
 
 export default function ManagerProfile() {
-  const { user, setUser } = useAuthStore();
+  const { user, setUser, logout } = useAuthStore();
+  const navigate = useNavigate();
   const fullUser = user as FullUser | null;
   const [name, setName] = useState(fullUser?.name || "");
   const [email, setEmail] = useState(fullUser?.email || "");
@@ -101,6 +103,20 @@ export default function ManagerProfile() {
     }
   };
 
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+      logout(); // Clear local state
+      navigate("/login"); // Redirect to login page
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Even if API call fails, still clear local state
+      logout();
+      navigate("/login");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -174,12 +190,15 @@ export default function ManagerProfile() {
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end space-x-2">
                 <Button onClick={handleUpdateProfile} disabled={loading}>
                   {loading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : null}
                   Update Profile
+                </Button>
+                <Button variant="outline" onClick={handleLogout}>
+                  Logout
                 </Button>
               </div>
             </CardContent>

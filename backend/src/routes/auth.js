@@ -22,6 +22,7 @@ router.post('/login', login);
 router.post('/logout', logout);
 
 // Protected routes
+router.get('/me', protect, getProfile); // New endpoint for token validation
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
 router.put('/change-password', protect, changePassword);

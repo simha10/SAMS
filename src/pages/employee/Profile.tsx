@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 // Helper function to format date for input field
 const formatDateForInput = (dateString?: string): string => {
@@ -43,8 +44,8 @@ export default function Profile() {
   const { user, setUser } = useAuthStore();
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
-  // Format DOB for the date input field
-  const [dob, setDob] = useState(formatDateForInput(user?.dob));
+  // Access DOB using bracket notation to avoid TypeScript errors
+  const [dob, setDob] = useState<string>(user?.["dob"] || "");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -52,6 +53,7 @@ export default function Profile() {
   // Confirmation dialog states
   const [showProfileConfirm, setShowProfileConfirm] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -60,6 +62,9 @@ export default function Profile() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
+
+  const navigate = useNavigate();
+  const { logout } = useAuthStore();
 
   // Handle profile update submission with confirmation
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,6 +132,27 @@ export default function Profile() {
       );
     } finally {
       setPasswordLoading(false);
+    }
+  };
+
+  // Handle logout with confirmation
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  // Actual logout function
+  const performLogout = async () => {
+    try {
+      await authAPI.logout();
+      logout(); // Clear local state
+      navigate("/login"); // Redirect to login page
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Even if API call fails, still clear local state
+      logout();
+      navigate("/login");
+    } finally {
+      setShowLogoutConfirm(false);
     }
   };
 
@@ -199,10 +225,15 @@ export default function Profile() {
               </div>
             </div>
 
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Update Profile
-            </Button>
+            <div className="flex space-x-2">
+              <Button type="submit" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Profile
+              </Button>
+              <Button type="button" variant="outline" onClick={handleLogout}>
+                Logout
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
@@ -306,6 +337,24 @@ export default function Profile() {
               Cancel
             </Button>
             <Button onClick={performPasswordChange}>Confirm Change</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Logout</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to logout? You'll need to sign in again to access your account.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={performLogout}>Logout</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -46,6 +46,13 @@ export const useAuthStore = create<AuthState>()(
         // Clear all auth-related storage
         localStorage.removeItem('auth-storage');
         sessionStorage.removeItem('auth-storage');
+        // Also clear any other potential auth storage
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        // Clear all cookies
+        document.cookie.split(";").forEach((c) => {
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
         set({ user: null, isAuthenticated: false });
         console.log("Auth store updated:", { user: null, isAuthenticated: false });
         console.log("=== END AUTH STORE LOGOUT ===");
@@ -68,7 +75,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => localStorage), // Use localStorage instead of sessionStorage
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated
@@ -85,9 +92,7 @@ export const useAuthStore = create<AuthState>()(
 
             // Check if we have a user but need to verify authentication
             if (state?.isAuthenticated && state?.user) {
-              console.log("User is authenticated, verifying token...");
-              // We could make an API call here to verify the token is still valid
-              // This helps prevent the blinking issue by verifying auth state on app load
+              console.log("User is authenticated, token should be valid...");
             }
           }
         };

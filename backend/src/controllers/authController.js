@@ -2,7 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
-// Generate JWT token
+// Generate JWT token with 7-day expiry for all environments
 const generateToken = (user) => {
   return jwt.sign(
     {
@@ -11,14 +11,14 @@ const generateToken = (user) => {
       empId: user.empId
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.NODE_ENV === 'production' ? '7d' : '1d' }
+    { expiresIn: '7d' } // Consistent 7-day expiry
   );
 };
 
 // Login user
 async function login(req, res) {
   try {
-    const { empId, password, rememberMe } = req.body;
+    const { empId, password } = req.body;
 
     // Validate input
     if (!empId || !password) {
@@ -56,13 +56,11 @@ async function login(req, res) {
       });
     }
 
-    // Generate token
+    // Generate token with 7-day expiry
     const token = generateToken(user);
 
-    // Set cookie with extended expiration if "remember me" is selected
-    const maxAge = rememberMe
-      ? 30 * 24 * 60 * 60 * 1000 // 30 days
-      : 24 * 60 * 60 * 1000; // 24 hours (default)
+    // Set cookie with 7-day expiration (consistent for all users)
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
     // Configure cookie options for production
     const cookieOptions = {
@@ -109,7 +107,14 @@ async function login(req, res) {
 // Logout user
 async function logout(req, res) {
   try {
-    res.clearCookie('token');
+    // Clear the token cookie
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    });
+
     res.json({
       success: true,
       message: 'Logout successful'

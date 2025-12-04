@@ -123,10 +123,10 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  login: async (empId: string, password: string, rememberMe: boolean = false): Promise<ApiResponse<{ user: User }>> => {
-    console.log("Calling login API with:", { empId, password, rememberMe });
+  login: async (empId: string, password: string): Promise<ApiResponse<{ user: User }>> => {
+    console.log("Calling login API with:", { empId, password });
     try {
-      const response = await api.post('/auth/login', { empId, password, rememberMe });
+      const response = await api.post('/auth/login', { empId, password });
       console.log("Login API response:", response.data);
       return response.data;
     } catch (error) {
@@ -138,6 +138,15 @@ export const authAPI = {
   logout: async (): Promise<ApiResponse> => {
     try {
       const response = await api.post('/auth/logout');
+      // Clear local storage and cookies on logout
+      localStorage.removeItem('auth-storage');
+      sessionStorage.removeItem('auth-storage');
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      // Clear all cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
       toast.success("Logged out", {
         description: "You have been successfully logged out.",
       });
@@ -153,6 +162,16 @@ export const authAPI = {
   getProfile: async (): Promise<ApiResponse<{ user: User }>> => {
     const response = await api.get('/auth/profile');
     return response.data;
+  },
+
+  // New endpoint for validating token and getting user info
+  validateToken: async (): Promise<ApiResponse<{ user: User }>> => {
+    try {
+      const response = await api.get('/auth/me');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
   updateProfile: async (userData: { name?: string; email?: string; dob?: string }): Promise<ApiResponse<{ user: User }>> => {

@@ -3,7 +3,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { authAPI } from "@/services/api";
 import Login from "./pages/Login";
 
 import AdminDashboard from "./pages/AdminDashboard";
@@ -100,7 +101,35 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, login, logout } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Silent token validation on app load
+  useEffect(() => {
+    const validateToken = async () => {
+      try {
+        // If user is already authenticated, no need to validate
+        if (isAuthenticated && user) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Try to validate existing token
+        const response = await authAPI.validateToken();
+        if (response.success && response.data?.user) {
+          login(response.data.user);
+        }
+      } catch (error) {
+        // If token validation fails, ensure user is logged out
+        logout();
+        console.log("Token validation failed, user logged out");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    validateToken();
+  }, [isAuthenticated, user, login, logout]);
 
   // Check for authentication errors on app load
   useEffect(() => {
@@ -110,9 +139,21 @@ const App = () => {
 
     if (authError) {
       // Clear auth state
-      useAuthStore.getState().logout();
+      logout();
     }
-  }, []);
+  }, [logout]);
+
+  // Show loading state while validating token
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-dark-blue">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <p className="mt-4 text-lg">Validating session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
