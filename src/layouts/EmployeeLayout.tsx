@@ -84,7 +84,7 @@ export default function EmployeeLayout() {
   // Mobile bottom navigation
   const BottomNav = () => (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-      <div className="grid grid-cols-4 gap-1 p-2">
+      <div className="grid grid-cols-5 gap-1 p-2">
         {sidebarItems.map((item) => (
           <Link
             key={item.href}
