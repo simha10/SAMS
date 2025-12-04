@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -24,6 +24,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
+// Import profile cache utilities
+import { saveProfileToCache, loadProfileFromCache } from "@/utils/profileCache";
 
 // Helper function to format date for input field
 const formatDateForInput = (dateString?: string): string => {
@@ -44,8 +46,14 @@ export default function Profile() {
   const { user, setUser } = useAuthStore();
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
-  // Access DOB using bracket notation to avoid TypeScript errors
-  const [dob, setDob] = useState<string>(user?.["dob"] || "");
+  // Access DOB and format it for the date input
+  const [dob, setDob] = useState<string>(() => {
+    if (user?.dob) {
+      // Format the DOB from the user object for the date input
+      return formatDateForInput(user.dob);
+    }
+    return "";
+  });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -65,6 +73,50 @@ export default function Profile() {
 
   const navigate = useNavigate();
   const { logout } = useAuthStore();
+
+  // Load cached profile data immediately on component mount
+  // Only fetch from API if no cache exists
+  useEffect(() => {
+    // First, try to load from cache
+    const cachedProfile = loadProfileFromCache();
+    if (cachedProfile) {
+      console.log("Loaded profile data from cache");
+      setName(cachedProfile.name || "");
+      setEmail(cachedProfile.email || "");
+      setDob(formatDateForInput(cachedProfile.dob));
+      // Update the user in the store with cached data
+      if (cachedProfile._id) {
+        setUser(cachedProfile);
+      }
+    } else {
+      // Only fetch from API if no cache exists
+      const fetchProfileData = async () => {
+        try {
+          const response = await authAPI.getProfile();
+          if (response.success && response.data?.user) {
+            // Update the user in the store
+            setUser(response.data.user);
+            // Save to cache
+            saveProfileToCache(response.data.user);
+          }
+        } catch (error) {
+          console.error("Failed to fetch profile data:", error);
+        }
+      };
+      
+      fetchProfileData();
+    }
+  }, []); // Empty dependency array - only run on mount
+  
+  // Update form state when user data changes (from API response)
+  // But only if it's not already set from cache
+  useEffect(() => {
+    if (user && !name && !email && !dob) {
+      setName(user.name || "");
+      setEmail(user.email || "");
+      setDob(formatDateForInput(user.dob));
+    }
+  }, [user, name, email, dob]);
 
   // Handle profile update submission with confirmation
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,6 +138,10 @@ export default function Profile() {
         // Update the user in the store
         if (response.data?.user) {
           setUser(response.data.user);
+          // Also update the DOB state with the formatted value
+          setDob(formatDateForInput(response.data.user.dob));
+          // Save updated profile to cache
+          saveProfileToCache(response.data.user);
         }
       } else {
         setError(response.message || "Failed to update profile");
@@ -160,13 +216,13 @@ export default function Profile() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Profile</h1>
-        <p className="text-gray-600">Manage your profile information</p>
+        <p className="text-white">Manage your profile information</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Update your personal details here</CardDescription>
+          <CardDescription className="text-white">Update your personal details here</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -186,12 +242,12 @@ export default function Profile() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="empId">Employee ID</Label>
+                <Label htmlFor="empId" className="text-white">Employee ID</Label>
                 <Input id="empId" value={user?.empId || ""} disabled />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-white">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -201,7 +257,7 @@ export default function Profile() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name" className="text-white">Full Name</Label>
                 <Input
                   id="name"
                   value={name}
@@ -210,7 +266,7 @@ export default function Profile() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="dob">Date of Birth</Label>
+                <Label htmlFor="dob" className="text-white">Date of Birth</Label>
                 <Input
                   id="dob"
                   type="date"
@@ -220,7 +276,7 @@ export default function Profile() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
+                <Label htmlFor="role" className="text-white">Role</Label>
                 <Input id="role" value={user?.role || ""} disabled />
               </div>
             </div>
@@ -241,7 +297,7 @@ export default function Profile() {
       <Card>
         <CardHeader>
           <CardTitle>Change Password</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-white">
             Update your password regularly to keep your account secure
           </CardDescription>
         </CardHeader>
@@ -262,7 +318,7 @@ export default function Profile() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="currentPassword">Current Password</Label>
+              <Label htmlFor="currentPassword" className="text-white">Current Password</Label>
               <Input
                 id="currentPassword"
                 type="password"
@@ -273,7 +329,7 @@ export default function Profile() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
+              <Label htmlFor="newPassword" className="text-white">New Password</Label>
               <Input
                 id="newPassword"
                 type="password"
@@ -285,7 +341,7 @@ export default function Profile() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Label htmlFor="confirmPassword" className="text-white">Confirm New Password</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -309,8 +365,8 @@ export default function Profile() {
       <Dialog open={showProfileConfirm} onOpenChange={setShowProfileConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Profile Update</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Confirm Profile Update</DialogTitle>
+            <DialogDescription className="text-white">
               Are you sure you want to update your profile information?
             </DialogDescription>
           </DialogHeader>
@@ -327,8 +383,8 @@ export default function Profile() {
       <Dialog open={showPasswordConfirm} onOpenChange={setShowPasswordConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Password Change</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Confirm Password Change</DialogTitle>
+            <DialogDescription className="text-white">
               Are you sure you want to change your password?
             </DialogDescription>
           </DialogHeader>
@@ -345,8 +401,8 @@ export default function Profile() {
       <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Logout</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Confirm Logout</DialogTitle>
+            <DialogDescription className="text-white">
               Are you sure you want to logout? You'll need to sign in again to access your account.
             </DialogDescription>
           </DialogHeader>

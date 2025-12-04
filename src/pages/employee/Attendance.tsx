@@ -318,34 +318,33 @@ export default function Attendance() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                className="btn-secondary"
+                className="btn-secondary bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
               >
-                Previous
+                Previous Month
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentMonth(new Date())}
-                className="btn-secondary"
+                className="btn-secondary bg-green-500 hover:bg-green-600 text-white border-green-500"
               >
-                Today
+                Current Month
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                className="btn-secondary"
+                className="btn-secondary bg-red-500 hover:bg-red-600 text-white border-red-500"
               >
-                Next
+                Next Month
               </Button>
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={handleRefresh} 
                 disabled={loading || refreshing}
-                className="flex items-center btn-secondary"
+                className="flex items-center btn-secondary bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
               >
-                <Loader2 className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
@@ -443,7 +442,7 @@ export default function Attendance() {
 
               {!selectedAttendance && (
                 <div className="text-center py-8 text-muted-foreground">
-                  Select a date to view attendance details
+                  Select a date to view attendance details or click refresh to load data
                 </div>
               )}
             </div>

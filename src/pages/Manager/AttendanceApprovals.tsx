@@ -29,6 +29,7 @@ import { toast } from "@/components/ui/sonner";
 export default function AttendanceApprovals() {
   const [flaggedRecords, setFlaggedRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
@@ -41,9 +42,8 @@ export default function AttendanceApprovals() {
     to: format(new Date(), "yyyy-MM-dd"),
   });
 
-  useEffect(() => {
-    fetchFlaggedAttendance();
-  }, [dateRange]);
+  // Removed auto-fetch on component mount as per optimization requirements
+  // Data will only be fetched when user explicitly clicks the Refresh button or applies filters
 
   const fetchFlaggedAttendance = async () => {
     setLoading(true);
@@ -66,6 +66,30 @@ export default function AttendanceApprovals() {
       setFlaggedRecords([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setError("");
+    try {
+      const response = await managerAPI.getFlaggedAttendance(
+        dateRange.from,
+        dateRange.to
+      );
+      if (response.success && response.data) {
+        setFlaggedRecords(response.data.flaggedRecords);
+      } else {
+        setFlaggedRecords([]);
+      }
+    } catch (err: unknown) {
+      setError("Failed to refresh flagged attendance records.");
+      toast.error("Failed to refresh flagged attendance records", {
+        description: "Could not load attendance records. Please try again.",
+      });
+      setFlaggedRecords([]);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -214,8 +238,19 @@ export default function AttendanceApprovals() {
                 }
               />
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end space-x-2">
               <Button onClick={fetchFlaggedAttendance}>Apply Filters</Button>
+              <Button 
+                variant="outline" 
+                onClick={handleRefresh}
+                disabled={loading || refreshing}
+                className="flex items-center btn-secondary bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+              >
+                {refreshing ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Refresh
+              </Button>
             </div>
           </div>
         </CardContent>

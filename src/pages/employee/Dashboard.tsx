@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,8 +16,6 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Calendar,
-  Trash2,
   Cake,
   Navigation,
   Timer,
@@ -28,11 +26,10 @@ import { useBirthdayStore } from "@/stores/birthdayStore";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import {
   attendanceAPI,
-  leaveAPI,
   holidayAPI,
 } from "@/services/api";
 import { format } from "date-fns";
-import type { AttendanceRecord, LeaveRequest, ApiError } from "@/types";
+import type { AttendanceRecord, ApiError } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +39,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
+
+// Import the attendance cache utilities
+import { saveAttendanceToCache, loadAttendanceFromCache } from "@/utils/attendanceCache";
 
 interface TodayStatus {
   date: string;
@@ -67,11 +67,10 @@ export default function Dashboard() {
   } = useGeolocation();
 
   const [todayStatus, setTodayStatus] = useState<TodayStatus | null>(null);
-  const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>(
-    []
-  );
-  const [recentLeaves, setRecentLeaves] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Removed recentAttendance and recentLeaves state as per optimization requirements
+  // const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([]);
+  // const [recentLeaves, setRecentLeaves] = useState<LeaveRequest[]>([]);
+  // const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -86,17 +85,27 @@ export default function Dashboard() {
   const [showGeofenceWarning, setShowGeofenceWarning] = useState(false);
   const [rateLimitError, setRateLimitError] = useState(false);
 
+  // Load cached attendance status immediately on component mount
+  useEffect(() => {
+    const cachedStatus = loadAttendanceFromCache();
+    if (cachedStatus) {
+      console.log("Loaded attendance status from cache");
+      setTodayStatus({
+        date: cachedStatus.date,
+        attendance: cachedStatus.attendance
+      });
+    }
+  }, []);
+
+  // Removed auto-fetch on component mount as per optimization requirements
+  // Data will only be fetched when user explicitly clicks refresh button
+
   // Remove auto-fetch useEffect and replace with manual refresh
+  // Optimized to only fetch essential data (today's attendance status)
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       await fetchTodayStatus();
-      // Add delay between requests to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await fetchRecentAttendance();
-      // Add delay between requests to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await fetchRecentLeaves();
       setRateLimitError(false);
       // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
@@ -120,6 +129,8 @@ export default function Dashboard() {
       const response = await attendanceAPI.getTodayStatus();
       if (response.success && response.data) {
         setTodayStatus(response.data);
+        // Save to cache for immediate load on next visit
+        saveAttendanceToCache(response.data.attendance);
       }
       setRateLimitError(false);
       // Clear rate limit error flag on success
@@ -137,84 +148,11 @@ export default function Dashboard() {
     }
   };
 
-  const fetchRecentAttendance = async () => {
-    setLoading(true);
-    try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - 7); // Last 7 days
-
-      const response = await attendanceAPI.getMyAttendance(
-        startDate.toISOString().split("T")[0],
-        endDate.toISOString().split("T")[0]
-      );
-
-      if (response.success && response.data) {
-        setRecentAttendance(response.data.attendance);
-      }
-      setRateLimitError(false);
-      // Clear rate limit error flag on success
-      localStorage.removeItem("rateLimitError");
-    } catch (err: unknown) {
-      console.error("Failed to fetch attendance history:", err);
-      // Check if it's a rate limit error
-      const error = err as any;
-      if (error.response?.status === 429) {
-        setRateLimitError(true);
-        toast.error("Too many requests", {
-          description: "Please wait a moment and try again.",
-        });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchRecentLeaves = async () => {
-    try {
-      const response = await leaveAPI.getMyLeaveRequests();
-      if (response.success && response.data) {
-        setRecentLeaves(response.data.leaveRequests.slice(0, 5)); // Get last 5 leave requests
-      }
-      setRateLimitError(false);
-      // Clear rate limit error flag on success
-      localStorage.removeItem("rateLimitError");
-    } catch (err: unknown) {
-      console.error("Failed to fetch leave requests:", err);
-      // Check if it's a rate limit error
-      const error = err as any;
-      if (error.response?.status === 429) {
-        setRateLimitError(true);
-        toast.error("Too many requests", {
-          description: "Please wait a moment and try again.",
-        });
-      }
-    }
-  };
-
-  // Add function to delete leave request
-  const deleteLeaveRequest = async (id: string) => {
-    try {
-      const response = await leaveAPI.deleteLeaveRequest(id);
-      if (response.success) {
-        toast.success("Leave request deleted", {
-          description: "Your leave request has been deleted successfully.",
-        });
-        // Refresh the leave requests list
-        await fetchRecentLeaves();
-      } else {
-        toast.error("Failed to delete leave request", {
-          description: response.message || "Please try again.",
-        });
-      }
-    } catch (err: unknown) {
-      toast.error("Failed to delete leave request", {
-        description: "Please try again.",
-      });
-    }
-  };
-
   const prepareAttendanceAction = async (action: "checkin" | "checkout") => {
+    // Clear any previous messages when starting a new action
+    setMessage("");
+    setError("");
+    
     if (!latitude || !longitude) {
       setError("Location not available. Please enable location access.");
       return;
@@ -295,9 +233,17 @@ export default function Dashboard() {
           }
         );
         // Refresh today's status after successful action
+        // Add a small delay to ensure database is updated
+        await new Promise(resolve => setTimeout(resolve, 500));
         await fetchTodayStatus();
-        setShowGeofenceWarning(false);
-        setRateLimitError(false);
+        // Also refresh recent attendance to show the latest record
+        // Removed as per optimization requirements - attendance only fetched on explicit user action
+        setShowGeofenceWarning(false);        setRateLimitError(false);
+              
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setMessage("");
+        }, 5000);
       } else {
         setError(response.message || `${action} failed`);
         toast.error(
@@ -352,10 +298,18 @@ export default function Dashboard() {
           }
         );
         // Refresh today's status after successful action
+        // Add a small delay to ensure database is updated
+        await new Promise(resolve => setTimeout(resolve, 500));
         await fetchTodayStatus();
+        // Also refresh recent attendance to show the latest record
+        // Removed as per optimization requirements - attendance only fetched on explicit user action
         setShowConfirmation(false);
         setPendingAction(null);
-        setRateLimitError(false);
+        setRateLimitError(false);              
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setMessage("");
+        }, 5000);
       } else {
         // Handle the case where the user is outside the geofence
         // Check if the response contains geofence error data
@@ -444,32 +398,6 @@ export default function Dashboard() {
     }
   };
 
-  // Add function to get status badge with appropriate colors
-  const getLeaveStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending":
-        return (
-          <Badge variant="default" className="bg-amber-500 text-amber-50">
-            Pending
-          </Badge>
-        );
-      case "approved":
-        return (
-          <Badge variant="default" className="bg-emerald-500 text-emerald-50">
-            Approved
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge variant="default" className="bg-rose-500 text-rose-50">
-            Rejected
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
   const isWithinOfficeHours = () => {
     const now = new Date();
     const hour = now.getHours();
@@ -477,12 +405,72 @@ export default function Dashboard() {
     return hour >= 9 && hour <= 20;
   };
 
-  // Fixed logic for determining check-in/check-out eligibility
+  // Improved logic for determining check-in/check-out eligibility
   const canCheckin = !todayStatus?.attendance?.checkInTime;
   const canCheckout =
     todayStatus?.attendance?.checkInTime &&
     !todayStatus?.attendance?.checkOutTime;
+    
+  // Enhanced button state logic with better visual feedback
+  const getCheckInButtonClass = () => {
+    if (actionLoading && pendingAction === "checkin") {
+      return "flex-1 h-12 bg-green-500 hover:bg-green-600";
+    }
+    if (canCheckin) {
+      return "flex-1 h-12 bg-green-500 hover:bg-green-600 border-2 border-white";
+    }
+    return "flex-1 h-12 bg-gray-400 cursor-not-allowed border-2 border-white";
+  };
+  
+  const getCheckOutButtonClass = () => {
+    if (actionLoading && pendingAction === "checkout") {
+      return "flex-1 h-12 bg-red-500 hover:bg-red-600 text-white";
+    }
+    if (canCheckout) {
+      return "flex-1 h-12 bg-red-500 hover:bg-red-600 text-white border-2 border-white";
+    }
+    return "flex-1 h-12 bg-gray-400 text-gray-700 cursor-not-allowed border-2 border-gray-400";
+  };
+  // Debug logging to help troubleshoot button states
+  useEffect(() => {
+    console.log('Today status updated:', todayStatus);
+    console.log('Can checkin:', canCheckin);
+    console.log('Can checkout:', canCheckout);
+    if (todayStatus?.attendance) {
+      console.log('Attendance details:', {
+        checkInTime: todayStatus.attendance.checkInTime,
+        checkOutTime: todayStatus.attendance.checkOutTime,
+        status: todayStatus.attendance.status
+      });
+    }
+  }, [todayStatus, canCheckin, canCheckout]);  
+  // Removed aggressive visibility change handler as per optimization requirements
+  // Data will only be fetched when user explicitly clicks refresh button
+  /*
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Check if we have fresh cached data (less than 5 minutes old)
+        const cachedStatus = loadAttendanceFromCache();
+        if (cachedStatus) {
+          const cacheAge = Date.now() - cachedStatus.timestamp;
+          // Only refresh if cache is older than 5 minutes
+          if (cacheAge > 5 * 60 * 1000) {
+            handleRefresh();
+          }
+        } else {
+          // No cache, refresh data
+          handleRefresh();
+        }
+      }
+    };
 
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+  */
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -490,7 +478,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back, {user?.name}!</p>
         </div>
-        <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+        <Button variant="outline" onClick={handleRefresh} disabled={refreshing} className="bg-orange-500 hover:bg-orange-600">
           <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
@@ -534,9 +522,17 @@ export default function Dashboard() {
               <div>
                 <p className="text-sm text-muted-foreground">Today's Status</p>
                 <p className="font-bold">
-                  {todayStatus?.attendance?.status === "present" ? "Present" : 
-                   todayStatus?.attendance?.status === "absent" ? "Absent" : 
-                   "Not Marked"}
+                  {todayStatus?.attendance ? (
+                    todayStatus.attendance.checkOutTime ? (
+                      <span className="text-green-500">Checked Out</span>
+                    ) : todayStatus.attendance.checkInTime ? (
+                      <span className="text-blue-500">Checked In</span>
+                    ) : (
+                      <span>Not Marked</span>
+                    )
+                  ) : (
+                    "Not Marked"
+                  )}
                 </p>
               </div>
             </div>
@@ -608,8 +604,8 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent className="space-y-4">
           {message && (
-            <Alert className="alert-modern">
-              <AlertDescription className="text-green-500">
+            <Alert className="alert-modern bg-green-50 border-green-200">
+              <AlertDescription className="text-green-700 font-medium">
                 {message}
               </AlertDescription>
             </Alert>
@@ -620,7 +616,6 @@ export default function Dashboard() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
           {todayStatus && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -631,7 +626,17 @@ export default function Dashboard() {
                   <Badge variant="secondary">No Record</Badge>
                 )}
               </div>
-
+              
+              {/* Visual indicator for checkout status */}
+              {todayStatus?.attendance?.checkOutTime && (
+                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                  <span className="font-medium">Checkout Status:</span>
+                  <Badge variant="default" className="bg-green-500 text-green-50">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Completed
+                  </Badge>
+                </div>
+              )}
               {todayStatus.attendance?.checkInTime && (
                 <div className="flex items-center justify-between">
                   <span>Check-in:</span>
@@ -680,7 +685,7 @@ export default function Dashboard() {
                 geoError !== null ||
                 !isWithinOfficeHours()
               }
-              className="flex-1 bg-green-500 border-2 border-white h-12"
+              className={getCheckInButtonClass()}
             >
               {actionLoading && pendingAction === "checkin" && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -690,9 +695,8 @@ export default function Dashboard() {
 
             <Button
               onClick={() => prepareAttendanceAction("checkout")}
-              variant="outline"
               disabled={!canCheckout || actionLoading || geoError !== null}
-              className="flex-1 bg-red-400 border-2 border-white hover:bg-white hover:text-red-400 h-12"
+              className={getCheckOutButtonClass()}
             >
               {actionLoading && pendingAction === "checkout" && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -700,127 +704,10 @@ export default function Dashboard() {
               Check Out
             </Button>
           </div>
-
           {!isWithinOfficeHours() && (
             <p className="text-sm text-amber-500 text-center">
               ⚠️ Outside office hours (9:00 AM - 8:00 PM)
             </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Attendance */}
-      <Card className="card-modern">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Recent Attendance (Last 7 Days)</span>
-            <Button variant="outline" size="sm" onClick={fetchRecentAttendance} disabled={refreshing || loading}>
-              <RefreshCw className={`w-4 h-4 ${refreshing || loading ? 'animate-spin' : ''}`} />
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin" />
-            </div>
-          ) : recentAttendance.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No attendance records found
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {recentAttendance.map((record) => (
-                <div
-                  key={record._id}
-                  className="flex items-center justify-between p-3 border rounded-lg bg-secondary/50"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {format(new Date(record.date), "MMM d, yyyy")}
-                    </p>
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      {record.checkInTime && (
-                        <span>
-                          In: {format(new Date(record.checkInTime), "HH:mm")}
-                        </span>
-                      )}
-                      {record.checkOutTime && (
-                        <span>
-                          Out: {format(new Date(record.checkOutTime), "HH:mm")}
-                        </span>
-                      )}
-                      {record.workingHours && record.workingHours > 0 && (
-                        <span>
-                          Hours: {Math.floor(record.workingHours / 60)}h{" "}
-                          {record.workingHours % 60}m
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {getStatusBadge(record.status)}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Leaves */}
-      <Card className="card-modern">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Calendar className="w-5 h-5 mr-2 text-blue-200" />
-              Recent Leave Requests
-            </div>
-            <Button variant="outline" size="sm" onClick={fetchRecentLeaves} disabled={refreshing}>
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recentLeaves.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No leave requests found
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {recentLeaves.map((leave) => (
-                <div
-                  key={leave._id}
-                  className="flex items-center justify-between p-3 border rounded-lg bg-secondary/50"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {leave.type} - {leave.status}
-                    </p>
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      <span>
-                        From: {format(new Date(leave.startDate), "MMM d, yyyy")}
-                      </span>
-                      <span>
-                        To: {format(new Date(leave.endDate), "MMM d, yyyy")}
-                      </span>
-                      <span>{leave.days} days</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {getLeaveStatusBadge(leave.status)}
-                    {leave.status === "pending" && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteLeaveRequest(leave._id)}
-                        className="btn-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
         </CardContent>
       </Card>

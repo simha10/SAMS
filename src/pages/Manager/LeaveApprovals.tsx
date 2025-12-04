@@ -28,6 +28,7 @@ import { toast } from "@/components/ui/sonner";
 export default function LeaveApprovals() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -36,9 +37,8 @@ export default function LeaveApprovals() {
   );
   const [rejectionReason, setRejectionReason] = useState("");
 
-  useEffect(() => {
-    fetchLeaveRequests();
-  }, []);
+  // Removed auto-fetch on component mount as per optimization requirements
+  // Data will only be fetched when user explicitly clicks the Refresh button
 
   const fetchLeaveRequests = async () => {
     setLoading(true);
@@ -76,6 +76,45 @@ export default function LeaveApprovals() {
       setLeaveRequests([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setError("");
+    try {
+      const response = await managerAPI.getTeamLeaveRequests();
+      if (response.success && response.data) {
+        // Filter out approved/rejected requests older than 24 hours
+        const filteredRequests = response.data.leaveRequests.filter(
+          (request: LeaveRequest) => {
+            // Always show pending requests
+            if (request.status === "pending") return true;
+
+            // For approved/rejected requests, check if they're within 24 hours
+            const createdAt = new Date(request.createdAt);
+            const now = new Date();
+            const hoursDifference =
+              (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+
+            // Show approved/rejected requests if they're less than 24 hours old
+            return hoursDifference < 24;
+          }
+        );
+        setLeaveRequests(filteredRequests);
+      } else {
+        // Set empty array if no data
+        setLeaveRequests([]);
+      }
+    } catch (err: unknown) {
+      setError("Failed to refresh leave requests. Showing N/A values.");
+      toast.error("Failed to refresh leave requests", {
+        description: "Could not load leave requests. Please try again.",
+      });
+      // Set empty array on error
+      setLeaveRequests([]);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -206,10 +245,30 @@ export default function LeaveApprovals() {
 
       <Card className="card-modern">
         <CardHeader>
-          <CardTitle>Pending Leave Requests</CardTitle>
-          <CardDescription>
-            Leave requests awaiting your approval
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <CardTitle>Pending Leave Requests</CardTitle>
+              <CardDescription>
+                Leave requests awaiting your approval
+              </CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleRefresh} 
+              disabled={loading || refreshing}
+              className="flex items-center btn-secondary bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+            >
+              {refreshing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Refreshing...
+                </>
+              ) : (
+                "Refresh"
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (

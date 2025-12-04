@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,6 +14,8 @@ import { Loader2, MapPin, Trash2, Edit } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { branchAPI } from "@/services/api";
 import type { Branch } from "@/types";
+// Import branch cache utilities
+import { saveBranchesToCache, loadBranchesFromCache } from "@/utils/branchCache";
 
 export default function BranchManagement() {
   const { user } = useAuthStore();
@@ -36,7 +38,43 @@ export default function BranchManagement() {
   // Check if user is manager or director
   const isAuthorized = user?.role === "manager" || user?.role === "director";
 
-  // Remove auto-fetch useEffect and replace with manual refresh
+  // Load cached branch data immediately on component mount
+  // Only fetch from API if no cache exists
+  useEffect(() => {
+    // First, try to load from cache
+    const cachedBranches = loadBranchesFromCache();
+    if (cachedBranches) {
+      console.log("Loaded branch data from cache");
+      setBranches(cachedBranches);
+    } else {
+      // Only fetch from API if no cache exists
+      const fetchBranchData = async () => {
+        if (!isAuthorized) return;
+        
+        setRefreshing(true);
+        setError("");
+        
+        try {
+          const response = await branchAPI.getBranches();
+          if (response.success) {
+            setBranches(response.data.branches);
+            // Save to cache
+            saveBranchesToCache(response.data.branches);
+          } else {
+            setError(response.message || "Failed to fetch branches");
+          }
+        } catch (err) {
+          setError("Failed to fetch branches. Please try again.");
+          console.error("Failed to fetch branches:", err);
+        } finally {
+          setRefreshing(false);
+        }
+      };
+      
+      fetchBranchData();
+    }
+  }, []); // Empty dependency array - only run on mount
+
   const handleRefresh = async () => {
     if (!isAuthorized) return;
     
@@ -47,6 +85,8 @@ export default function BranchManagement() {
       const response = await branchAPI.getBranches();
       if (response.success) {
         setBranches(response.data.branches);
+        // Save to cache
+        saveBranchesToCache(response.data.branches);
       } else {
         setError(response.message || "Failed to fetch branches");
       }
@@ -57,11 +97,6 @@ export default function BranchManagement() {
       setRefreshing(false);
     }
   };
-
-  // Initial load when component mounts
-  useState(() => {
-    handleRefresh();
-  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target as HTMLInputElement;
@@ -115,7 +150,7 @@ export default function BranchManagement() {
         });
         setIsEditing(false);
         setEditingId(null);
-        handleRefresh(); // Refresh the list
+        handleRefresh(); // Refresh the list and update cache
       } else {
         setError(response.message || (isEditing ? "Failed to update branch" : "Failed to create branch"));
       }
@@ -151,7 +186,7 @@ export default function BranchManagement() {
       const response = await branchAPI.deleteBranch(id);
       if (response.success) {
         setSuccess("Branch deleted successfully!");
-        handleRefresh(); // Refresh the list
+        handleRefresh(); // Refresh the list and update cache
       } else {
         setError(response.message || "Failed to delete branch");
       }

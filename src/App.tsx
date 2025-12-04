@@ -16,7 +16,7 @@ import EmployeeDashboard from "./pages/employee/Dashboard";
 import ApplyLeave from "./pages/employee/ApplyLeave";
 import Profile from "./pages/employee/Profile";
 import Attendance from "./pages/employee/Attendance";
-import History from "./pages/employee/History";
+import Requests from "./pages/employee/Requests";
 
 // Admin/Manager pages
 import AdminManagerLayout from "./layouts/AdminManagerLayout";
@@ -190,7 +190,7 @@ const App = () => {
                 <Route path="apply-leave" element={<ApplyLeave />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="attendance" element={<Attendance />} />
-                <Route path="history" element={<History />} />
+                <Route path="requests" element={<Requests />} />
               </Route>
 
               {/* Manager/Director Routes with Layout */}

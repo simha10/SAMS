@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,16 +15,54 @@ import { useAuthStore } from "@/stores/authStore";
 import { Loader2, User, BadgeCheck } from "lucide-react";
 import type { User as FullUser } from "@/types";
 import { authAPI } from "@/services/api";
+// Import profile cache utilities
+import { saveProfileToCache, loadProfileFromCache } from "@/utils/profileCache";
 
 export default function ManagerProfile() {
   const { user, setUser, logout } = useAuthStore();
   const navigate = useNavigate();
   const fullUser = user as FullUser | null;
-  const [name, setName] = useState(fullUser?.name || "");
-  const [email, setEmail] = useState(fullUser?.email || "");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Load cached profile data immediately on component mount
+  // Only fetch from API if no cache exists
+  useEffect(() => {
+    // First, try to load from cache
+    const cachedProfile = loadProfileFromCache();
+    if (cachedProfile) {
+      console.log("Loaded profile data from cache");
+      setName(cachedProfile.name || "");
+      setEmail(cachedProfile.email || "");
+      // Update the user in the store with cached data
+      if (cachedProfile._id) {
+        setUser(cachedProfile);
+      }
+    } else {
+      // Only fetch from API if no cache exists
+      const fetchProfileData = async () => {
+        try {
+          const response = await authAPI.getProfile();
+          if (response.success && response.data?.user) {
+            // Update the user in the store
+            setUser(response.data.user);
+            // Save to cache
+            saveProfileToCache(response.data.user);
+            // Update form fields
+            setName(response.data.user.name || "");
+            setEmail(response.data.user.email || "");
+          }
+        } catch (error) {
+          console.error("Failed to fetch profile data:", error);
+        }
+      };
+      
+      fetchProfileData();
+    }
+  }, []); // Empty dependency array - only run on mount
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -44,6 +82,8 @@ export default function ManagerProfile() {
       if (response.success && response.data?.user) {
         setUser(response.data.user);
         setSuccess("Profile updated successfully!");
+        // Save updated profile to cache
+        saveProfileToCache(response.data.user);
       } else {
         setError("Failed to update profile");
       }

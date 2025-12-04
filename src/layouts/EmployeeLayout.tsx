@@ -4,11 +4,11 @@ import {
   Home,
   User,
   Calendar,
-  History,
   LogOut,
   Menu,
   FileText,
   Download,
+  Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -48,9 +48,9 @@ const sidebarItems: SidebarItem[] = [
     icon: <Calendar className="h-5 w-5 text-blue-200" />,
   },
   {
-    title: "History",
-    href: "/employee/history",
-    icon: <History className="h-5 w-5" />,
+    title: "Requests",
+    href: "/employee/requests",
+    icon: <Inbox className="h-5 w-5" />,
   },
 ];
 
@@ -84,8 +84,8 @@ export default function EmployeeLayout() {
   // Mobile bottom navigation
   const BottomNav = () => (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-      <div className="grid grid-cols-5 gap-1 p-2">
-        {sidebarItems.slice(0, 5).map((item) => (
+      <div className="grid grid-cols-4 gap-1 p-2">
+        {sidebarItems.map((item) => (
           <Link
             key={item.href}
             to={item.href}
