@@ -33,7 +33,7 @@ const sidebarItems: SidebarItem[] = [
     icon: <Home className="h-5 w-5" />,
   },
   {
-    title: "Apply Leave",
+    title: "Apply_Leave",
     href: "/employee/apply-leave",
     icon: <FileText className="h-5 w-5" />,
   },

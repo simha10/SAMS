@@ -1,7 +1,7 @@
 {
   "name": "LRMC Staff Attendance System",
   "short_name": "LRMC Staff",
-  "description": "Geo-fence based attendance management system for LRMC employees",
+  "description": "LRMC Attendance management system",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
