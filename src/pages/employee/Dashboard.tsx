@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { useAttendanceStore } from "@/stores/attendanceStore";
 import { useBirthdayStore } from "@/stores/birthdayStore";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import {
@@ -57,6 +58,7 @@ interface GeofenceErrorData {
 export default function Dashboard() {
   const { user } = useAuthStore();
   const { birthdayMessage, showBirthdayBanner, hideBirthdayBanner } = useBirthdayStore();
+  const { todayAttendance, setTodayAttendance } = useAttendanceStore();
 
   const {
     latitude,
@@ -86,15 +88,59 @@ export default function Dashboard() {
   const [rateLimitError, setRateLimitError] = useState(false);
 
   // Load cached attendance status immediately on component mount
+  // This ensures UI renders immediately with cached data while fetching fresh data in background
   useEffect(() => {
-    const cachedStatus = loadAttendanceFromCache();
-    if (cachedStatus) {
-      console.log("Loaded attendance status from cache");
-      setTodayStatus({
-        date: cachedStatus.date,
-        attendance: cachedStatus.attendance
-      });
-    }
+    const loadInitialAttendanceStatus = async () => {
+      // First, load cached data for immediate UI rendering
+      const cachedStatus = loadAttendanceFromCache();
+      if (cachedStatus) {
+        console.log("Loaded attendance status from cache");
+        const todayStatusData = {
+          date: cachedStatus.date,
+          attendance: cachedStatus.attendance
+        };
+        setTodayStatus(todayStatusData);
+        // Sync with attendance store
+        setTodayAttendance(todayStatusData);
+      }
+      
+      // Then fetch fresh data in background to update UI
+      try {
+        await fetchTodayStatus();
+      } catch (error) {
+        console.error("Failed to fetch fresh attendance status:", error);
+        // Keep using cached data if fetch fails
+      }
+    };
+    
+    loadInitialAttendanceStatus();
+  }, []);
+
+  // Detect date changes and automatically refresh attendance status
+  useEffect(() => {
+    const checkDateChange = () => {
+      const today = new Date().toISOString().split('T')[0];
+      const cachedStatus = loadAttendanceFromCache();
+      
+      // If cached data is from a different date, clear cache and fetch fresh data
+      if (cachedStatus && cachedStatus.date !== today) {
+        console.log("Date changed, clearing cache and refreshing attendance status");
+        // Clear the cache
+        localStorage.removeItem('attendance_status_cache');
+        // Clear attendance store
+        setTodayAttendance(null);
+        // Fetch fresh data
+        fetchTodayStatus();
+      }
+    };
+
+    // Check for date change when component mounts
+    checkDateChange();
+
+    // Set up interval to check for date changes every minute
+    const intervalId = setInterval(checkDateChange, 60000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   // Removed auto-fetch on component mount as per optimization requirements
@@ -129,8 +175,17 @@ export default function Dashboard() {
       const response = await attendanceAPI.getTodayStatus();
       if (response.success && response.data) {
         setTodayStatus(response.data);
+        // Sync with attendance store
+        setTodayAttendance(response.data);
         // Save to cache for immediate load on next visit
         saveAttendanceToCache(response.data.attendance);
+      } else {
+        // If response is not successful, clear the current status
+        setTodayStatus(null);
+        // Clear attendance store as well
+        setTodayAttendance(null);
+        // Clear cache as well
+        localStorage.removeItem('attendance_status_cache');
       }
       setRateLimitError(false);
       // Clear rate limit error flag on success
@@ -144,6 +199,13 @@ export default function Dashboard() {
         toast.error("Too many requests", {
           description: "Please wait a moment and try again.",
         });
+      } else {
+        // For other errors, clear the current status to avoid showing stale data
+        setTodayStatus(null);
+        // Clear attendance store as well
+        setTodayAttendance(null);
+        // Clear cache as well
+        localStorage.removeItem('attendance_status_cache');
       }
     }
   };
@@ -245,21 +307,33 @@ export default function Dashboard() {
           setMessage("");
         }, 5000);
       } else {
-        setError(response.message || `${action} failed`);
+        const errorMessage = response.message || `${action} failed`;
+        setError(errorMessage);
+        // If backend says already checked in/out, refresh the UI to show current state
+        if (errorMessage?.includes("Already checked")) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await fetchTodayStatus();
+        }
         toast.error(
           action === "checkin" ? "Check-in failed" : "Check-out failed",
           {
-            description: response.message || "Please try again.",
+            description: errorMessage || "Please try again.",
           }
         );
       }
     } catch (err: unknown) {
       const error = err as ApiError;
-      setError(error.response?.data?.message || `${action} failed`);
+      const errorMessage = error.response?.data?.message || `${action} failed`;
+      setError(errorMessage);
+      // If backend says already checked in/out, refresh the UI to show current state
+      if (errorMessage?.includes("Already checked")) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchTodayStatus();
+      }
       toast.error(
         action === "checkin" ? "Check-in failed" : "Check-out failed",
         {
-          description: error.response?.data?.message || "Please try again.",
+          description: errorMessage || "Please try again.",
         }
       );
     } finally {
@@ -311,9 +385,16 @@ export default function Dashboard() {
           setMessage("");
         }, 5000);
       } else {
+        const errorMessage = response.message || `${pendingAction} failed`;
+        setError(errorMessage);
+        // If backend says already checked in/out, refresh the UI to show current state
+        if (errorMessage?.includes("Already checked")) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await fetchTodayStatus();
+        }
         // Handle the case where the user is outside the geofence
         // Check if the response contains geofence error data
-        if (
+        else if (
           "data" in response &&
           response.data &&
           typeof response.data === "object" &&
@@ -323,13 +404,11 @@ export default function Dashboard() {
           const geofenceData = response.data as GeofenceErrorData;
           setError(`You are ${geofenceData.distance}m away from the nearest branch. Your attendance will be flagged for manager review.`);
           setShowGeofenceWarning(true);
-        } else {
-          setError(response.message || `${pendingAction} failed`);
         }
         toast.error(
           pendingAction === "checkin" ? "Check-in failed" : "Check-out failed",
           {
-            description: response.message || "Please try again.",
+            description: errorMessage || "Please try again.",
           }
         );
       }
@@ -350,11 +429,17 @@ export default function Dashboard() {
             error.response.data.message || "You are outside the allowed area.",
         });
       } else {
-        setError(error.response?.data?.message || `${pendingAction} failed`);
+        const errorMessage = error.response?.data?.message || `${pendingAction} failed`;
+        setError(errorMessage);
+        // If backend says already checked in/out, refresh the UI to show current state
+        if (errorMessage?.includes("Already checked")) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await fetchTodayStatus();
+        }
         toast.error(
           pendingAction === "checkin" ? "Check-in failed" : "Check-out failed",
           {
-            description: error.response?.data?.message || "Please try again.",
+            description: errorMessage || "Please try again.",
           }
         );
       }
@@ -406,10 +491,14 @@ export default function Dashboard() {
   };
 
   // Improved logic for determining check-in/check-out eligibility
-  const canCheckin = !todayStatus?.attendance?.checkInTime;
-  const canCheckout =
-    todayStatus?.attendance?.checkInTime &&
-    !todayStatus?.attendance?.checkOutTime;
+  // Ensure button states are strictly based on backend data
+  const canCheckin = todayStatus?.attendance ? !todayStatus.attendance.checkInTime : true;
+  const canCheckout = todayStatus?.attendance 
+    ? todayStatus.attendance.checkInTime && !todayStatus.attendance.checkOutTime
+    : false;
+    
+  // Ensure buttons are properly disabled when data is loading or unavailable
+  const isDataLoading = todayStatus === null && !error;
     
   // Enhanced button state logic with better visual feedback
   const getCheckInButtonClass = () => {
@@ -683,25 +772,26 @@ export default function Dashboard() {
                 !canCheckin ||
                 actionLoading ||
                 geoError !== null ||
-                !isWithinOfficeHours()
+                !isWithinOfficeHours() ||
+                isDataLoading
               }
               className={getCheckInButtonClass()}
             >
-              {actionLoading && pendingAction === "checkin" && (
+              {(actionLoading && pendingAction === "checkin") || isDataLoading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              )}
-              Check In
+              ) : null}
+              {isDataLoading ? "Loading..." : "Check In"}
             </Button>
 
             <Button
               onClick={() => prepareAttendanceAction("checkout")}
-              disabled={!canCheckout || actionLoading || geoError !== null}
+              disabled={!canCheckout || actionLoading || geoError !== null || isDataLoading}
               className={getCheckOutButtonClass()}
             >
-              {actionLoading && pendingAction === "checkout" && (
+              {(actionLoading && pendingAction === "checkout") || isDataLoading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              )}
-              Check Out
+              ) : null}
+              {isDataLoading ? "Loading..." : "Check Out"}
             </Button>
           </div>
           {!isWithinOfficeHours() && (
