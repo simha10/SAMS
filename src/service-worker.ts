@@ -3,6 +3,7 @@
 import { registerSW } from 'virtual:pwa-register'
 
 const updateSW = registerSW({
+    immediate: true,
     onNeedRefresh() {
         console.log('New content is available, please refresh.')
         // Show a prompt to the user to update the app
@@ -16,6 +17,9 @@ const updateSW = registerSW({
     },
     onRegistered(swRegistration) {
         console.log('Service Worker registered:', swRegistration)
+        if (swRegistration) {
+            swRegistration.update();
+        }
     },
     onRegisterError(error) {
         console.error('Service Worker registration error:', error)

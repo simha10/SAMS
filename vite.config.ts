@@ -22,10 +22,15 @@ export default defineConfig({
         icon: 'public/logo192.png',
         start_url: '/',
         scope: '/',
+        orientation: 'portrait',
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
-      }
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallback: '/index.html',
+        cleanupOutdatedCaches: true,
+      },
+      injectRegister: 'auto',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
     })
   ],
   resolve: {

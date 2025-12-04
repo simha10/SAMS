@@ -114,10 +114,17 @@ const App = () => {
           return;
         }
 
+        // Check if we're in a PWA context
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+        
         // Try to validate existing token
         const response = await authAPI.validateToken();
         if (response.success && response.data?.user) {
           login(response.data.user);
+        } else if (isStandalone) {
+          // In PWA mode, if validation fails, we still want to show the app
+          // but with login state cleared
+          logout();
         }
       } catch (error) {
         // If token validation fails, ensure user is logged out
