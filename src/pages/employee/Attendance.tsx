@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ArrowLeftToLine, ArrowRightFromLine, ArrowRightLeft } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -320,7 +321,7 @@ export default function Attendance() {
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                 className="btn-secondary bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
               >
-                Previous Month
+                <ArrowLeftToLine className="w-4 h-4 mr-1" />
               </Button>
               <Button
                 variant="outline"
@@ -328,7 +329,7 @@ export default function Attendance() {
                 onClick={() => setCurrentMonth(new Date())}
                 className="btn-secondary bg-green-500 hover:bg-green-600 text-white border-green-500"
               >
-                Current Month
+                <ArrowRightLeft className="w-4 h-4 mr-1" />
               </Button>
               <Button
                 variant="outline"
@@ -336,7 +337,8 @@ export default function Attendance() {
                 onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                 className="btn-secondary bg-red-500 hover:bg-red-600 text-white border-red-500"
               >
-                Next Month
+                
+                <ArrowRightFromLine className="w-4 h-4 mr-1" />
               </Button>
               <Button 
                 variant="outline" 
