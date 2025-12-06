@@ -32,10 +32,15 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { managerAPI } from "@/services/api";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
+import { EditEmployeeModal } from "@/components/EditEmployeeModal";
+import { DeleteEmployeeModal } from "@/components/DeleteEmployeeModal";
+import type { User, Branch } from "@/types";
 
 interface TeamMember {
   employee: {
@@ -75,6 +80,13 @@ export default function ManagerAttendance() {
   const [filter, setFilter] = useState<
     "all" | "present" | "absent" | "flagged"
   >("all");
+  
+  // Employee management states
+  const [editingEmployee, setEditingEmployee] = useState<User | null>(null);
+  const [deletingEmployee, setDeletingEmployee] = useState<User | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
   // Remove auto-fetch useEffect and replace with manual refresh
   const handleRefresh = async () => {
@@ -169,6 +181,106 @@ export default function ManagerAttendance() {
         );
       default:
         return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const handleEditEmployee = (employeeId: string) => {
+    // Find the employee in the team data
+    const teamMember = teamAttendance?.team.find(
+      member => member.employee.id === employeeId
+    );
+    
+    if (teamMember) {
+      // Create a User object from the team member data
+      const user: User = {
+        _id: teamMember.employee.id,
+        empId: teamMember.employee.empId,
+        name: teamMember.employee.name,
+        email: teamMember.employee.email,
+        role: "employee",
+        isActive: true,
+        officeLocation: {
+          lat: 0,
+          lng: 0,
+          radius: 50
+        },
+        createdAt: "",
+        updatedAt: ""
+      };
+      
+      setEditingEmployee(user);
+      setIsEditModalOpen(true);
+    }
+  };
+
+  const handleDeleteEmployee = (employeeId: string) => {
+    // Find the employee in the team data
+    const teamMember = teamAttendance?.team.find(
+      member => member.employee.id === employeeId
+    );
+    
+    if (teamMember) {
+      // Create a User object from the team member data
+      const user: User = {
+        _id: teamMember.employee.id,
+        empId: teamMember.employee.empId,
+        name: teamMember.employee.name,
+        email: teamMember.employee.email,
+        role: "employee",
+        isActive: true,
+        officeLocation: {
+          lat: 0,
+          lng: 0,
+          radius: 50
+        },
+        createdAt: "",
+        updatedAt: ""
+      };
+      
+      setDeletingEmployee(user);
+      setIsDeleteModalOpen(true);
+    }
+  };
+
+  const handleEmployeeUpdated = (updatedEmployee: User) => {
+    // Optimistically update the team attendance data
+    if (teamAttendance) {
+      const updatedTeam = teamAttendance.team.map(member => {
+        if (member.employee.id === updatedEmployee._id) {
+          return {
+            ...member,
+            employee: {
+              ...member.employee,
+              name: updatedEmployee.name,
+              email: updatedEmployee.email
+            }
+          };
+        }
+        return member;
+      });
+      
+      setTeamAttendance({
+        ...teamAttendance,
+        team: updatedTeam
+      });
+    }
+  };
+
+  const handleEmployeeDeleted = (deletedEmployeeId: string) => {
+    // Optimistically remove the employee from the team attendance data
+    if (teamAttendance) {
+      const updatedTeam = teamAttendance.team.filter(
+        member => member.employee.id !== deletedEmployeeId
+      );
+      
+      setTeamAttendance({
+        ...teamAttendance,
+        team: updatedTeam,
+        summary: {
+          ...teamAttendance.summary,
+          total: teamAttendance.summary.total - 1
+        }
+      });
     }
   };
 
@@ -343,6 +455,7 @@ export default function ManagerAttendance() {
                     <TableHead>Check-out</TableHead>
                     <TableHead>Working Hours</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -381,6 +494,24 @@ export default function ManagerAttendance() {
                           member.attendance.flagged
                         )}
                       </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditEmployee(member.employee.id)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteEmployee(member.employee.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -389,6 +520,29 @@ export default function ManagerAttendance() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Employee Modal */}
+      <EditEmployeeModal
+        employee={editingEmployee}
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingEmployee(null);
+        }}
+        onUpdate={handleEmployeeUpdated}
+        branches={branches}
+      />
+
+      {/* Delete Employee Modal */}
+      <DeleteEmployeeModal
+        employee={deletingEmployee}
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingEmployee(null);
+        }}
+        onDelete={handleEmployeeDeleted}
+      />
     </div>
   );
 }

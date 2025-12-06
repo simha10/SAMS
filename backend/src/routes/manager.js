@@ -9,7 +9,9 @@ const {
   getHolidays,
   updateHoliday,
   deleteHoliday,
-  getManagerSummary
+  getManagerSummary,
+  updateEmployee,
+  deleteEmployee
 } = require('../controllers/managerController');
 const { getTeamLeaveRequests, updateLeaveRequest } = require('../controllers/leaveController');
 const { protect, restrictTo } = require('../middleware/auth');
@@ -54,6 +56,8 @@ router.get('/summary', protect, restrictTo('manager', 'director'), cacheMiddlewa
 // Write operations (no caching)
 router.put('/leaves/:id', protect, restrictTo('manager', 'director'), updateLeaveRequest);
 router.put('/attendance/:id', protect, restrictTo('manager', 'director'), updateAttendanceStatus);
+router.put('/employees/:id', protect, restrictTo('manager', 'director'), updateEmployee);
+router.delete('/employees/:id', protect, restrictTo('manager', 'director'), deleteEmployee);
 
 // Holiday management routes (less frequent, no caching for now)
 router.post('/holidays', protect, restrictTo('manager', 'director'), createHoliday);

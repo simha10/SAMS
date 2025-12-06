@@ -578,14 +578,94 @@ async function calculateWorkingDays(startDate, endDate, managerId) {
   return workingDays;
 }
 
+// Update employee (manager only)
+async function updateEmployee(req, res) {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const managerId = req.user._id;
+
+    // Validate that the employee belongs to this manager
+    const employee = await User.findOne({
+      _id: id,
+      managerId: managerId,
+      role: 'employee'
+    });
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found or not under your management'
+      });
+    }
+
+    // Prevent updating sensitive fields
+    const { empId, role, managerId: newManagerId, password, ...safeUpdateData } = updateData;
+
+    // Update employee
+    const updatedEmployee = await User.findByIdAndUpdate(
+      id,
+      safeUpdateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Employee updated successfully',
+      data: {
+        employee: updatedEmployee
+      }
+    });
+  } catch (error) {
+    console.error('Update employee error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+// Delete employee (manager only)
+async function deleteEmployee(req, res) {
+  try {
+    const { id } = req.params;
+    const managerId = req.user._id;
+
+    // Validate that the employee belongs to this manager
+    const employee = await User.findOne({
+      _id: id,
+      managerId: managerId,
+      role: 'employee'
+    });
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found or not under your management'
+      });
+    }
+
+    // Set employee as inactive instead of deleting
+    employee.isActive = false;
+    await employee.save();
+
+    res.json({
+      success: true,
+      message: 'Employee deactivated successfully'
+    });
+  } catch (error) {
+    console.error('Delete employee error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   getTeamAttendance,
   getFlaggedAttendance,
   updateAttendanceStatus,
-  getTeamMembers,  // Add this export
-  createHoliday,   // Add holiday management exports
+  getTeamMembers,
+  createHoliday,
   getHolidays,
   updateHoliday,
   deleteHoliday,
-  getManagerSummary  // Add the new summary function
+  getManagerSummary,
+  updateEmployee,
+  deleteEmployee
 };

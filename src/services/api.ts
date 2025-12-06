@@ -393,6 +393,38 @@ export const managerAPI = {
     }
   },
 
+  // New method for updating employee details
+  updateEmployee: async (id: string, employeeData: Partial<User>) => {
+    try {
+      const response = await api.put(`/manager/employees/${id}`, employeeData);
+      toast.success("Employee updated", {
+        description: "Employee has been updated successfully.",
+      });
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to update employee", {
+        description: "Could not update employee. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  // New method for deleting/deactivating an employee
+  deleteEmployee: async (id: string) => {
+    try {
+      const response = await api.delete(`/manager/employees/${id}`);
+      toast.success("Employee deactivated", {
+        description: "Employee has been deactivated successfully.",
+      });
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to deactivate employee", {
+        description: "Could not deactivate employee. Please try again.",
+      });
+      throw error;
+    }
+  },
+
   getRecentActivities: async (period: string) => {
     try {
       const response = await api.get(`/manager/team/activities?period=${period}`);
@@ -521,6 +553,58 @@ export const reportAPI = {
       console.error("Preview report error:", error);
       toast.error("Failed to preview report", {
         description: error.response?.data?.message || "Could not generate report preview. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  // Stream report for direct download
+  streamReport: async (reportData: {
+    type: string;
+    format?: string;
+    startDate: string;
+    endDate: string;
+    filters?: Record<string, any>;
+  }): Promise<Blob> => {
+    try {
+      // Validate required fields
+      if (!reportData.type) {
+        throw new Error("Report type is required");
+      }
+
+      if (!reportData.startDate) {
+        throw new Error("Start date is required");
+      }
+
+      if (!reportData.endDate) {
+        throw new Error("End date is required");
+      }
+
+      // Validate dates
+      const start = new Date(reportData.startDate);
+      const end = new Date(reportData.endDate);
+
+      // Check if dates are valid
+      if (isNaN(start.getTime())) {
+        throw new Error("Invalid start date format");
+      }
+
+      if (isNaN(end.getTime())) {
+        throw new Error("Invalid end date format");
+      }
+
+      if (end < start) {
+        throw new Error("End date must be after start date");
+      }
+
+      const response = await api.post('/reports/stream', reportData, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error("Stream report error:", error);
+      toast.error("Failed to generate report", {
+        description: error.response?.data?.message || "Could not generate report. Please try again.",
       });
       throw error;
     }
