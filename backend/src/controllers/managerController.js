@@ -4,11 +4,31 @@ const LeaveRequest = require('../models/LeaveRequest');
 const Holiday = require('../models/Holiday'); // Added Holiday model
 const { haversine } = require('../utils/haversine');
 
+// Helper function to get team query based on user role
+function getTeamQuery(userId, userRole) {
+  if (userRole === 'director') {
+    // Directors see all employees in the organization (except themselves)
+    return {
+      role: 'employee',
+      isActive: true,
+      _id: { $ne: userId } // Exclude the director themselves
+    };
+  } else {
+    // Managers see employees under their management
+    return {
+      managerId: userId,
+      role: 'employee',
+      isActive: true
+    };
+  }
+}
+
 // Get team attendance for a specific date
 async function getTeamAttendance(req, res) {
   try {
     const { date } = req.query;
-    const managerId = req.user._id;
+    const userId = req.user._id;
+    const userRole = req.user.role;
 
     // Validate date
     if (!date) {
@@ -22,11 +42,11 @@ async function getTeamAttendance(req, res) {
     targetDate.setHours(0, 0, 0, 0);
     const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
 
-    // Find all employees under this manager
-    const teamMembers = await User.find({
-      managerId: managerId,
-      isActive: true
-    });
+    // Get team query based on user role
+    const teamQuery = getTeamQuery(userId, userRole);
+
+    // Find all employees based on role
+    const teamMembers = await User.find(teamQuery);
 
     const teamMemberIds = teamMembers.map(member => member._id);
 
@@ -105,13 +125,14 @@ async function getTeamAttendance(req, res) {
 async function getFlaggedAttendance(req, res) {
   try {
     const { from, to } = req.query;
-    const managerId = req.user._id;
+    const userId = req.user._id;
+    const userRole = req.user.role;
 
-    // Find all employees under this manager
-    const teamMembers = await User.find({
-      managerId: managerId,
-      isActive: true
-    });
+    // Get team query based on user role
+    const teamQuery = getTeamQuery(userId, userRole);
+
+    // Find all employees based on role
+    const teamMembers = await User.find(teamQuery);
 
     const teamMemberIds = teamMembers.map(member => member._id);
 
@@ -144,17 +165,90 @@ async function getFlaggedAttendance(req, res) {
   }
 }
 
+// Update attendance status for a team member
+async function updateAttendanceStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status, approvalReason, checkOutTime } = req.body;
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    // Validate input
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status is required'
+      });
+    }
+
+    // Get team query based on user role to validate attendance ownership
+    const teamQuery = getTeamQuery(userId, userRole);
+
+    // Find all employees based on role
+    const teamMembers = await User.find(teamQuery);
+    const teamMemberIds = teamMembers.map(member => member._id);
+
+    // Find the attendance record and populate user info
+    const attendance = await Attendance.findById(id)
+      .populate('userId', 'empId name');
+
+    if (!attendance) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attendance record not found'
+      });
+    }
+
+    // Validate that the attendance record belongs to a team member
+    if (!teamMemberIds.includes(attendance.userId._id.toString())) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to update this attendance record'
+      });
+    }
+
+    // Store previous status for logging
+    const previousStatus = attendance.status;
+
+    // Update attendance status
+    attendance.status = status;
+    attendance.approvalReason = approvalReason || '';
+
+    // If a checkOutTime is provided, update it
+    if (checkOutTime) {
+      attendance.checkOutTime = new Date(`${attendance.date.toISOString().split('T')[0]}T${checkOutTime}`);
+    }
+
+    // Unflag the attendance when manually approved/rejected
+    attendance.flagged = false;
+    attendance.flaggedReason = '';
+
+    await attendance.save();
+
+    res.json({
+      success: true,
+      message: `Attendance record updated from ${previousStatus} to ${status}`,
+      data: {
+        attendance
+      }
+    });
+  } catch (error) {
+    console.error('Update attendance status error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
 // Get team members for a manager
 async function getTeamMembers(req, res) {
   try {
-    const managerId = req.user._id;
+    const userId = req.user._id;
+    const userRole = req.user.role;
 
-    // Find all employees under this manager
-    const teamMembers = await User.find({
-      managerId: managerId,
-      isActive: true,
-      role: 'employee'
-    }).select('empId name email');
+    // Get team query based on user role
+    const teamQuery = getTeamQuery(userId, userRole);
+
+    // Add projection for team members
+    const teamMembers = await User.find(teamQuery).select('empId name email');
 
     res.json({
       success: true,
@@ -169,260 +263,12 @@ async function getTeamMembers(req, res) {
   }
 }
 
-// Create a new holiday (manager only)
-async function createHoliday(req, res) {
-  try {
-    const { date, name, description, isRecurringSunday } = req.body;
-    const createdBy = req.user._id;
-
-    // Validate input
-    if (!date || !name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Date and name are required'
-      });
-    }
-
-    // Check if holiday already exists for this date
-    const existingHoliday = await Holiday.findOne({ date: new Date(date) });
-    if (existingHoliday) {
-      return res.status(400).json({
-        success: false,
-        message: 'Holiday already exists for this date'
-      });
-    }
-
-    // Create new holiday
-    const holiday = new Holiday({
-      date: new Date(date),
-      name,
-      description,
-      isRecurringSunday: isRecurringSunday || false,
-      createdBy
-    });
-
-    await holiday.save();
-
-    // Populate creator info
-    await holiday.populate('createdBy', 'empId name');
-
-    res.status(201).json({
-      success: true,
-      message: 'Holiday created successfully',
-      data: {
-        holiday
-      }
-    });
-  } catch (error) {
-    console.error('Create holiday error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
-// Get all holidays
-async function getHolidays(req, res) {
-  try {
-    const { year, month } = req.query;
-
-    // Build filter
-    const filter = {};
-
-    if (year) {
-      const startOfYear = new Date(year, 0, 1);
-      const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
-      filter.date = { $gte: startOfYear, $lte: endOfYear };
-    }
-
-    if (month && year) {
-      const startOfMonth = new Date(year, month - 1, 1);
-      const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
-      filter.date = { $gte: startOfMonth, $lte: endOfMonth };
-    }
-
-    const holidays = await Holiday.find(filter)
-      .sort({ date: 1 })
-      .populate('createdBy', 'empId name');
-
-    res.json({
-      success: true,
-      data: {
-        holidays,
-        total: holidays.length
-      }
-    });
-  } catch (error) {
-    console.error('Get holidays error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
-// Update holiday
-async function updateHoliday(req, res) {
-  try {
-    const { id } = req.params;
-    const { date, name, description, isRecurringSunday } = req.body;
-
-    // Validate input
-    if (!date || !name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Date and name are required'
-      });
-    }
-
-    const holiday = await Holiday.findById(id);
-    if (!holiday) {
-      return res.status(404).json({
-        success: false,
-        message: 'Holiday not found'
-      });
-    }
-
-    // Check if another holiday already exists for this date
-    const existingHoliday = await Holiday.findOne({
-      date: new Date(date),
-      _id: { $ne: id } // Exclude current holiday
-    });
-
-    if (existingHoliday) {
-      return res.status(400).json({
-        success: false,
-        message: 'Holiday already exists for this date'
-      });
-    }
-
-    // Update holiday
-    holiday.date = new Date(date);
-    holiday.name = name;
-    holiday.description = description;
-    if (isRecurringSunday !== undefined) {
-      holiday.isRecurringSunday = isRecurringSunday;
-    }
-
-    await holiday.save();
-
-    // Populate creator info
-    await holiday.populate('createdBy', 'empId name');
-
-    res.json({
-      success: true,
-      message: 'Holiday updated successfully',
-      data: {
-        holiday
-      }
-    });
-  } catch (error) {
-    console.error('Update holiday error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
-// Delete holiday
-async function deleteHoliday(req, res) {
-  try {
-    const { id } = req.params;
-
-    const holiday = await Holiday.findById(id);
-    if (!holiday) {
-      return res.status(404).json({
-        success: false,
-        message: 'Holiday not found'
-      });
-    }
-
-    await Holiday.findByIdAndDelete(id);
-
-    res.json({
-      success: true,
-      message: 'Holiday deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete holiday error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
-// Update attendance status (manager only)
-async function updateAttendanceStatus(req, res) {
-  try {
-    const { id } = req.params;
-    const { status, approvalReason, checkOutTime } = req.body;
-    const managerId = req.user._id;
-
-    // Validate status
-    const validStatuses = ['present', 'absent', 'half-day', 'outside-duty'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
-      });
-    }
-
-    // Find the attendance record
-    const attendance = await Attendance.findById(id)
-      .populate('userId', 'empId name managerId');
-
-    if (!attendance) {
-      return res.status(404).json({
-        success: false,
-        message: 'Attendance record not found'
-      });
-    }
-
-    // Check if user is under this manager
-    if (attendance.userId.managerId.toString() !== managerId.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this attendance record'
-      });
-    }
-
-    // Update attendance record
-    attendance.status = status;
-    attendance.flagged = false; // Unflag after approval
-
-    // If checkout time is provided, update it
-    if (checkOutTime) {
-      attendance.checkOutTime = new Date(checkOutTime);
-
-      // Recalculate working hours if both check-in and check-out times exist
-      if (attendance.checkInTime && attendance.checkOutTime) {
-        const checkInTime = new Date(attendance.checkInTime);
-        const checkoutTime = new Date(attendance.checkOutTime);
-        const diffMs = checkoutTime - checkInTime;
-        attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
-      }
-    }
-
-    if (approvalReason) {
-      attendance.flaggedReason = `Approved as ${status}: ${approvalReason}`;
-    } else {
-      attendance.flaggedReason = `Approved as ${status}`;
-    }
-
-    await attendance.save();
-
-    // Populate user info
-    await attendance.populate('userId', 'empId name');
-
-    res.json({
-      success: true,
-      message: `Attendance record updated to ${status} successfully`,
-      data: {
-        attendance
-      }
-    });
-  } catch (error) {
-    console.error('Update attendance status error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-}
-
 // Get lightweight summary for manager dashboard
 async function getManagerSummary(req, res) {
   try {
     const { period = 'month' } = req.query;
-    const managerId = req.user._id;
+    const userId = req.user._id;
+    const userRole = req.user.role;
 
     // Calculate date range based on period
     const endDate = new Date();
@@ -449,11 +295,11 @@ async function getManagerSummary(req, res) {
     const startDateString = startDate.toISOString().split('T')[0];
     const endDateString = endDate.toISOString().split('T')[0];
 
-    // Find all employees under this manager
-    const teamMembers = await User.find({
-      managerId: managerId,
-      isActive: true
-    });
+    // Get team query based on user role
+    const teamQuery = getTeamQuery(userId, userRole);
+
+    // Find all employees based on role
+    const teamMembers = await User.find(teamQuery);
 
     const teamMemberIds = teamMembers.map(member => member._id);
 
@@ -501,7 +347,7 @@ async function getManagerSummary(req, res) {
     const leaveCounts = leaveStats.length > 0 ? leaveStats[0].total : 0;
 
     // Get working days (business days excluding weekends and holidays)
-    const workingDays = await calculateWorkingDays(startDate, endDate, managerId);
+    const workingDays = await calculateWorkingDays(startDate, endDate);
 
     // Get simple attendance graph array (daily present count for last 30 days)
     const graphStartDate = new Date();
@@ -548,48 +394,21 @@ async function getManagerSummary(req, res) {
   }
 }
 
-// Helper function to calculate working days
-async function calculateWorkingDays(startDate, endDate, managerId) {
-  // For simplicity, we'll calculate business days (Monday-Friday) minus holidays
-  let workingDays = 0;
-  const currentDate = new Date(startDate);
-
-  // Get holidays for the period
-  const holidays = await Holiday.find({
-    date: { $gte: startDate, $lte: endDate }
-  });
-
-  const holidayDates = holidays.map(holiday => holiday.date.toISOString().split('T')[0]);
-
-  // Count business days
-  while (currentDate <= endDate) {
-    const dayOfWeek = currentDate.getDay();
-    // Monday to Friday (1-5), excluding weekends (0, 6)
-    if (dayOfWeek > 0 && dayOfWeek < 6) {
-      const dateString = currentDate.toISOString().split('T')[0];
-      // Exclude holidays
-      if (!holidayDates.includes(dateString)) {
-        workingDays++;
-      }
-    }
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  return workingDays;
-}
-
 // Update employee (manager only)
 async function updateEmployee(req, res) {
   try {
     const { id } = req.params;
     const updateData = req.body;
-    const managerId = req.user._id;
+    const userId = req.user._id;
+    const userRole = req.user.role;
 
-    // Validate that the employee belongs to this manager
+    // Get team query based on user role to validate employee ownership
+    const teamQuery = getTeamQuery(userId, userRole);
+
+    // Validate that the employee belongs to this user's team
     const employee = await User.findOne({
       _id: id,
-      managerId: managerId,
-      role: 'employee'
+      ...teamQuery
     });
 
     if (!employee) {
@@ -626,13 +445,16 @@ async function updateEmployee(req, res) {
 async function deleteEmployee(req, res) {
   try {
     const { id } = req.params;
-    const managerId = req.user._id;
+    const userId = req.user._id;
+    const userRole = req.user.role;
 
-    // Validate that the employee belongs to this manager
+    // Get team query based on user role to validate employee ownership
+    const teamQuery = getTeamQuery(userId, userRole);
+
+    // Validate that the employee belongs to this user's team
     const employee = await User.findOne({
       _id: id,
-      managerId: managerId,
-      role: 'employee'
+      ...teamQuery
     });
 
     if (!employee) {
@@ -656,15 +478,41 @@ async function deleteEmployee(req, res) {
   }
 }
 
+// Helper function to calculate working days
+async function calculateWorkingDays(startDate, endDate) {
+  // For simplicity, we'll calculate business days (Monday-Friday) minus holidays
+  let workingDays = 0;
+  const currentDate = new Date(startDate);
+
+  // Get holidays for the period
+  const holidays = await Holiday.find({
+    date: { $gte: startDate, $lte: endDate }
+  });
+
+  const holidayDates = holidays.map(holiday => holiday.date.toISOString().split('T')[0]);
+
+  // Count business days
+  while (currentDate <= endDate) {
+    const dayOfWeek = currentDate.getDay();
+    // Monday to Friday (1-5), excluding weekends (0, 6)
+    if (dayOfWeek > 0 && dayOfWeek < 6) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      // Exclude holidays
+      if (!holidayDates.includes(dateString)) {
+        workingDays++;
+      }
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return workingDays;
+}
+
 module.exports = {
   getTeamAttendance,
   getFlaggedAttendance,
   updateAttendanceStatus,
   getTeamMembers,
-  createHoliday,
-  getHolidays,
-  updateHoliday,
-  deleteHoliday,
   getManagerSummary,
   updateEmployee,
   deleteEmployee

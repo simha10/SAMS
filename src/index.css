@@ -46,43 +46,64 @@
   }
 
   .dark {
-    --background: 222 30% 10%; /* Dark blue background */
-    --foreground: 0 0% 98%; /* Light text */
+    --background: 222 30% 10%;
+    /* Dark blue background */
+    --foreground: 0 0% 98%;
+    /* Light text */
 
-    --card: 222 25% 15%; /* Slightly lighter card background */
+    --card: 222 25% 15%;
+    /* Slightly lighter card background */
     --card-foreground: 0 0% 98%;
 
-    --popover: 222 30% 12%; /* Popover background */
+    --popover: 222 30% 12%;
+    /* Popover background */
     --popover-foreground: 0 0% 98%;
 
-    --primary: 25 90% 60%; /* Orange primary color */
+    --primary: 25 90% 60%;
+    /* Orange primary color */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 222 30% 20%; /* Dark blue secondary */
+    --secondary: 222 30% 20%;
+    /* Dark blue secondary */
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 222 20% 25%; /* Muted dark blue */
+    --muted: 222 20% 25%;
+    /* Muted dark blue */
     --muted-foreground: 215 20% 70%;
 
-    --accent: 150 80% 40%; /* Green accent color */
+    --accent: 150 80% 40%;
+    /* Green accent color */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 80% 50%; /* Red destructive color */
+    --destructive: 0 80% 50%;
+    /* Red destructive color */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 222 25% 20%; /* Border color */
-    --input: 222 25% 20%; /* Input border color */
-    --ring: 25 90% 60%; /* Ring color (orange) */
+    --border: 222 25% 20%;
+    /* Border color */
+    --input: 222 25% 20%;
+    /* Input border color */
+    --ring: 25 90% 60%;
+    /* Ring color (orange) */
 
-    --sidebar-background: 222 35% 8%; /* Dark sidebar background */
-    --sidebar-foreground: 0 0% 90%; /* Sidebar text */
-    --sidebar-primary: 25 90% 60%; /* Sidebar primary (orange) */
-    --sidebar-primary-foreground: 0 0% 100%; /* Sidebar primary text */
-    --sidebar-accent: 222 30% 15%; /* Sidebar accent */
-    --sidebar-accent-foreground: 0 0% 90%; /* Sidebar accent text */
-    --sidebar-border: 222 25% 20%; /* Sidebar border */
-    --sidebar-muted: 215 20% 60%; /* Sidebar muted text */
-    --sidebar-ring: 25 90% 60%; /* Sidebar ring (orange) */
+    --sidebar-background: 222 35% 8%;
+    /* Dark sidebar background */
+    --sidebar-foreground: 0 0% 90%;
+    /* Sidebar text */
+    --sidebar-primary: 25 90% 60%;
+    /* Sidebar primary (orange) */
+    --sidebar-primary-foreground: 0 0% 100%;
+    /* Sidebar primary text */
+    --sidebar-accent: 222 30% 15%;
+    /* Sidebar accent */
+    --sidebar-accent-foreground: 0 0% 90%;
+    /* Sidebar accent text */
+    --sidebar-border: 222 25% 20%;
+    /* Sidebar border */
+    --sidebar-muted: 215 20% 60%;
+    /* Sidebar muted text */
+    --sidebar-ring: 25 90% 60%;
+    /* Sidebar ring (orange) */
 
     --radius: 0.5rem;
   }

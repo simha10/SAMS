@@ -4,6 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { authAPI } from "@/services/api";
 import { CollapsibleSidebar } from "@/components/ui/collapsible-sidebar";
 import { toast } from "@/components/ui/sonner";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function AdminManagerLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -50,38 +51,41 @@ export default function AdminManagerLayout() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <CollapsibleSidebar
-        onLogout={handleLogout}
-        collapsed={sidebarCollapsed}
-        onCollapsedChange={setSidebarCollapsed}
-      />
+    <div className="flex h-screen w-full bg-background text-foreground">
+      {/* Fixed sidebar - always on left */}
+      <div className="fixed left-0 top-0 h-full z-50">
+        <CollapsibleSidebar
+          onLogout={handleLogout}
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
+        />
+      </div>
 
-      {/* Main content */}
-      <div
-        className={`flex-1 transition-all duration-300 ${
-          sidebarCollapsed ? "md:ml-16" : "md:ml-64"
+      {/* Main content area - positioned to the right of sidebar */}
+      <div 
+        className={`flex flex-col flex-1 transition-all duration-300 overflow-y-auto ${
+          sidebarCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
         }`}
       >
-        <header className="bg-background border-b border-border sticky top-0 z-40">
-          <div className="flex items-center justify-between px-4 py-4 sm:px-6">
-            <div className="flex items-center space-x-2">
-              <h1 className="text-xl font-semibold text-foreground">
-                Manager Dashboard
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right text-sm">
-                <p className="font-medium text-foreground">{user?.name}</p>
-                <p className="text-muted-foreground">
+        {/* Header - sticky at top with proper spacing */}
+        <header className="bg-background border-b border-border sticky top-0 z-40 w-full flex items-center justify-end px-4 py-4 sm:px-6">
+          <div className="flex items-center space-x-4">
+              
+              <div className="text-right text-sm min-w-0">
+                <p className="font-medium text-foreground truncate">{user?.name}</p>
+                <p className="text-muted-foreground truncate">
                   {user?.role === "director" ? "Director" : "Manager"} •{" "}
                   {user?.empId}
                 </p>
               </div>
+              <div className="flex items-center space-x-4 border-l border-border pl-4">
+                <ThemeToggle />
+              </div>
             </div>
-          </div>
         </header>
-        <main className="p-4 sm:p-6">
+        
+        {/* Page content - with proper padding to prevent overlap with header */}
+        <main className="flex-1 pt-16 p-4 sm:p-6 bg-background text-foreground">
           <Outlet />
         </main>
       </div>

@@ -347,7 +347,7 @@ export default function ManagerAttendance() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button onClick={handleRefresh} disabled={refreshing}>
+              <Button onClick={handleRefresh} disabled={refreshing} className="w-full md:w-auto">
                 {refreshing ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : null}
@@ -445,27 +445,27 @@ export default function ManagerAttendance() {
               </p>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Employee ID</TableHead>
-                    <TableHead>Check-in</TableHead>
-                    <TableHead>Check-out</TableHead>
-                    <TableHead>Working Hours</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="whitespace-nowrap">Employee</TableHead>
+                    <TableHead className="whitespace-nowrap">Employee ID</TableHead>
+                    <TableHead className="whitespace-nowrap">Check-in</TableHead>
+                    <TableHead className="whitespace-nowrap">Check-out</TableHead>
+                    <TableHead className="whitespace-nowrap">Working Hours</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredTeam.map((member) => (
                     <TableRow key={member.employee.id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium whitespace-nowrap">
                         {member.employee.name}
                       </TableCell>
-                      <TableCell>{member.employee.empId}</TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">{member.employee.empId}</TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {member.attendance.checkInTime
                           ? format(
                               new Date(member.attendance.checkInTime),
@@ -473,7 +473,7 @@ export default function ManagerAttendance() {
                             )
                           : "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {member.attendance.checkOutTime
                           ? format(
                               new Date(member.attendance.checkOutTime),
@@ -481,20 +481,20 @@ export default function ManagerAttendance() {
                             )
                           : "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {member.attendance.workingHours !== null
                           ? `${Math.floor(
                               member.attendance.workingHours / 60
                             )}h ${member.attendance.workingHours % 60}m`
                           : "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {getStatusBadge(
                           member.attendance.status,
                           member.attendance.flagged
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <div className="flex space-x-2">
                           <Button
                             variant="outline"

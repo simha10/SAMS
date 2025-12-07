@@ -5,15 +5,18 @@ const {
   getFlaggedAttendance,
   updateAttendanceStatus,
   getTeamMembers,
-  createHoliday,
-  getHolidays,
-  updateHoliday,
-  deleteHoliday,
   getManagerSummary,
   updateEmployee,
   deleteEmployee
 } = require('../controllers/managerController');
 const { getTeamLeaveRequests, updateLeaveRequest } = require('../controllers/leaveController');
+// Import holiday functions from the correct controller
+const {
+  createHoliday,
+  getHolidays,
+  updateHoliday,
+  deleteHoliday
+} = require('../controllers/holidayController');
 const { protect, restrictTo } = require('../middleware/auth');
 const cacheMiddleware = require('../middleware/cache');
 

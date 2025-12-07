@@ -213,6 +213,25 @@ async function deleteReport(req, res) {
   }
 }
 
+// Helper function to get team query based on user role
+function getTeamQuery(userId, userRole) {
+  if (userRole === 'director') {
+    // Directors see all employees in the organization (except themselves)
+    return {
+      role: 'employee',
+      isActive: true,
+      _id: { $ne: userId } // Exclude the director themselves
+    };
+  } else {
+    // Managers see employees under their management
+    return {
+      managerId: userId,
+      role: 'employee',
+      isActive: true
+    };
+  }
+}
+
 // Helper function to generate attendance report data
 async function generateAttendanceReport(req, start, end, filters, limit = 0) {
   // Ensure end date is inclusive by setting it to end of day
@@ -234,9 +253,10 @@ async function generateAttendanceReport(req, start, end, filters, limit = 0) {
     } else {
       return []; // No user found with that empId
     }
-  } else if (req.user.role === 'manager') {
-    // If manager, only get reports for their team members
-    const teamMembers = await User.find({ managerId: req.user._id, isActive: true });
+  } else if (req.user.role === 'manager' || req.user.role === 'director') {
+    // If manager or director, get team query based on role
+    const teamQuery = getTeamQuery(req.user._id, req.user.role);
+    const teamMembers = await User.find(teamQuery);
     const teamMemberIds = teamMembers.map(member => member._id);
     query.userId = { $in: teamMemberIds };
   }
@@ -273,9 +293,10 @@ async function generateAttendanceReport(req, start, end, filters, limit = 0) {
     if (user) {
       allRelevantUsers = [user];
     }
-  } else if (req.user.role === 'manager') {
-    // If manager, get all team members
-    allRelevantUsers = await User.find({ managerId: req.user._id, isActive: true });
+  } else if (req.user.role === 'manager' || req.user.role === 'director') {
+    // If manager or director, get team query based on role
+    const teamQuery = getTeamQuery(req.user._id, req.user.role);
+    allRelevantUsers = await User.find(teamQuery);
   } else {
     // For admin, get all active users
     allRelevantUsers = await User.find({ isActive: true });
@@ -328,9 +349,10 @@ async function generateLeaveReport(req, start, end, filters, limit = 0) {
     } else {
       return []; // No user found with that empId
     }
-  } else if (req.user.role === 'manager') {
-    // If manager, only get reports for their team members
-    const teamMembers = await User.find({ managerId: req.user._id, isActive: true });
+  } else if (req.user.role === 'manager' || req.user.role === 'director') {
+    // If manager or director, get team query based on role
+    const teamQuery = getTeamQuery(req.user._id, req.user.role);
+    const teamMembers = await User.find(teamQuery);
     const teamMemberIds = teamMembers.map(member => member._id);
     query.userId = { $in: teamMemberIds };
   }
@@ -366,9 +388,10 @@ async function generateSummaryReport(req, start, end, filters, limit = 0) {
     } else {
       return []; // No user found with that empId
     }
-  } else if (req.user.role === 'manager') {
-    // If manager, only get reports for their team members
-    const teamMembers = await User.find({ managerId: req.user._id, isActive: true });
+  } else if (req.user.role === 'manager' || req.user.role === 'director') {
+    // If manager or director, get team query based on role
+    const teamQuery = getTeamQuery(req.user._id, req.user.role);
+    const teamMembers = await User.find(teamQuery);
     const teamMemberIds = teamMembers.map(member => member._id);
     query.userId = { $in: teamMemberIds };
   }
@@ -424,9 +447,10 @@ async function generateSummaryReport(req, start, end, filters, limit = 0) {
     if (user) {
       allRelevantUsers = [user];
     }
-  } else if (req.user.role === 'manager') {
-    // If manager, get all team members
-    allRelevantUsers = await User.find({ managerId: req.user._id, isActive: true });
+  } else if (req.user.role === 'manager' || req.user.role === 'director') {
+    // If manager or director, get team query based on role
+    const teamQuery = getTeamQuery(req.user._id, req.user.role);
+    allRelevantUsers = await User.find(teamQuery);
   } else {
     // For admin, get all active users
     allRelevantUsers = await User.find({ isActive: true });

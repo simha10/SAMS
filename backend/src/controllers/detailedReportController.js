@@ -3,11 +3,31 @@ const User = require('../models/User');
 const Branch = require('../models/Branch');
 const { createDetailedAttendanceExcel, convertDetailedAttendanceToCSV } = require('../utils/detailedAttendanceReport');
 
+// Helper function to get team query based on user role
+function getTeamQuery(userId, userRole) {
+    if (userRole === 'director') {
+        // Directors see all employees in the organization (except themselves)
+        return {
+            role: 'employee',
+            isActive: true,
+            _id: { $ne: userId } // Exclude the director themselves
+        };
+    } else {
+        // Managers see employees under their management
+        return {
+            managerId: userId,
+            role: 'employee',
+            isActive: true
+        };
+    }
+}
+
 // Generate detailed attendance report
 async function generateDetailedAttendanceReport(req, res) {
     try {
         const { format = 'csv', startDate, endDate, filters = {} } = req.body;
         const userId = req.user._id;
+        const userRole = req.user.role;
 
         // Validate dates
         if (!startDate) {
@@ -54,9 +74,10 @@ async function generateDetailedAttendanceReport(req, res) {
                     message: 'Employee not found with provided employee ID'
                 });
             }
-        } else if (req.user.role === 'manager') {
-            // If manager, only get reports for their team members
-            const teamMembers = await User.find({ managerId: req.user._id, isActive: true });
+        } else if (req.user.role === 'manager' || req.user.role === 'director') {
+            // If manager or director, get team query based on role
+            const teamQuery = getTeamQuery(userId, userRole);
+            const teamMembers = await User.find(teamQuery);
             const teamMemberIds = teamMembers.map(member => member._id);
             query.userId = { $in: teamMemberIds };
         }

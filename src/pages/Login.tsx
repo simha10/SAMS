@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -10,33 +8,32 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock } from "lucide-react";
-import { authAPI } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
-import type { ApiError } from "@/types";
+import { authAPI } from "@/services/api";
 import { toast } from "@/components/ui/sonner";
+import type { ApiError } from "@/types";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Login() {
   const [empId, setEmpId] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
+  const [error, setError] = useState("");
   const navigate = useNavigate();
   const { login } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
-      // Use the authAPI service which is properly configured with the correct baseURL
-      // Removed rememberMe parameter as it's no longer needed
       const response = await authAPI.login(empId, password);
-      
-      if (response.success && response.data) {
+      if (response.success && response.data?.user) {
         login(response.data.user);
         toast.success("Login successful", {
           description: "Welcome back! You have been successfully logged in.",
@@ -48,7 +45,8 @@ export default function Login() {
         } else if (response.data.user.role === "manager") {
           navigate("/manager");
         } else if (response.data.user.role === "director") {
-          navigate("/admin");
+          // Directors should go to the manager dashboard
+          navigate("/manager");
         } else {
           navigate("/dashboard");
         }
@@ -76,15 +74,18 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-blue-orange p-4">
-      <Card className="w-full max-w-md card-modern shadow-2xl">
+      <Card className="w-full max-w-md card-modern shadow-2xl bg-background">
         <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-end">
+            <ThemeToggle />
+          </div>
           <div className="mx-auto bg-primary/10 p-3 rounded-full mb-4">
             <Lock className="h-8 w-8 text-primary mx-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold">
+          <CardTitle className="text-2xl font-bold display-heading">
             LRMC Staff Login
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="section-heading">
             Sign in to your account to continue
           </CardDescription>
         </CardHeader>

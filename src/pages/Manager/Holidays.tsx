@@ -37,7 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Plus, Trash2, Edit } from "lucide-react";
+import { Loader2, Plus, Trash2, Edit, RefreshCw } from "lucide-react";
 import { managerAPI } from "@/services/api";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
@@ -345,12 +345,22 @@ export default function ManagerHolidays() {
 
       {/* Holidays Table */}
       <Card>
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
           <div>
             <CardTitle className="text-2xl font-bold px-4 py-2">Holidays</CardTitle>
             <CardDescription className="text-sm text-gray-500 px-4">
               List of holidays for the selected period
             </CardDescription>
+          </div>
+          <div className="px-4">
+            <Button onClick={handleRefresh} disabled={refreshing} variant="outline" className="w-full sm:w-auto">
+              {refreshing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Refresh
+            </Button>
           </div>
         </div>
         <CardContent>
@@ -369,26 +379,26 @@ export default function ManagerHolidays() {
               </p>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Created By</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="whitespace-nowrap">Date</TableHead>
+                    <TableHead className="whitespace-nowrap">Name</TableHead>
+                    <TableHead className="whitespace-nowrap">Description</TableHead>
+                    <TableHead className="whitespace-nowrap">Created By</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {holidays.map((holiday) => (
                     <TableRow key={holiday._id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium whitespace-nowrap">
                         {format(new Date(holiday.date), "MMM d, yyyy")}
                       </TableCell>
-                      <TableCell>{holiday.name}</TableCell>
-                      <TableCell>{holiday.description || "-"}</TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">{holiday.name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{holiday.description || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {holiday.createdBy.name} ({holiday.createdBy.empId})
                       </TableCell>
                       <TableCell className="text-right">

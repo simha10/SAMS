@@ -15,7 +15,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useAuthStore } from "@/stores/authStore";
 import type { ReactNode } from "react";
 
@@ -158,6 +158,13 @@ export function CollapsibleSidebar({
           side="left"
           className="w-64 p-0 bg-gradient-to-b from-sidebar-background to-sidebar-accent"
         >
+          {/* Add accessibility labels for SheetContent */}
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navigation Menu</SheetTitle>
+            <SheetDescription>
+              Main navigation menu for accessing different sections of the application
+            </SheetDescription>
+          </SheetHeader>
           <SidebarContent
             logout={onLogout}
             isActive={isActive}

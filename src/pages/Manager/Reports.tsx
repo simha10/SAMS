@@ -1404,11 +1404,12 @@ export default function ManagerReports() {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-2">
+          <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-2">
             <Button
               onClick={previewReport}
               disabled={previewing}
               variant="outline"
+              className="w-full sm:w-auto"
             >
               {previewing ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1468,11 +1469,12 @@ export default function ManagerReports() {
                       ).summary.length === 0))
               }
               variant="outline"
+              className="w-full sm:w-auto"
             >
               <Eye className="w-4 h-4 mr-2" />
               Preview in New Tab
             </Button>
-            <Button onClick={generateReport} disabled={loading}>
+            <Button onClick={generateReport} disabled={loading} className="w-full sm:w-auto">
               {loading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (

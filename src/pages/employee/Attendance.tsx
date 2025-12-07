@@ -311,7 +311,7 @@ export default function Attendance() {
             <div>
               <CardTitle>{format(currentMonth, "MMMM yyyy")}</CardTitle>
               <CardDescription>
-                Click on a date to view attendance details
+                click refresh to load data
               </CardDescription>
             </div>
             <div className="flex space-x-2">
@@ -444,7 +444,7 @@ export default function Attendance() {
 
               {!selectedAttendance && (
                 <div className="text-center py-8 text-muted-foreground">
-                  Select a date to view attendance details or click refresh to load data
+                  Select a date to view attendance details
                 </div>
               )}
             </div>

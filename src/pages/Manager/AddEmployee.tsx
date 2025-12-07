@@ -35,7 +35,8 @@ export default function AddEmployee() {
 
   // Fetch branches for selection
   const fetchBranches = async () => {
-    if (user?.role !== "director") return;
+    // Both managers and directors can fetch branches
+    if (user?.role !== "manager" && user?.role !== "director") return;
     
     setBranchesLoading(true);
     try {
@@ -100,14 +101,9 @@ export default function AddEmployee() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        role: "employee",
+        role: 'employee',
         managerId: user?._id,
       };
-
-      // Add branch assignment for directors
-      if (user?.role === "director" && formData.branchId) {
-        // We'll handle branch assignment on the backend
-      }
 
       const response = await authAPI.register(registerData);
 
@@ -230,8 +226,8 @@ export default function AddEmployee() {
                 />
               </div>
 
-              {user?.role === "director" && (
-                <div className="space-y-2">
+              {(user?.role === "manager" || user?.role === "director") && (
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="branchId">Assign Branch</Label>
                   {branchesLoading ? (
                     <div className="flex items-center justify-center p-2">
@@ -259,7 +255,7 @@ export default function AddEmployee() {
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                 {loading ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : null}
@@ -282,16 +278,17 @@ export default function AddEmployee() {
             <li>Employee ID must be unique across the system</li>
             <li>Email address must be unique across the system</li>
             <li>Password must be at least 6 characters long</li>
-            {user?.role === "director" && (
+            {(user?.role === "manager" || user?.role === "director") && (
               <>
                 <li>
-                  Directors can assign employees to specific branches (optional)
+                  Managers and Directors can assign employees to specific branches (optional)
                 </li>
                 <li>
                   Date of Birth is used for birthday notifications
                 </li>
               </>
             )}
+
           </ul>
         </CardContent>
       </Card>

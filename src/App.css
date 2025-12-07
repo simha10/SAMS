@@ -1,23 +1,17 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
 
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
@@ -25,46 +19,91 @@
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
-    --destructive: 0 100% 50%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --ring: 215 20.2% 65.1%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
 
     --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-muted: 240 3.8% 46.1%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    --background: 224 30% 10%; /* Dark blue background */
-    --foreground: 213 31% 91%;
+    --background: 222 30% 10%;
+    /* Dark blue background (#0f172a) */
+    --foreground: 0 0% 98%;
+    /* Light text */
 
-    --muted: 223 20% 20%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --card: 222 25% 15%;
+    /* Slightly lighter card background (#1e293b) */
+    --card-foreground: 0 0% 98%;
 
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
+    --popover: 222 30% 12%;
+    /* Popover background */
+    --popover-foreground: 0 0% 98%;
 
-    --popover: 224 30% 10%;
-    --popover-foreground: 215 20.2% 65.1%;
-
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-
-    --card: 224 30% 12%; /* Slightly lighter card background */
-    --card-foreground: 213 31% 91%;
-
-    --primary: 25 95% 65%; /* Vibrant orange */
+    --primary: 25 90% 60%;
+    /* Orange primary color (#ea580c) */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 224 30% 15%; /* Secondary elements */
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 222 30% 20%;
+    /* Dark blue secondary */
+    --secondary-foreground: 0 0% 98%;
 
-    --destructive: 0 80% 50%; /* Vibrant red */
+    --muted: 222 20% 25%;
+    /* Muted dark blue */
+    --muted-foreground: 215 20% 70%;
+
+    --accent: 150 80% 40%;
+    /* Green accent color */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 80% 50%;
+    /* Red destructive color */
     --destructive-foreground: 0 0% 100%;
 
-    --ring: 25 95% 65%; /* Orange ring */
+    --border: 222 25% 20%;
+    /* Border color */
+    --input: 222 25% 20%;
+    /* Input border color */
+    --ring: 25 90% 60%;
+    /* Ring color (orange) */
+
+    --sidebar-background: 222 35% 8%;
+    /* Dark sidebar background */
+    --sidebar-foreground: 0 0% 90%;
+    /* Sidebar text */
+    --sidebar-primary: 25 90% 60%;
+    /* Sidebar primary (orange) */
+    --sidebar-primary-foreground: 0 0% 100%;
+    /* Sidebar primary text */
+    --sidebar-accent: 222 30% 15%;
+    /* Sidebar accent */
+    --sidebar-accent-foreground: 0 0% 90%;
+    /* Sidebar accent text */
+    --sidebar-border: 222 25% 20%;
+    /* Sidebar border */
+    --sidebar-muted: 215 20% 60%;
+    /* Sidebar muted text */
+    --sidebar-ring: 25 90% 60%;
+    /* Sidebar ring (orange) */
 
     --radius: 0.5rem;
   }
@@ -72,11 +111,11 @@
 
 @layer base {
   * {
-    border-color: hsl(var(--border));
+    @apply border-border;
   }
+
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -138,9 +177,12 @@
 
 /* Animation for loading states */
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -153,4 +195,30 @@
 /* Sidebar specific styles */
 .sidebar-gradient {
   background: linear-gradient(135deg, hsl(var(--sidebar-background)) 0%, hsl(var(--sidebar-accent)) 100%);
+}
+
+/* Enhanced heading fonts for MNC look */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.display-heading {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.section-heading {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }

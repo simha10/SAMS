@@ -180,7 +180,7 @@ export default function ManagerProfile() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Information */}
-        <div className="lg:col-span-2 space-y-9">
+        <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
@@ -198,6 +198,7 @@ export default function ManagerProfile() {
                     onChange={(e) => setName(e.target.value)}
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="employee-id">Employee ID</Label>
                   <Input
@@ -230,14 +231,14 @@ export default function ManagerProfile() {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2">
-                <Button onClick={handleUpdateProfile} disabled={loading}>
+              <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+                <Button onClick={handleUpdateProfile} disabled={loading} className="w-full sm:w-auto">
                   {loading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : null}
                   Update Profile
                 </Button>
-                <Button variant="outline" onClick={handleLogout}>
+                <Button variant="outline" onClick={handleLogout} className="w-full sm:w-auto">
                   Logout
                 </Button>
               </div>
@@ -302,6 +303,7 @@ export default function ManagerProfile() {
                   <Button
                     onClick={handleChangePassword}
                     disabled={passwordLoading}
+                    className="w-full sm:w-auto"
                   >
                     {passwordLoading ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -11,7 +11,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { useAuthStore } from "@/stores/authStore";
 import { authAPI } from "@/services/api";
 import type { ReactNode } from "react";
@@ -19,6 +19,7 @@ import { toast } from "@/components/ui/sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { usePWA } from "@/hooks/usePWA";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface SidebarItem {
   title: string;
@@ -83,7 +84,7 @@ export default function EmployeeLayout() {
 
   // Mobile bottom navigation
   const BottomNav = () => (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50 text-foreground">
       <div className="grid grid-cols-5 gap-1 p-2">
         {sidebarItems.map((item) => (
           <Link
@@ -105,7 +106,7 @@ export default function EmployeeLayout() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* Install Prompt */}
       {showInstallPrompt && !isStandalone && (
         <Alert className="bg-blue-500 text-white border-0 rounded-none">
@@ -149,8 +150,14 @@ export default function EmployeeLayout() {
             </SheetTrigger>
             <SheetContent
               side="left"
-              className="w-64 p-0 bg-gradient-to-b from-sidebar-background to-sidebar-accent"
+              className="w-64 p-0 bg-gradient-to-b from-sidebar-background to-sidebar-accent text-sidebar-primary"
             >
+              <SheetHeader className="sr-only">
+                <SheetTitle>Employee Navigation</SheetTitle>
+                <SheetDescription>
+                  Navigation menu for employee dashboard sections
+                </SheetDescription>
+              </SheetHeader>
               <div className="flex h-full flex-col">
                 <div className="p-4 border-b border-sidebar-border">
                   <div className="flex items-center space-x-3">
@@ -160,7 +167,7 @@ export default function EmployeeLayout() {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium text-sidebar-primary">
+                      <p className="font-medium text-sidebar-primary-foreground">
                         {user?.name}
                       </p>
                       <p className="text-xs text-sidebar-foreground">
@@ -210,26 +217,32 @@ export default function EmployeeLayout() {
             </SheetContent>
           </Sheet>
           
-          <h1 className="text-lg font-semibold text-foreground">
-            LRMC Staff
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-lg font-semibold text-foreground section-heading">
+              LRMC Staff
+            </h1>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
       {/* Desktop sidebar */}
-      <div className="hidden md:block fixed left-0 top-0 h-full w-64 border-r border-border bg-background z-40">
+      <div className="hidden md:block fixed left-0 top-0 h-full w-64 border-r border-border bg-background z-40 text-foreground">
         <div className="flex h-full flex-col">
           <div className="p-4 border-b border-border">
-            <div className="flex items-center space-x-3">
-              <Avatar>
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  {user?.name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium">{user?.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.empId}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Avatar>
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    {user?.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground">{user?.empId}</p>
+                </div>
               </div>
+              <ThemeToggle />
             </div>
           </div>
           
@@ -267,7 +280,7 @@ export default function EmployeeLayout() {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 pb-16 md:pb-0 md:ml-64 pt-16 md:pt-0">
+      <main className="flex-1 pb-16 md:pb-0 md:ml-64 pt-16 md:pt-0 bg-background text-foreground">
         <div className="p-4 md:p-6">
           <Outlet />
         </div>

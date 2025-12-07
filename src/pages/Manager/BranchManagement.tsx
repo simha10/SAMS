@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, MapPin, Trash2, Edit } from "lucide-react";
+import { Loader2, MapPin, Trash2, Edit, RefreshCw } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { branchAPI } from "@/services/api";
 import type { Branch } from "@/types";
@@ -322,7 +322,7 @@ export default function BranchManagement() {
                 <Label htmlFor="isActive">Active Branch</Label>
               </div>
 
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row sm:space-x-3 sm:space-y-0 space-y-3">
                 <Button type="submit" disabled={loading || refreshing} className="flex-1">
                   {loading || refreshing ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -338,6 +338,7 @@ export default function BranchManagement() {
                       handleCancel();
                       handleRefresh();
                     }}
+                    className="flex-1"
                   >
                     Cancel
                   </Button>
@@ -348,12 +349,22 @@ export default function BranchManagement() {
         </Card>
 
         <Card>
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
             <div>
               <CardTitle className="text-2xl font-bold px-6 pt-4">Existing Branches</CardTitle>
               <CardDescription className="px-6">
                 Manage all office locations for attendance tracking
               </CardDescription>
+            </div>
+            <div className="px-6">
+              <Button onClick={handleRefresh} disabled={refreshing} variant="outline" className="w-full sm:w-auto">
+                {refreshing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Refresh
+              </Button>
             </div>
           </div>
           <CardContent>
@@ -374,14 +385,14 @@ export default function BranchManagement() {
                 {branches.map((branch) => (
                   <div 
                     key={branch._id} 
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted transition-colors gap-4"
                   >
-                    <div>
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <div className="flex-1">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <MapPin className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                         <h4 className="font-medium">{branch.name}</h4>
                         {!branch.isActive && (
-                          <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded whitespace-nowrap">
                             Inactive
                           </span>
                         )}
