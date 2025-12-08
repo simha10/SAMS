@@ -19,6 +19,7 @@ This is the backend API for the Geo-Fence Attendance Management System.
 - **Industrial-Grade Rate Limiting with Redis**
 - **Distributed Caching with Redis**
 - **Database Connection Pooling**
+- **Enhanced Dashboard API**: Improved endpoints for Manager/Director dashboard with role-specific data
 
 ## Tech Stack
 
@@ -166,6 +167,12 @@ The test files will automatically use the `MONGO_URI` from your `.env` file, or 
 - `PUT /api/branches/:id` - Update branch (admin only)
 - `DELETE /api/branches/:id` - Delete branch (admin only)
 
+### Dashboard Enhancements
+
+- `GET /api/manager/dashboard/stats` - Get dashboard statistics for manager/director
+- `GET /api/manager/team/members` - Get team members with enhanced profile data
+- Enhanced data endpoints with role-specific information for unified Manager/Director interface
+
 ## Environment Variables
 
 See `.env.example` for all required environment variables, including Redis configuration.
@@ -183,21 +190,22 @@ See `.env.example` for all required environment variables, including Redis confi
 - Half-day threshold changed from 4 hours to 5 hours
 - Clean attendance between 9 AM to 7 PM unless holiday/Sunday
 
-### ✅ Holiday Rules
-- All Sundays are holidays
+### ✅ Holiday Management System
+- All Sundays automatically treated as holidays
 - If employee marks attendance on Sunday, always flagged
-- Managers can declare monthly holidays via API/UI
+- Managers can declare custom holidays via API/UI
 - Added isRecurringSunday field to Holiday model
 
 ### ✅ Birthday Notification Feature
 - Added dob field to User model as Date (indexed for performance)
-- Created daily cron job at 8:00 AM to scan for birthdays and notify all employees
+- Created daily cron job at 8:00 AM to scan for birthdays
+- Notifies all employees about birthdays
 - Frontend displays birthday banner in dashboard
 
 ### ✅ Flagged Attendance Enhancements
 - Enhanced flaggedReason with detailed information including distance
-- Distance from branch is stored in attendance records
-- Distance is included in CSV/Excel reports and manager dashboard
+- Distance from branch stored in attendance records
+- Distance included in CSV/Excel reports and manager dashboard
 
 ### ✅ Persistent Login Sessions
 - Added "Remember Me" functionality for extended session duration
@@ -216,6 +224,12 @@ See `.env.example` for all required environment variables, including Redis confi
 - Cache-aside pattern implementation
 - Configurable TTL for different data types
 - Intelligent cache key generation
+
+### ✅ Enhanced Dashboard API
+- Added role-specific endpoints for Manager/Director dashboard
+- Improved data aggregation for dashboard statistics
+- Enhanced team member data with profile information
+- Unified data structure for consistent Manager/Director interface
 
 ## Current Achievements
 
@@ -300,6 +314,7 @@ Successfully seeded database with:
 - ✅ All login tests passing
 - ✅ Zero-cost deployment ready
 - ✅ Industrial-grade rate limiting and caching implemented
+- ✅ Enhanced dashboard API endpoints
 
 ### Phase 2: Short-term Improvements
 - [ ] Add comprehensive error tracking
