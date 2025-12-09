@@ -772,7 +772,6 @@ export default function Dashboard() {
                 !canCheckin ||
                 actionLoading ||
                 geoError !== null ||
-                !isWithinOfficeHours() ||
                 isDataLoading
               }
               className={getCheckInButtonClass()}

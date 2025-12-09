@@ -217,15 +217,6 @@ async function checkout(req, res) {
     attendance.distanceFromOffice.checkOut = distanceFromBranch;
     attendance.checkOutTime = new Date();
 
-    // Calculate working hours in minutes
-    if (attendance.checkInTime) {
-      const checkInTime = new Date(attendance.checkInTime);
-      const checkOutTime = new Date(attendance.checkOutTime);
-      const diffMs = checkOutTime - checkInTime;
-      attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
-      console.log('Working hours calculated:', attendance.workingHours, 'minutes');
-    }
-
     // Check if within allowed radius
     const isWithinBranchRadius = !!nearestBranchResult;
 
