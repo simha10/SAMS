@@ -217,6 +217,15 @@ async function updateAttendanceStatus(req, res) {
     // If a checkOutTime is provided, update it
     if (checkOutTime) {
       attendance.checkOutTime = new Date(`${attendance.date.toISOString().split('T')[0]}T${checkOutTime}`);
+      
+      // Recalculate working hours when checkout time is updated
+      if (attendance.checkInTime && attendance.checkOutTime) {
+        const checkInTime = new Date(attendance.checkInTime);
+        const checkOutTimeObj = new Date(attendance.checkOutTime);
+        const diffMs = checkOutTimeObj - checkInTime;
+        attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
+        console.log('Working hours recalculated:', attendance.workingHours, 'minutes');
+      }
     }
 
     // Unflag the attendance when manually approved/rejected

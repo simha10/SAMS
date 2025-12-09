@@ -35,7 +35,12 @@ cron.schedule('59 18 * * *', async () => {
           continue;
         }
         
-        // No skip conditions - auto-checkout should run for all records with checkInTime and null checkOutTime
+        // Safeguard 2: Manager Approval Protection - Skip if already approved
+        if (!attendance.flagged && 
+            ['present', 'absent', 'half-day', 'outside-duty', 'on-leave'].includes(attendance.status)) {
+          logger.info(`Skipping user ${attendance.userId} - record already approved`);
+          continue;
+        }
         
         // Set auto checkout time to 11:59 PM
         const autoCheckoutTime = new Date(attendance.date);
@@ -52,14 +57,9 @@ cron.schedule('59 18 * * *', async () => {
           attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
         }
         
-        // Set flagged status and append reason for auto-checkout
+        // Set flagged status and reason for auto-checkout
         attendance.flagged = true;
-        // Append to existing flaggedReason or set new one
-        if (attendance.flaggedReason) {
-          attendance.flaggedReason += ' | Auto checkout at 23:59 — pending manager verification';
-        } else {
-          attendance.flaggedReason = 'Auto checkout at 23:59 — pending manager verification';
-        }
+        attendance.flaggedReason = 'Auto-checkout applied — needs manager verification';
         
         // Save the updated attendance record
         await attendance.save();
