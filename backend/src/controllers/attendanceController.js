@@ -2,12 +2,26 @@ const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
 const Holiday = require('../models/Holiday');
-const { haversine, formatWorkingHours } = require('../utils/haversine');
-const { isSunday, isWithinAllowedAttendanceWindow, isFairOfficeHours } = require('../utils/timeUtils');
+const { haversine, isWithinOfficeHours, formatWorkingHours } = require('../utils/haversine');
 const { findNearestBranch } = require('./branchController');
 const mongoose = require('mongoose');
 
-// ... existing code ...
+// Check if date is a Sunday
+function isSunday(date) {
+  return date.getDay() === 0;
+}
+
+// Check if time is within full attendance hours (12:01 AM to 11:59 PM)
+function isWithinFullAttendanceHours(date = new Date()) {
+  const hour = date.getHours();
+  return hour >= 0 && hour < 24; // 12:01 AM to 11:59 PM
+}
+
+// Check if time is within clean attendance hours (9 AM to 7 PM)
+function isWithinCleanHours(date = new Date()) {
+  const hour = date.getHours();
+  return hour >= 9 && hour < 19; // 9 AM to 7 PM
+}
 
 // Check-in function
 async function checkin(req, res) {
@@ -100,39 +114,40 @@ async function checkin(req, res) {
     // Set check-in time
     attendance.checkInTime = new Date();
 
-    // Determine status based on location, time, and holiday with unified flagging logic
+    // Check if within office hours
+    const isWithinFullHours = isWithinFullAttendanceHours(new Date(attendance.checkInTime));
+    const isWithinCleanAttendanceHours = isWithinCleanHours(new Date(attendance.checkInTime));
+
+    // Determine status based on location, time, and holiday
     let status = 'present';
     let flagged = false;
     let flaggedReason = '';
 
-    // Apply flag reasons in priority order (First match wins)
-    
-    // Priority 1 - Holiday
-    if (isHoliday) {
+    if (isTodaySunday) {
+      // If it's Sunday, always flag the attendance
+      status = 'present'; // Keep status as present
       flagged = true;
-      flaggedReason = 'Working on holiday';
-    }
-    // Priority 2 - Sunday
-    else if (isTodaySunday) {
+      flaggedReason = 'Working on Sunday - Awaiting manager approval';
+    } else if (isHoliday) {
+      // If it's a holiday, flag the attendance
+      status = 'present'; // Keep status as present
       flagged = true;
-      flaggedReason = 'Working on Sunday';
-    }
-    // Priority 3 - Outside Fair Hours (9:00 AM - 8:00 PM)
-    else if (!isFairOfficeHours(new Date(attendance.checkInTime))) {
+      flaggedReason = 'Working on holiday - Awaiting manager approval';
+    } else if (!isWithinBranchRadius) {
+      status = 'outside-duty';  // Changed from 'absent' to 'outside-duty'
       flagged = true;
-      flaggedReason = 'Attendance outside office hours';
-    }
-    // Priority 4 - Geofence
-    else if (!isWithinBranchRadius) {
-      flagged = true;
-      flaggedReason = `Outside geofence - ${distanceFromBranch ? distanceFromBranch.toFixed(2) : 'unknown'} meters away`;
-    }
-    // Allow check-in if within allowed attendance window (12:01 AM - 11:59 PM)
-    else if (!isWithinAllowedAttendanceWindow(new Date(attendance.checkInTime))) {
-      // This should never happen as we allow check-in anytime within the window
+      flaggedReason = `Outside geofence - ${distanceFromBranch ? distanceFromBranch.toFixed(2) : 'unknown'} meters away from nearest office branch - Awaiting manager approval`;
+      console.log('User is outside geofence during check-in, marking as outside-duty');
+    } else if (!isWithinFullHours) {
       status = 'outside-duty';
       flagged = true;
-      flaggedReason = 'Check-in outside allowed attendance window';
+      flaggedReason = 'Check-in outside allowed hours (12:01 AM - 11:59 PM)';
+      console.log('User is outside full attendance hours during check-in, marking as outside-duty');
+    } else if (!isWithinCleanAttendanceHours) {
+      // Within full hours but outside clean hours - may be flagged depending on other factors
+      console.log('User is within full hours but outside clean hours during check-in');
+    } else {
+      console.log('User is within geofence and office hours during check-in, marking as present');
     }
 
     attendance.status = status;
@@ -217,22 +232,6 @@ async function checkout(req, res) {
     attendance.distanceFromOffice.checkOut = distanceFromBranch;
     attendance.checkOutTime = new Date();
 
-    // Check if within allowed radius
-    const isWithinBranchRadius = !!nearestBranchResult;
-
-    // Check if checkout is attempted after midnight of the same day
-    const checkoutDate = new Date(attendance.checkOutTime);
-    const attendanceDate = new Date(attendance.date);
-    attendanceDate.setHours(23, 59, 59, 999); // Set to end of the attendance day
-    
-    if (checkoutDate > attendanceDate) {
-      // Checkout is after the attendance day (past midnight)
-      return res.status(400).json({
-        success: false,
-        message: 'Your previous day was auto-closed at 23:59. Please check-in fresh for the new day.'
-      });
-    }
-
     // Calculate working hours in minutes
     if (attendance.checkInTime) {
       const checkInTime = new Date(attendance.checkInTime);
@@ -242,27 +241,68 @@ async function checkout(req, res) {
       console.log('Working hours calculated:', attendance.workingHours, 'minutes');
     }
 
-    // Apply unified flagging logic for checkout
-    // Only apply flags if not already flagged for other reasons
-    if (!attendance.flagged || attendance.flaggedReason === '') {
-      // Apply flag reasons in priority order (First match wins)
-      
-      // Priority 1 - Holiday (check if the attendance date is a holiday)
-      // Note: We don't re-check for holidays here as it was already checked at check-in
-      
-      // Priority 2 - Sunday (check if the attendance date is a Sunday)
-      // Note: We don't re-check for Sundays here as it was already checked at check-in
-      
-      // Priority 3 - Outside Fair Hours (9:00 AM - 8:00 PM)
-      if (!isFairOfficeHours(new Date(attendance.checkOutTime))) {
+    // Check if within allowed radius
+    const isWithinBranchRadius = !!nearestBranchResult;
+
+    // Check if within office hours
+    const isWithinFullHours = isWithinFullAttendanceHours(new Date(attendance.checkOutTime));
+    const isWithinCleanAttendanceHours = isWithinCleanHours(new Date(attendance.checkOutTime));
+
+    console.log('Checkout validation:', {
+      isWithinBranchRadius,
+      isWithinFullHours,
+      isWithinCleanAttendanceHours,
+      currentStatus: attendance.status,
+      isFlagged: attendance.flagged
+    });
+
+    // Update status if needed
+    console.log('Before status update:', {
+      currentStatus: attendance.status,
+      isFlagged: attendance.flagged,
+      flaggedReason: attendance.flaggedReason,
+      isWithinBranchRadius,
+      isWithinFullHours,
+      isWithinCleanAttendanceHours,
+      workingHours: attendance.workingHours
+    });
+
+    // Handle the case where user was previously flagged as outside-duty due to geofence
+    if (!isWithinBranchRadius) {
+      // User is currently outside the geofence
+      if (!attendance.flagged || attendance.status !== 'outside-duty' ||
+        !attendance.flaggedReason || !attendance.flaggedReason.includes('geofence')) {
+        // Only update if not already flagged for geofence issues
+        attendance.status = 'outside-duty';
         attendance.flagged = true;
-        attendance.flaggedReason = 'Attendance outside office hours';
+        attendance.flaggedReason = `Outside geofence - ${distanceFromBranch ? distanceFromBranch.toFixed(2) : 'unknown'} meters away from nearest office branch - Awaiting manager approval`;
+        console.log('User is outside geofence, setting status to outside-duty');
+      } else {
+        console.log('User is outside geofence but already flagged for geofence issues');
       }
-      // Priority 4 - Geofence
-      else if (!isWithinBranchRadius) {
-        attendance.flagged = true;
-        attendance.flaggedReason = `Outside geofence - ${distanceFromBranch ? distanceFromBranch.toFixed(2) : 'unknown'} meters away`;
+    } else {
+      // User is currently within the geofence
+      // Check if they were previously flagged for geofence issues and update accordingly
+      if (attendance.flagged && attendance.status === 'outside-duty' &&
+        attendance.flaggedReason && attendance.flaggedReason.includes('geofence')) {
+        // User was previously outside but is now inside, update status to present
+        attendance.status = 'present';
+        attendance.flagged = false;
+        attendance.flaggedReason = '';
+        console.log('User was previously outside but is now inside, updating status to present');
+      } else {
+        console.log('User is inside geofence, keeping current status');
       }
+      // If they were flagged for other reasons, keep that flag
+    }
+
+    // Check full attendance hours only if user is within geofence and not already flagged for geofence issues
+    if (isWithinBranchRadius && !isWithinFullHours &&
+      (!attendance.flagged || !attendance.flaggedReason || !attendance.flaggedReason.includes('geofence'))) {
+      attendance.status = 'outside-duty';
+      attendance.flagged = true;
+      attendance.flaggedReason = 'Check-out outside allowed hours (12:01 AM - 11:59 PM)';
+      console.log('User is within geofence but outside full attendance hours, setting status to outside-duty');
     }
 
     // Auto-mark as full-day or half-day based on working hours (5-hour rule)
@@ -281,6 +321,13 @@ async function checkout(req, res) {
         console.log('Working hours <= 5 hours, marking as half-day');
       }
     }
+
+    console.log('After status update:', {
+      updatedStatus: attendance.status,
+      isFlagged: attendance.flagged,
+      flaggedReason: attendance.flaggedReason,
+      workingHours: attendance.workingHours
+    });
 
     await attendance.save();
 
