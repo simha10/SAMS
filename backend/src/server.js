@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const app = require('./app');
+const app = require('./App.js');
 const { connectRedis, disconnectRedis } = require('./config/redis');
 require('dotenv').config();
 
