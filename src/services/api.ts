@@ -4,6 +4,12 @@ import { toast } from '@/components/ui/sonner';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+// Add a flag to track initialization
+let isInitializing = true;
+setTimeout(() => {
+  isInitializing = false;
+}, 1000); // Set to false after 1 second to allow initial requests
+
 // Create axios instance with default config
 export const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
@@ -12,6 +18,9 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add a flag to track if we've shown the auth error toast
+let hasShownAuthError = false;
 
 // Add request interceptor to add a small delay between requests to prevent rate limiting
 let lastRequestTime = 0;
@@ -51,81 +60,91 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor
-api.interceptors.response.use(
-  (response) => {
-    console.log("=== API RESPONSE ===");
-    console.log("Status:", response.status);
-    console.log("URL:", response.config.url);
-    console.log("Response data:", response.data);
-    console.log("Timestamp:", new Date().toISOString());
-    console.log("=== END API RESPONSE ===");
-    return response;
+// Add a response interceptor to handle infinite loading states
+let pendingRequests = 0;
+let loadingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const showLoadingState = () => {
+  // This is just for debugging - in a real app you might want to show a global loading indicator
+  console.log('Global loading state activated');
+};
+
+const hideLoadingState = () => {
+  // This is just for debugging - in a real app you might want to hide a global loading indicator
+  console.log('Global loading state deactivated');
+};
+
+api.interceptors.request.use(
+  (config) => {
+    // Skip loading state for initialization requests
+    if (isInitializing) return config;
+    
+    pendingRequests++;
+    if (pendingRequests === 1) {
+      // Show loading state after a small delay to avoid flickering
+      loadingTimeout = setTimeout(showLoadingState, 300);
+    }
+    return config;
   },
-  async (error) => {
-    console.error("=== API RESPONSE ERROR ===");
-    console.error("Status:", error.response?.status);
-    console.error("Data:", error.response?.data);
-    console.error("Message:", error.message);
-    console.error("Config:", error.config);
-    console.error("Request:", error.request);
-    console.error("Timestamp:", new Date().toISOString());
-
-    // Handle rate limiting (429)
-    if (error.response?.status === 429) {
-      console.log("RATE LIMIT EXCEEDED - Setting error flag");
-      // Set a flag in localStorage to indicate rate limit error
-      localStorage.setItem('rateLimitError', 'true');
-      // Don't retry on rate limit to prevent infinite loop
-      console.log("=== END API RESPONSE ERROR ===");
-      toast.error("Too many requests", {
-        description: "Please wait a moment and try again.",
-      });
-      return Promise.reject(error);
+  (error) => {
+    pendingRequests = Math.max(0, pendingRequests - 1);
+    if (pendingRequests === 0) {
+      if (loadingTimeout) clearTimeout(loadingTimeout);
+      hideLoadingState();
     }
-
-    // Handle authentication errors (401)
-    if (error.response?.status === 401) {
-      console.log("AUTHENTICATION ERROR - Redirecting to login");
-      console.log("Error message:", error.response?.data?.message);
-
-      // Check if it's a token/user not found error
-      if (error.response?.data?.message?.includes('user not found')) {
-        console.log("User not found in database - clearing auth state");
-        // Clear auth state
-        localStorage.removeItem('auth-storage');
-        sessionStorage.removeItem('auth-storage');
-      }
-
-      // Only redirect if we're not already on the login page
-      if (window.location.pathname !== '/login') {
-        console.log("Redirecting to login page");
-        window.location.href = '/login';
-        toast.error("Session expired", {
-          description: "Please log in again to continue.",
-        });
-      }
-    }
-
-    if (error.response?.status === 403) {
-      console.log("FORBIDDEN ACCESS - Possible authentication issue");
-      console.log("Error message:", error.response?.data?.message);
-      toast.error("Access denied", {
-        description: "You don't have permission to perform this action.",
-      });
-      // Don't redirect automatically for 403, let the component handle it
-    }
-
-    console.log("=== END API RESPONSE ERROR ===");
     return Promise.reject(error);
   }
 );
+
+api.interceptors.response.use(
+  (response) => {
+    pendingRequests = Math.max(0, pendingRequests - 1);
+    if (pendingRequests === 0) {
+      if (loadingTimeout) clearTimeout(loadingTimeout);
+      hideLoadingState();
+    }
+    return response;
+  },
+  (error) => {
+    pendingRequests = Math.max(0, pendingRequests - 1);
+    if (pendingRequests === 0) {
+      if (loadingTimeout) clearTimeout(loadingTimeout);
+      hideLoadingState();
+      
+      // If we get a 401 and we're not on the login page, redirect to login
+      // But only if we're not in initialization phase
+      if (!isInitializing && error.response?.status === 401 && window.location.pathname !== '/login') {
+        // Clear auth state
+        localStorage.removeItem('auth-storage');
+        sessionStorage.removeItem('auth-storage');
+        // Redirect to login after a small delay to allow error handling
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+
 
 // Auth API
 export const authAPI = {
   login: async (empId: string, password: string): Promise<ApiResponse<{ user: User }>> => {
     console.log("Calling login API with:", { empId, password });
     try {
+      // Clear any existing auth data before login
+      localStorage.removeItem('auth-storage');
+      sessionStorage.removeItem('auth-storage');
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      
+      // Clear all cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
       const response = await api.post('/auth/login', { empId, password });
       console.log("Login API response:", response.data);
       return response.data;
@@ -143,6 +162,7 @@ export const authAPI = {
       sessionStorage.removeItem('auth-storage');
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
+      localStorage.removeItem('rateLimitError');
       // Clear all cookies
       document.cookie.split(";").forEach((c) => {
         document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
@@ -164,17 +184,17 @@ export const authAPI = {
     return response.data;
   },
 
-  // New endpoint for validating token and getting user info
+  // Endpoint for validating token and getting user info
   validateToken: async (): Promise<ApiResponse<{ user: User }>> => {
     try {
-      const response = await api.get('/auth/me');
+      const response = await api.get('/auth/profile');
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  updateProfile: async (userData: { name?: string; email?: string; dob?: string }): Promise<ApiResponse<{ user: User }>> => {
+  updateProfile: async (userData: { name?: string; email?: string; dob?: string; mobile?: string }): Promise<ApiResponse<{ user: User }>> => {
     try {
       const response = await api.put('/auth/profile', userData);
       toast.success("Profile updated", {
@@ -232,9 +252,9 @@ interface GeofenceErrorData {
 
 // Attendance API
 export const attendanceAPI = {
-  checkin: async (lat: number, lng: number): Promise<ApiResponse<{ checkInTime: string; distance: number; status: string } | GeofenceErrorData>> => {
+  checkin: async (lat: number, lng: number, branchId: string): Promise<ApiResponse<{ checkInTime: string; distance: number; status: string } | GeofenceErrorData>> => {
     try {
-      const response = await api.post('/attendance/checkin', { lat, lng });
+      const response = await api.post('/attendance/checkin', { lat, lng, branchId });
       return response.data;
     } catch (error) {
       toast.error("Check-in failed", {
@@ -244,9 +264,9 @@ export const attendanceAPI = {
     }
   },
 
-  checkout: async (lat: number, lng: number): Promise<ApiResponse<{ checkOutTime: string; distance: number; workingHours: number } | GeofenceErrorData>> => {
+  checkout: async (lat: number, lng: number, branchId: string): Promise<ApiResponse<{ checkOutTime: string; distance: number; workingHours: number } | GeofenceErrorData>> => {
     try {
-      const response = await api.post('/attendance/checkout', { lat, lng });
+      const response = await api.post('/attendance/checkout', { lat, lng, branchId });
       return response.data;
     } catch (error) {
       toast.error("Check-out failed", {
@@ -689,6 +709,78 @@ export const holidayAPI = {
     } catch (error) {
       toast.error("Failed to check holiday status", {
         description: "Could not check if date is a holiday. Please try again.",
+      });
+      throw error;
+    }
+  }
+};
+
+// Announcement API
+export const announcementAPI = {
+  getActiveAnnouncements: async () => {
+    try {
+      const response = await api.get('/announcements');
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to load announcements", {
+        description: "Could not load announcements. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  getAnnouncementById: async (id: string) => {
+    try {
+      const response = await api.get(`/announcements/${id}`);
+      return response.data;
+    } catch (error) {
+      toast.error("Failed to load announcement", {
+        description: "Could not load announcement. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  createAnnouncement: async (data: { heading: string; description: string }) => {
+    try {
+      const response = await api.post('/announcements', data);
+      toast.success("Announcement created", {
+        description: "Announcement has been created successfully.",
+      });
+      return response.data;
+    } catch (error: any) {
+      toast.error("Failed to create announcement", {
+        description: error.response?.data?.message || "Could not create announcement. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  updateAnnouncement: async (id: string, data: { heading?: string; description?: string; isActive?: boolean }) => {
+    try {
+      const response = await api.put(`/announcements/${id}`, data);
+      toast.success("Announcement updated", {
+        description: "Announcement has been updated successfully.",
+      });
+      return response.data;
+    } catch (error: any) {
+      toast.error("Failed to update announcement", {
+        description: error.response?.data?.message || "Could not update announcement. Please try again.",
+      });
+      throw error;
+    }
+  },
+
+  deleteAnnouncement: async (id: string) => {
+    try {
+      const response = await api.delete(`/announcements/${id}`);
+      toast.success("Announcement deleted", {
+        description: "Announcement has been deleted successfully.",
+      });
+      return response.data;
+    } catch (error: any) {
+      toast.error("Failed to delete announcement", {
+        description: error.response?.data?.message || "Could not delete announcement. Please try again.",
       });
       throw error;
     }

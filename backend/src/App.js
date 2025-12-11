@@ -18,6 +18,7 @@ const reportRoutes = require('./routes/reports');
 const holidayRoutes = require('./routes/holidays');
 const publicHolidayRoutes = require('./routes/publicHolidays'); // Public holiday routes
 const branchesRoutes = require('./routes/branches'); // Branches route
+const announcementsRoutes = require('./routes/announcements'); // Announcements route
 
 // Initialize app
 const app = express();
@@ -143,6 +144,7 @@ console.log("Report routes:", '/api/reports');
 console.log("Manager holiday routes:", '/api/manager/holidays');
 console.log("Public holiday routes:", '/api/holidays');
 console.log("Branches routes:", '/api/branches'); // Added branches route
+console.log("Announcements routes:", '/api/announcements'); // Added announcements route
 console.log("=== END REGISTERING ROUTES ===");
 
 // Routes
@@ -153,6 +155,7 @@ app.use('/api/manager', managerRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/holidays', publicHolidayRoutes); // Public holiday routes
 app.use('/api/branches', branchesRoutes); // Branches route
+app.use('/api/announcements', announcementsRoutes); // Announcements route
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -9,6 +9,7 @@ import {
   FileText,
   Download,
   Inbox,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
@@ -17,9 +18,11 @@ import { authAPI } from "@/services/api";
 import type { ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { usePWA } from "@/hooks/usePWA";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import AnnouncementModal from "@/components/AnnouncementModal";
+import { useAnnouncementModal } from "@/hooks/useAnnouncementModal";
 
 interface SidebarItem {
   title: string;
@@ -53,6 +56,11 @@ const sidebarItems: SidebarItem[] = [
     href: "/employee/requests",
     icon: <Inbox className="h-5 w-5" />,
   },
+  {
+    title: "Announcements",
+    href: "/employee/announcements",
+    icon: <Bell className="h-5 w-5" />,
+  },
 ];
 
 export default function EmployeeLayout() {
@@ -61,6 +69,12 @@ export default function EmployeeLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { showInstallPrompt, installApp, isStandalone, isOnline } = usePWA();
+  const { showModal, latestAnnouncement, checkForNewAnnouncements, closeModal } = useAnnouncementModal();
+
+  // Check for new announcements when the app loads
+  useEffect(() => {
+    checkForNewAnnouncements();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -85,7 +99,7 @@ export default function EmployeeLayout() {
   // Mobile bottom navigation
   const BottomNav = () => (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50 text-foreground">
-      <div className="grid grid-cols-5 gap-1 p-2">
+      <div className="grid grid-cols-6 gap-1 p-2">
         {sidebarItems.map((item) => (
           <Link
             key={item.href}
@@ -98,7 +112,6 @@ export default function EmployeeLayout() {
             onClick={() => setOpen(false)}
           >
             {item.icon}
-            <span className="text-xs mt-1">{item.title}</span>
           </Link>
         ))}
       </div>
@@ -107,6 +120,13 @@ export default function EmployeeLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
+      {/* Announcement Modal */}
+      <AnnouncementModal
+        isOpen={showModal}
+        onClose={closeModal}
+        announcement={latestAnnouncement}
+      />
+      
       {/* Install Prompt */}
       {showInstallPrompt && !isStandalone && (
         <Alert className="bg-blue-500 text-white border-0 rounded-none">
@@ -183,10 +203,10 @@ export default function EmployeeLayout() {
                       <li key={item.href}>
                         <Link
                           to={item.href}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300 border border-transparent ${
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300 border ${
                             isActive(item.href)
                               ? "bg-primary text-primary-foreground shadow-md border-blue-400"
-                              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-primary hover:shadow-sm hover:border-blue-400"
+                              : "text-sidebar-foreground border-transparent hover:border-orange-500"
                           }`}
                           onClick={() => {
                             setOpen(false);
@@ -203,7 +223,7 @@ export default function EmployeeLayout() {
                 <div className="p-4 border-t border-sidebar-border mt-auto">
                   <Button
                     variant="outline"
-                    className="w-full justify-start gap-3 transition-all duration-300 border border-transparent hover:border-blue-400 bg-sidebar-accent text-sidebar-foreground hover:bg-primary hover:text-primary-foreground hover:shadow-md border-sidebar-border"
+                    className="w-full justify-start gap-3 transition-all duration-300 border border-transparent hover:border-orange-500 bg-sidebar-accent text-sidebar-foreground border-sidebar-border"
                     onClick={() => {
                       handleLogout();
                       setOpen(false);
@@ -255,7 +275,7 @@ export default function EmployeeLayout() {
                     className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300 border border-transparent ${
                       isActive(item.href)
                         ? "bg-primary text-primary-foreground shadow-md border-blue-400"
-                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                        : "text-foreground border-transparent hover:border-orange-500"
                     }`}
                   >
                     {item.icon}
@@ -269,7 +289,7 @@ export default function EmployeeLayout() {
           <div className="p-4 border-t border-border mt-auto">
             <Button
               variant="outline"
-              className="w-full justify-start gap-3"
+              className="w-full justify-start gap-3 border border-transparent hover:border-orange-500"
               onClick={handleLogout}
             >
               <LogOut className="h-5 w-5" />

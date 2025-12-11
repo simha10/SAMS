@@ -48,7 +48,7 @@ const attendanceSchema = new mongoose.Schema({
   flaggedReason: {
     type: {
       type: String,
-      enum: ['location_breach', 'late_checkin', 'early_checkout', 'other']
+      enum: ['location_breach', 'late_checkin', 'early_checkout', 'other', 'manager_approval']
     },
     distance: Number,
     message: String
@@ -61,7 +61,29 @@ const attendanceSchema = new mongoose.Schema({
     type: String,
     enum: ['morning', 'afternoon']
   },
-  // Multi-branch support
+  // Multi-branch support - selected branch for check-in
+  checkInBranch: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch'
+  },
+  checkInBranchName: {
+    type: String
+  },
+  checkInBranchDistance: {
+    type: Number
+  },
+  // Selected branch for check-out
+  checkOutBranch: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch'
+  },
+  checkOutBranchName: {
+    type: String
+  },
+  checkOutBranchDistance: {
+    type: Number
+  },
+  // Legacy field - kept for backward compatibility
   branch: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch'

@@ -19,6 +19,7 @@ const EmployeeProfile = lazy(() => import("@/pages/employee/Profile"));
 const Requests = lazy(() => import("@/pages/employee/Requests"));
 const ApplyLeave = lazy(() => import("@/pages/employee/ApplyLeave"));
 const Attendance = lazy(() => import("@/pages/employee/Attendance"));
+import EmployeeAnnouncements from "@/pages/employee/Announcements"; // Add this import
 
 // Manager Pages
 const ManagerAttendance = lazy(() => import("@/pages/Manager/Attendance"));
@@ -29,6 +30,7 @@ const ManagerHolidays = lazy(() => import("@/pages/Manager/Holidays"));
 const BranchManagement = lazy(() => import("@/pages/Manager/BranchManagement"));
 const ManagerReports = lazy(() => import("@/pages/Manager/Reports"));
 const ManagerProfile = lazy(() => import("@/pages/Manager/Profile"));
+const ManagerAnnouncements = lazy(() => import("@/pages/Manager/Announcements"));
 
 // Admin Pages
 const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
@@ -217,6 +219,8 @@ const App = () => {
                     <Route path="requests" element={<Requests />} />
                     <Route path="apply-leave" element={<ApplyLeave />} />
                     <Route path="attendance" element={<Attendance />} />
+                    <Route path="announcements" element={<EmployeeAnnouncements />} />{" "}
+                    {/* Added Announcements route */}
                   </Route>
 
                   {/* Manager/Director Routes with Layout */}
@@ -245,6 +249,8 @@ const App = () => {
                     {/* Added BranchManagement route */}
                     <Route path="reports" element={<ManagerReports />} />
                     <Route path="profile" element={<ManagerProfile />} />
+                    <Route path="announcements" element={<ManagerAnnouncements />} />{" "}
+                    {/* Added Announcements route */}
                   </Route>
 
                   {/* Admin Routes - Directors can also access these */}

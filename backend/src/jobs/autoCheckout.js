@@ -4,21 +4,33 @@ const User = require('../models/User');
 const { isWithinOfficeHours, haversine } = require('../utils/haversine');
 const logger = require('../config/logger');
 
-// Auto checkout at 9:00 PM daily
-cron.schedule('0 21 * * *', async () => {
+// Auto checkout at 11:59 PM IST
+// Cron expression: "At 59 minutes past hour 23 (11 PM) in Asia/Kolkata timezone"
+// This will run at 11:59 PM IST regardless of server timezone
+cron.schedule('59 23 * * *', async () => {
   try {
     logger.info('Running auto checkout job...');
     
-    // Get today's date
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    // Get today's date in IST
+    const now = new Date();
+    // Convert to IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+    const istNow = new Date(now.getTime() + istOffset);
     
-    // Find all users who have checked in but not checked out today
+    // Get today's date in IST (midnight)
+    const todayIST = new Date(istNow);
+    todayIST.setHours(0, 0, 0, 0);
+    
+    // Get tomorrow's date in IST
+    const tomorrowIST = new Date(todayIST.getTime() + 24 * 60 * 60 * 1000);
+    
+    logger.info(`Checking attendance records for date range: ${todayIST.toISOString()} to ${tomorrowIST.toISOString()}`);
+    
+    // Find all users who have checked in but not checked out today (IST)
     const attendanceRecords = await Attendance.find({
       date: {
-        $gte: today,
-        $lt: tomorrow
+        $gte: todayIST,
+        $lt: tomorrowIST
       },
       checkInTime: { $ne: null },
       checkOutTime: null
@@ -34,10 +46,18 @@ cron.schedule('0 21 * * *', async () => {
         const autoCheckoutTime = new Date();
         autoCheckoutTime.setHours(21, 0, 0, 0); // 9:00 PM
         
-        // If check-in time is after 9:00 PM, set checkout time to check-in time + 1 minute
-        if (attendance.checkInTime > autoCheckoutTime) {
-          autoCheckoutTime.setTime(attendance.checkInTime.getTime() + 60000); // Add 1 minute
+        // Safeguard 2: Manager Approval Protection - Skip if already approved by manager
+        // Only skip if the record is flagged with a manager approval reason
+        if (attendance.flagged && attendance.flaggedReason && 
+            typeof attendance.flaggedReason === 'object' &&
+            attendance.flaggedReason.type === 'manager_approval') {
+          logger.info(`Skipping user ${attendance.userId} - record already approved by manager`);
+          continue;
         }
+        
+        // Set auto checkout time to 11:59 PM IST
+        const autoCheckoutTime = new Date(attendance.date);
+        autoCheckoutTime.setHours(23, 59, 0, 0); // 11:59 PM
         
         // Update attendance record with auto checkout
         attendance.checkOutTime = autoCheckoutTime;
@@ -50,47 +70,53 @@ cron.schedule('0 21 * * *', async () => {
           attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
         }
         
-        // Check if within office hours at checkout time
-        const isWithinHours = isWithinOfficeHours(new Date(attendance.checkOutTime));
+        // Remove flagged status and update status based on working hours
+        attendance.flagged = false;
+        attendance.flaggedReason = null;
         
-        // Determine auto checkout reason based on existing flagged reason or create new one
-        let autoCheckoutReason = '';
-        
-        if (attendance.flagged && attendance.flaggedReason) {
-          // If already flagged, append auto checkout info
-          autoCheckoutReason = `${attendance.flaggedReason} | Auto checkout applied at 9:00 PM`;
+        // Update status based on working hours:
+        // - Less than 5 hours (300 minutes) = Half Day
+        // - 5 hours or more = Present
+        // - 0 hours = Absent (though this shouldn't happen with auto-checkout)
+        if (attendance.workingHours >= 300) {
+          attendance.status = 'present';
+        } else if (attendance.workingHours > 0 && attendance.workingHours < 300) {
+          attendance.status = 'half-day';
         } else {
-          // Check if check-in was outside office hours
-          const checkInWithinHours = isWithinOfficeHours(new Date(attendance.checkInTime));
-          
-          if (!checkInWithinHours) {
-            autoCheckoutReason = 'Check-in outside office hours | Auto checkout applied at 9:00 PM';
-            attendance.status = 'outside-duty';
-            attendance.flagged = true;
-          } else {
-            // Check if current time (9:00 PM) is outside office hours
-            if (!isWithinHours) {
-              autoCheckoutReason = 'Auto checkout outside office hours | Auto checkout applied at 9:00 PM';
-              attendance.status = 'outside-duty';
-              attendance.flagged = true;
-            } else {
-              autoCheckoutReason = 'Auto checkout applied at 9:00 PM';
-              // Keep existing status or set to present if not already set
-              if (!attendance.status || attendance.status === 'absent') {
-                attendance.status = 'present';
-              }
-            }
-          }
+          attendance.status = 'absent';
         }
-        
-        // Update flagged reason
-        attendance.flaggedReason = autoCheckoutReason;
         
         // Save the updated attendance record
         await attendance.save();
         autoCheckoutCount++;
         
-        logger.info(`Auto checked out user ${attendance.userId._id} at ${attendance.checkOutTime}`);
+        // Invalidate Redis cache for this user
+        try {
+          if (redisClient && redisClient.isOpen) {
+            // Delete cache keys for this user's attendance data
+            const userPrefix = `attendance:user:${attendance.userId}`;
+            const pattern = `${userPrefix}:*`;
+            
+            // Get all keys matching the pattern
+            const keys = [];
+            for await (const key of redisClient.scanIterator({
+              MATCH: pattern,
+              COUNT: 100
+            })) {
+              keys.push(key);
+            }
+            
+            // Delete all matching keys
+            if (keys.length > 0) {
+              await redisClient.del(keys);
+              logger.info(`Invalidated ${keys.length} cache keys for user ${attendance.userId}`);
+            }
+          }
+        } catch (cacheError) {
+          logger.error(`Error invalidating cache for user ${attendance.userId}:`, cacheError);
+        }
+        
+        logger.info(`Auto checked out user ${attendance.userId} at ${attendance.checkOutTime} with status ${attendance.status}`);
       } catch (error) {
         logger.error(`Error auto-checking out user ${attendance.userId._id}:`, error);
       }
@@ -101,6 +127,8 @@ cron.schedule('0 21 * * *', async () => {
   } catch (error) {
     logger.error('Auto checkout job error:', error);
   }
+}, {
+  timezone: "Asia/Kolkata" // Explicitly set timezone to IST
 });
 
 logger.info('Auto checkout cron job initialized');

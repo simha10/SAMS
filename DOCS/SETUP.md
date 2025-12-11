@@ -93,10 +93,6 @@ OFFICE_DEFAULT_RADIUS=50
 ADMIN_INIT_EMAIL=admin@company.com
 ADMIN_INIT_PASSWORD=admin123
 
-# Notifications (optional)
-TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-TELEGRAM_CHAT_ID=your-telegram-chat-id
-
 # CORS
 FRONTEND_URL=http://localhost:5173
 ```

@@ -33,22 +33,11 @@ const userSchema = new mongoose.Schema({
   dob: {
     type: Date
   },
-  // Note: officeLocation is deprecated but kept for backward compatibility
-  // New multi-branch system uses Branch model instead
-  officeLocation: {
-    lat: {
-      type: Number,
-      default: 26.913595
-    },
-    lng: {
-      type: Number,
-      default: 80.953481
-    },
-    radius: {
-      type: Number,
-      default: 50 // Updated from 10 to 50 meters
-    }
+  mobile: {
+    type: String
   },
+  // Note: officeLocation has been removed as part of multi-branch system implementation
+  // New multi-branch system uses Branch model instead
   isActive: {
     type: Boolean,
     default: true

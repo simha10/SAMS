@@ -62,12 +62,15 @@ async function login(req, res) {
     // Set cookie with 7-day expiration (consistent for all users)
     const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
-    // Configure cookie options for production
+    // Configure cookie options
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // true in production
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-origin in production
-      maxAge: maxAge
+      maxAge: maxAge,
+      path: '/', // Explicitly set path to ensure cookie is sent to all routes
+      // Add domain only if explicitly set in environment variables
+      ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
     };
 
     // Add domain option for production
@@ -91,6 +94,7 @@ async function login(req, res) {
           role: user.role,
           managerId: user.managerId,
           dob: user.dob,
+          mobile: user.mobile,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
           createdAt: user.createdAt,
@@ -107,11 +111,19 @@ async function login(req, res) {
 // Logout user
 async function logout(req, res) {
   try {
-    // Clear the token cookie
+    // Clear the token cookie with proper options
     res.clearCookie('token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/',
+      // Add domain only if explicitly set in environment variables
+      ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
+    });
+    
+    // Also clear any legacy cookies that might exist
+    res.clearCookie('token', {
+      httpOnly: true,
       path: '/'
     });
 
@@ -148,6 +160,7 @@ async function getProfile(req, res) {
           role: user.role,
           managerId: user.managerId,
           dob: user.dob,
+          mobile: user.mobile,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
           createdAt: user.createdAt,
@@ -172,7 +185,7 @@ async function register(req, res) {
       });
     }
 
-    const { empId, name, email, password, role, managerId, officeLocation, dob } = req.body;
+    const { empId, name, email, password, role, managerId, officeLocation, dob, mobile } = req.body;
 
     // Validate required fields
     if (!empId || !name || !email || !password || !role) {
@@ -225,6 +238,11 @@ async function register(req, res) {
       userData.dob = dob;
     }
 
+    // Add mobile if provided
+    if (mobile) {
+      userData.mobile = mobile;
+    }
+
     const user = new User(userData);
 
     await user.save();
@@ -241,6 +259,7 @@ async function register(req, res) {
           role: user.role,
           managerId: user.managerId,
           dob: user.dob,
+          mobile: user.mobile,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
           createdAt: user.createdAt,
@@ -257,14 +276,14 @@ async function register(req, res) {
 // Update user profile
 async function updateProfile(req, res) {
   try {
-    const { name, email, dob } = req.body;
+    const { name, email, dob, mobile } = req.body;
     const userId = req.user._id;
 
     // Validate input
-    if (!name && !email && !dob) {
+    if (!name && !email && !dob && !mobile) {
       return res.status(400).json({
         success: false,
-        message: 'Name, email, or date of birth is required'
+        message: 'Name, email, date of birth, or mobile number is required'
       });
     }
 
@@ -273,6 +292,7 @@ async function updateProfile(req, res) {
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (dob !== undefined) updateData.dob = dob;
+    if (mobile !== undefined) updateData.mobile = mobile;
 
     // Update user
     const user = await User.findByIdAndUpdate(
@@ -300,6 +320,7 @@ async function updateProfile(req, res) {
           role: user.role,
           managerId: user.managerId,
           dob: user.dob,
+          mobile: user.mobile,
           officeLocation: user.officeLocation,
           isActive: user.isActive,
           createdAt: user.createdAt,

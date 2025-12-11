@@ -29,6 +29,7 @@ export function EditEmployeeModal({ employee, isOpen, onClose, onUpdate, branche
   const [empId, setEmpId] = useState("");
   const [email, setEmail] = useState("");
   const [dob, setDob] = useState("");
+  const [mobile, setMobile] = useState(""); // Add mobile state
   const [branchId, setBranchId] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -39,6 +40,7 @@ export function EditEmployeeModal({ employee, isOpen, onClose, onUpdate, branche
       setEmpId(employee.empId);
       setEmail(employee.email);
       setDob(employee.dob || "");
+      setMobile(employee.mobile || ""); // Set mobile from employee data
       // For branch, we would need to map the user's officeLocation to a branch
       // This is a simplified implementation
       setIsActive(employee.isActive);
@@ -56,6 +58,7 @@ export function EditEmployeeModal({ employee, isOpen, onClose, onUpdate, branche
         name,
         email,
         dob: dob || undefined,
+        mobile: mobile || undefined, // Include mobile in update data
         isActive
       };
 
@@ -123,7 +126,7 @@ export function EditEmployeeModal({ employee, isOpen, onClose, onUpdate, branche
                   id="empId"
                   value={empId}
                   readOnly
-                  className="w-full bg-gray-100"
+                  className="w-full bg-gray-500"
                 />
               </div>
             </div>
@@ -157,22 +160,18 @@ export function EditEmployeeModal({ employee, isOpen, onClose, onUpdate, branche
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="branch" className="text-right">
-                Branch
+              <Label htmlFor="mobile" className="text-right">
+                Mobile Number
               </Label>
               <div className="col-span-3">
-                <Select value={branchId} onValueChange={setBranchId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch._id} value={branch._id}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="mobile"
+                  type="tel"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  className="w-full"
+                  placeholder="Enter mobile number"
+                />
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">

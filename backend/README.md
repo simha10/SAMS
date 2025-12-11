@@ -1,36 +1,43 @@
-# SAMS Backend
+# SAMS Backend v2.0
 
-This is the backend API for the Geo-Fence Attendance Management System.
+This is the backend API for the Geo-Fence Attendance Management System (SAMS) v2.0.
 
 ## Features
 
-- User authentication with JWT
-- Attendance tracking with geofence validation
-- Leave management system
-- Report generation (CSV and Excel)
-- Role-based access control
-- Manager dashboard functionality
-- Multi-Branch Attendance Support
-- Enhanced Attendance Time Rules (5-hour threshold)
-- Holiday Management with Recurring Sundays
-- Birthday Notification System
-- Advanced Flagged Attendance with Distance Reporting
-- Persistent Login Sessions with "Remember Me" Functionality
-- **Industrial-Grade Rate Limiting with Redis**
-- **Distributed Caching with Redis**
-- **Database Connection Pooling**
-- **Enhanced Dashboard API**: Improved endpoints for Manager/Director dashboard with role-specific data
+- **Multi-Branch Attendance System**: Employees can check in from any company branch location
+- **Advanced Geofencing**: Precise location validation with distance calculations using Haversine formula
+- **Role-Based Access Control**: Secure three-tier hierarchy (Director, Manager, Employee)
+- **Comprehensive Leave Management**: Full support for various leave types with approval workflows
+- **Robust Reporting Engine**: Detailed attendance reports with CSV/Excel export capabilities
+- **Automated Business Processes**: Daily attendance processing and birthday notifications
+- **Enhanced Dashboard UI**: Improved Manager/Director interface with role-specific layouts
+- **Real-time Notifications**: Telegram/Brevo integration for flagged attendance alerts
+- **Admin Analytics**: Company-wide insights and user management
+- **Flexible Absent Handling**: Users marked absent can check in later and update their status
+- **Enterprise-Grade Security**: JWT authentication with HTTP-only cookies and bcrypt password hashing
+- **Enhanced Holiday Management**: Automatic Sunday holidays and custom holiday declarations
+- **Birthday Notification System**: Daily birthday alerts with celebration banners
+- **Advanced Flagged Attendance**: Detailed reasons with distance reporting
+- **Persistent Login Sessions**: "Remember Me" functionality for extended sessions
+- **Industrial-Grade Rate Limiting**: Redis-based distributed rate limiting for scalability
+- **Distributed Caching**: Redis caching for improved performance
+- **Database Connection Pooling**: Optimized database connections for better resource utilization
+- **Zero-Cost Deployment**: Compatible with free tiers of Render, Vercel, and MongoDB Atlas
 
 ## Tech Stack
 
-- Node.js with Express.js
-- MongoDB with Mongoose
-- JWT for authentication
-- bcrypt for password hashing
-- ExcelJS for report generation
-- node-cron for scheduled jobs
-- Winston for logging
-- **Redis for Rate Limiting and Caching**
+- **Node.js with Express.js**: High-performance backend framework
+- **MongoDB with Mongoose**: NoSQL database with ODM for data modeling
+- **JWT for authentication**: Secure token-based authentication
+- **bcrypt for password hashing**: Industry-standard password encryption
+- **ExcelJS for report generation**: Professional CSV/Excel report exports
+- **node-cron for scheduled jobs**: Automated daily attendance processing
+- **Winston for logging**: Comprehensive application logging
+- **Redis for Rate Limiting and Caching**: Industrial-grade distributed rate limiting and caching
+- **Helmet for security**: HTTP security headers
+- **CORS protection**: Cross-origin resource sharing controls
+- **Zod for validation**: Schema validation for API requests
+- **Rate limiting**: Protection against brute force and DDoS attacks
 
 ## Setup
 
@@ -66,6 +73,36 @@ This is the backend API for the Geo-Fence Attendance Management System.
    # Terminal 2 - Start the application
    npm run dev
    ```
+
+## 🆕 What's New in v2.0
+
+This version introduces significant enhancements and new features:
+
+### Major New Features
+
+- **Multi-Branch Support**: Employees can now check in from any company branch location
+- **Enhanced Dashboard API**: Completely redesigned endpoints for Manager/Director dashboard
+- **Birthday Notification System**: Automatic birthday alerts with celebration banners
+- **Advanced Flagged Attendance**: Detailed reasons with precise distance reporting
+- **Industrial-Grade Rate Limiting**: Redis-based distributed rate limiting for scalability
+- **Distributed Caching**: Redis caching for improved performance
+- **Database Connection Pooling**: Optimized database connections for better resource utilization
+
+### Enhanced Functionality
+
+- **Improved Attendance Rules**: Updated time thresholds and flexible attendance marking
+- **Advanced Holiday Management**: Automatic Sunday holidays and custom holiday declarations
+- **Detailed Reporting**: Enhanced CSV/Excel reports with branch and distance information
+- **Persistent Login Sessions**: "Remember Me" functionality for extended sessions
+
+### Technical Improvements
+
+- **Enhanced Security**: Enterprise-grade authentication and authorization
+- **Better Performance**: Optimized queries and caching mechanisms
+- **Scalable Architecture**: Ready for horizontal scaling with Redis
+- **Zero-Cost Deployment**: Still compatible with free tiers of cloud services
+
+See [New Features Documentation](../DOCS/NEW_FEATURES.md) for detailed information.
 
 ## Redis Configuration
 

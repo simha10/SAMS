@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
-const app = require('./App');
+const app = require('./app');
 const { connectRedis, disconnectRedis } = require('./config/redis');
 require('dotenv').config();
 
 // Initialize cron jobs
 require('./jobs/daily');
 require('./jobs/autoCheckout');
+require('./jobs/birthdayNotifications');
 
 console.log("=== SERVER STARTUP ===");
 console.log("Environment:", process.env.NODE_ENV || 'development');

@@ -67,16 +67,22 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
 
     const defaultOptions: PositionOptions = {
       enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0, // Reduced from 60000 to ensure fresh location data
+      timeout: 15000, // Increased timeout for better accuracy
+      maximumAge: 0, // Ensure fresh location data
       ...options,
     };
 
-    navigator.geolocation.getCurrentPosition(
+    // Watch position for continuous updates
+    const watchId = navigator.geolocation.watchPosition(
       handleSuccess,
       handleError,
       defaultOptions
     );
+
+    // Cleanup function to stop watching position
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, []);
 
   const getCurrentPosition = (): Promise<GeolocationPosition> => {
@@ -88,7 +94,7 @@ export const useGeolocation = (options: GeolocationOptions = {}) => {
 
       navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 15000, // Increased timeout for better accuracy
         maximumAge: 0, // Ensure fresh location data
         ...options,
       });

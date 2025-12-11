@@ -2,8 +2,6 @@ const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const LeaveRequest = require('../models/LeaveRequest');
 const Holiday = require('../models/Holiday'); // Added Holiday model
-const { haversine } = require('../utils/haversine');
-
 // Helper function to get team query based on user role
 function getTeamQuery(userId, userRole) {
   if (userRole === 'director') {
@@ -46,7 +44,7 @@ async function getTeamAttendance(req, res) {
     const teamQuery = getTeamQuery(userId, userRole);
 
     // Find all employees based on role
-    const teamMembers = await User.find(teamQuery);
+    const teamMembers = await User.find(teamQuery).select('empId name email dob mobile isActive createdAt updatedAt');
 
     const teamMemberIds = teamMembers.map(member => member._id);
 
@@ -74,7 +72,12 @@ async function getTeamAttendance(req, res) {
           id: employee._id,
           empId: employee.empId,
           name: employee.name,
-          email: employee.email
+          email: employee.email,
+          dob: employee.dob,
+          mobile: employee.mobile,
+          isActive: employee.isActive,
+          createdAt: employee.createdAt,
+          updatedAt: employee.updatedAt
         },
         attendance: attendance ? {
           status: attendance.status,
@@ -128,17 +131,17 @@ async function getFlaggedAttendance(req, res) {
     const userId = req.user._id;
     const userRole = req.user.role;
 
-    // Get team query based on user role
-    const teamQuery = getTeamQuery(userId, userRole);
+    // Find all employees (no team restriction for managers/directors)
+    const allEmployees = await User.find({
+      role: 'employee',
+      isActive: true
+    });
 
-    // Find all employees based on role
-    const teamMembers = await User.find(teamQuery);
-
-    const teamMemberIds = teamMembers.map(member => member._id);
+    const allEmployeeIds = allEmployees.map(employee => employee._id);
 
     // Build date filter
     const filter = {
-      userId: { $in: teamMemberIds },
+      userId: { $in: allEmployeeIds },
       flagged: true
     };
 
@@ -181,13 +184,6 @@ async function updateAttendanceStatus(req, res) {
       });
     }
 
-    // Get team query based on user role to validate attendance ownership
-    const teamQuery = getTeamQuery(userId, userRole);
-
-    // Find all employees based on role
-    const teamMembers = await User.find(teamQuery);
-    const teamMemberIds = teamMembers.map(member => member._id);
-
     // Find the attendance record and populate user info
     const attendance = await Attendance.findById(id)
       .populate('userId', 'empId name');
@@ -199,11 +195,11 @@ async function updateAttendanceStatus(req, res) {
       });
     }
 
-    // Validate that the attendance record belongs to a team member
-    if (!teamMemberIds.includes(attendance.userId._id.toString())) {
-      return res.status(403).json({
+    // Validate that the attendance record is flagged
+    if (!attendance.flagged) {
+      return res.status(400).json({
         success: false,
-        message: 'You do not have permission to update this attendance record'
+        message: 'Only flagged attendance records can be updated'
       });
     }
 
@@ -216,12 +212,14 @@ async function updateAttendanceStatus(req, res) {
 
     // If a checkOutTime is provided, update it
     if (checkOutTime) {
+      // Create checkout datetime using the attendance date
+      // Assume the checkout is on the same day as the attendance date
       attendance.checkOutTime = new Date(`${attendance.date.toISOString().split('T')[0]}T${checkOutTime}`);
     }
 
     // Unflag the attendance when manually approved/rejected
     attendance.flagged = false;
-    attendance.flaggedReason = '';
+    attendance.flaggedReason = {};
 
     await attendance.save();
 

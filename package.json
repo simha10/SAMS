@@ -1,5 +1,6 @@
 {
-  "name": "shadcnui",
+  "name": "sams-frontend",
+  "version": "2.0.0",
   "type": "module",
   "packageManager": "pnpm@8.10.0",
   "scripts": {

@@ -1,48 +1,58 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+import { format } from "date-fns";
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  Alert, 
+  AlertDescription 
+} from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import {
-  MapPin,
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { 
+  Loader2, 
+  MapPin, 
+  Navigation, 
+  CheckCircle, 
+  AlertTriangle, 
   Clock,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Cake,
-  Navigation,
-  Timer,
+  Calendar as CalendarIcon,
   RefreshCw,
+  XCircle
 } from "lucide-react";
+import { toast } from "sonner";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import { useBranches } from "@/hooks/useBranches";
 import { useAuthStore } from "@/stores/authStore";
 import { useAttendanceStore } from "@/stores/attendanceStore";
 import { useBirthdayStore } from "@/stores/birthdayStore";
-import { useGeolocation } from "@/hooks/useGeolocation";
-import {
-  attendanceAPI,
-  holidayAPI,
-} from "@/services/api";
-import { format } from "date-fns";
+import { attendanceAPI } from "@/services/api";
+import { calculateDistance } from "@/utils/haversine";
 import type { AttendanceRecord, ApiError } from "@/types";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { toast } from "@/components/ui/sonner";
 
 // Import the attendance cache utilities
-import { saveAttendanceToCache, loadAttendanceFromCache } from "@/utils/attendanceCache";
+import { saveAttendanceToCache, loadAttendanceFromCache, clearAttendanceCache } from "@/utils/attendanceCache";
 
 interface TodayStatus {
   date: string;
@@ -57,22 +67,18 @@ interface GeofenceErrorData {
 
 export default function Dashboard() {
   const { user } = useAuthStore();
+  const { setTodayAttendance } = useAttendanceStore();
   const { birthdayMessage, showBirthdayBanner, hideBirthdayBanner } = useBirthdayStore();
-  const { todayAttendance, setTodayAttendance } = useAttendanceStore();
-
+  const { branches, loading: branchesLoading, error: branchesError } = useBranches();
   const {
     latitude,
     longitude,
+    accuracy,
     error: geoError,
     loading: geoLoading,
     getCurrentPosition,
   } = useGeolocation();
-
   const [todayStatus, setTodayStatus] = useState<TodayStatus | null>(null);
-  // Removed recentAttendance and recentLeaves state as per optimization requirements
-  // const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([]);
-  // const [recentLeaves, setRecentLeaves] = useState<LeaveRequest[]>([]);
-  // const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -84,8 +90,67 @@ export default function Dashboard() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [showGeofenceWarning, setShowGeofenceWarning] = useState(false);
-  const [rateLimitError, setRateLimitError] = useState(false);
+  const [distanceInfo, setDistanceInfo] = useState<{ 
+    distance: number; 
+    branchName: string; 
+    allowedRadius: number; 
+    isWithinGeofence: boolean 
+  } | null>(null);
+  // New state for better UX
+  const [gettingLocation, setGettingLocation] = useState(false);
+
+  // Clear cache when user changes
+  useEffect(() => {
+    if (user) {
+      // Clear any existing cache for previous user
+      clearAttendanceCache();
+    }
+  }, [user]);
+
+  // Log branch errors for debugging
+  useEffect(() => {
+    if (branchesError) {
+      console.error('Branch loading error:', branchesError);
+    }
+  }, [branchesError]);
+
+  // Automatically calculate distance when location or branch selection changes
+  // Use the continuous geolocation watcher data for UI updates
+  useEffect(() => {
+    if (latitude && longitude && selectedBranchId && branches.length > 0) {
+      const selectedBranch = branches.find(b => b._id === selectedBranchId);
+      if (selectedBranch) {
+        const distance = calculateDistance(
+          latitude,
+          longitude,
+          selectedBranch.location.lat,
+          selectedBranch.location.lng
+        );
+      
+        setDistanceInfo({
+          distance: Math.round(distance),
+          branchName: selectedBranch.name,
+          allowedRadius: selectedBranch.radius ?? 50,
+          isWithinGeofence: distance <= (selectedBranch.radius ?? 50)
+        });
+        
+        // Store the coordinates for use in check-in/check-out
+        setCoordinates({
+          lat: latitude,
+          lng: longitude
+        });
+      }
+    }
+  }, [latitude, longitude, selectedBranchId, branches]);
+  // Clear general error when we have valid coordinates
+  // This handles the case where geolocation watcher had an error but we successfully got coordinates
+  useEffect(() => {
+    if (coordinates && error === "Failed to get current location") {
+      setError("");
+    }
+  }, [coordinates, error]);
 
   // Load cached attendance status immediately on component mount
   // This ensures UI renders immediately with cached data while fetching fresh data in background
@@ -114,7 +179,7 @@ export default function Dashboard() {
     };
     
     loadInitialAttendanceStatus();
-  }, []);
+  }, [user]); // Add user as dependency so it re-runs when user changes
 
   // Detect date changes and automatically refresh attendance status
   useEffect(() => {
@@ -141,7 +206,7 @@ export default function Dashboard() {
     const intervalId = setInterval(checkDateChange, 60000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [user]); // Add user as dependency
 
   // Removed auto-fetch on component mount as per optimization requirements
   // Data will only be fetched when user explicitly clicks refresh button
@@ -152,15 +217,14 @@ export default function Dashboard() {
     setRefreshing(true);
     try {
       await fetchTodayStatus();
-      setRateLimitError(false);
       // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
     } catch (err) {
       console.error("Failed to refresh data:", err);
       // Check if it's a rate limit error
-      const error = err as any;
-      if (error.response?.status === 429) {
-        setRateLimitError(true);
+      if (err && typeof err === 'object' && 'response' in err && 
+          err.response && typeof err.response === 'object' && 'status' in err.response && 
+          err.response.status === 429) {
         toast.error("Too many requests", {
           description: "Please wait a moment and try again.",
         });
@@ -187,15 +251,14 @@ export default function Dashboard() {
         // Clear cache as well
         localStorage.removeItem('attendance_status_cache');
       }
-      setRateLimitError(false);
       // Clear rate limit error flag on success
       localStorage.removeItem("rateLimitError");
     } catch (err: unknown) {
       console.error("Failed to fetch today status:", err);
       // Check if it's a rate limit error
-      const error = err as any;
-      if (error.response?.status === 429) {
-        setRateLimitError(true);
+      if (err && typeof err === 'object' && 'response' in err && 
+          err.response && typeof err.response === 'object' && 'status' in err.response && 
+          err.response.status === 429) {
         toast.error("Too many requests", {
           description: "Please wait a moment and try again.",
         });
@@ -215,54 +278,67 @@ export default function Dashboard() {
     setMessage("");
     setError("");
     
-    if (!latitude || !longitude) {
-      setError("Location not available. Please enable location access.");
-      return;
-    }
-
+    // Show immediate feedback to user
+    setGettingLocation(true);
+    
     try {
-      const position = await getCurrentPosition();
-      const coords = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-      };
-      setCoordinates(coords);
-
-      // Check if today is a holiday
-      const today = new Date().toISOString().split("T")[0];
-      const holidayResponse = await holidayAPI.isHoliday(today);
-
-      if (
-        holidayResponse.success &&
-        holidayResponse.data &&
-        holidayResponse.data.isHoliday
-      ) {
-        // Today is a holiday - show holiday confirmation dialog
-        setError(
-          `You are trying to mark your attendance on a declared holiday (${holidayResponse.data.holiday.name}). This attendance will be flagged and will go for manager approval.`
-        );
-        setPendingAction(action);
-        setShowGeofenceWarning(true); // Reuse the geofence warning dialog for holiday warning
-        return;
+      // Use the coordinates from the continuous geolocation watcher
+      // If they're not available, fall back to explicit location request
+      let coords;
+      if (coordinates) {
+        coords = coordinates;
+      } else {
+        const position = await getCurrentPosition();
+        coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setCoordinates(coords);
       }
 
+      // Calculate distance to selected branch if available
+      if (selectedBranchId && branches.length > 0) {
+        const selectedBranch = branches.find(b => b._id === selectedBranchId);
+        if (selectedBranch) {
+          const distance = calculateDistance(
+            coords.lat,
+            coords.lng,
+            selectedBranch.location.lat,
+            selectedBranch.location.lng
+          );
+        
+          setDistanceInfo({
+            distance: Math.round(distance),
+            branchName: selectedBranch.name,
+            allowedRadius: selectedBranch.radius ?? 50,
+            isWithinGeofence: distance <= (selectedBranch.radius ?? 50)
+          });
+        }
+      }
+      
       // Instead of doing local geofence validation, proceed directly to confirmation
       // The backend will handle all geofence validation with the new multi-branch system
       setPendingAction(action);
       setShowConfirmation(true);
-      setError(""); // Clear any previous error
-    } catch (err) {
+    } catch {
       setError("Failed to get current location");
+      toast.error("Location error", {
+        description: "Unable to get your current location. Please try again.",
+      });
+    } finally {
+      setGettingLocation(false);
     }
   };
 
-  // New function to mark flagged attendance
-  const markFlaggedAttendance = async (action: "checkin" | "checkout") => {
-    if (!coordinates) {
+  const executeAttendanceAction = async () => {    // Validate that we have coordinates
+    if (!coordinates || !pendingAction) {
       setError("Location not available. Please enable location access.");
-      toast.error("Location not available", {
-        description: "Please enable location access.",
-      });
+      return;
+    }
+
+    // Validate branch selection
+    if (!selectedBranchId) {
+      setError("Please select a branch before proceeding.");
       return;
     }
 
@@ -271,88 +347,11 @@ export default function Dashboard() {
     setMessage("");
 
     try {
-      // Mark attendance as flagged regardless of location
-      const response =
-        action === "checkin"
-          ? await attendanceAPI.checkin(coordinates.lat, coordinates.lng)
-          : await attendanceAPI.checkout(coordinates.lat, coordinates.lng);
-
-      if (response.success) {
-        setMessage(
-          action === "checkin"
-            ? "Flagged check-in recorded successfully!"
-            : "Flagged check-out recorded successfully!"
-        );
-        toast.success(
-          action === "checkin"
-            ? "Flagged check-in recorded"
-            : "Flagged check-out recorded",
-          {
-            description:
-              action === "checkin"
-                ? "Your flagged check-in has been recorded successfully."
-                : "Your flagged check-out has been recorded successfully.",
-          }
-        );
-        // Refresh today's status after successful action
-        // Add a small delay to ensure database is updated
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await fetchTodayStatus();
-        // Also refresh recent attendance to show the latest record
-        // Removed as per optimization requirements - attendance only fetched on explicit user action
-        setShowGeofenceWarning(false);        setRateLimitError(false);
-              
-        // Clear success message after 5 seconds
-        setTimeout(() => {
-          setMessage("");
-        }, 5000);
-      } else {
-        const errorMessage = response.message || `${action} failed`;
-        setError(errorMessage);
-        // If backend says already checked in/out, refresh the UI to show current state
-        if (errorMessage?.includes("Already checked")) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          await fetchTodayStatus();
-        }
-        toast.error(
-          action === "checkin" ? "Check-in failed" : "Check-out failed",
-          {
-            description: errorMessage || "Please try again.",
-          }
-        );
-      }
-    } catch (err: unknown) {
-      const error = err as ApiError;
-      const errorMessage = error.response?.data?.message || `${action} failed`;
-      setError(errorMessage);
-      // If backend says already checked in/out, refresh the UI to show current state
-      if (errorMessage?.includes("Already checked")) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await fetchTodayStatus();
-      }
-      toast.error(
-        action === "checkin" ? "Check-in failed" : "Check-out failed",
-        {
-          description: errorMessage || "Please try again.",
-        }
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const executeAttendanceAction = async () => {
-    if (!coordinates || !pendingAction) return;
-
-    setActionLoading(true);
-    setError("");
-    setMessage("");
-
-    try {
+      // Use the same coordinates that were used for UI distance calculation
       const response =
         pendingAction === "checkin"
-          ? await attendanceAPI.checkin(coordinates.lat, coordinates.lng)
-          : await attendanceAPI.checkout(coordinates.lat, coordinates.lng);
+          ? await attendanceAPI.checkin(coordinates.lat, coordinates.lng, selectedBranchId)
+          : await attendanceAPI.checkout(coordinates.lat, coordinates.lng, selectedBranchId);
 
       if (response.success) {
         setMessage(
@@ -379,7 +378,6 @@ export default function Dashboard() {
         // Removed as per optimization requirements - attendance only fetched on explicit user action
         setShowConfirmation(false);
         setPendingAction(null);
-        setRateLimitError(false);              
         // Clear success message after 5 seconds
         setTimeout(() => {
           setMessage("");
@@ -483,14 +481,113 @@ export default function Dashboard() {
     }
   };
 
-  const isWithinOfficeHours = () => {
+  const isWithinAttendanceWindow = () => {
+    const now = new Date();
+    const time = now.getHours() * 60 + now.getMinutes(); // Convert to minutes
+    const minTime = 1; // 12:01 AM in minutes (0 * 60 + 1)
+    const maxTime = 23 * 60 + 59; // 11:59 PM in minutes (23 * 60 + 59)
+    return time >= minTime && time <= maxTime;
+  };
+
+  const isWithinFairOfficeHours = () => {
     const now = new Date();
     const hour = now.getHours();
     // Office hours: 9 AM to 8 PM
     return hour >= 9 && hour <= 20;
   };
 
-  // Improved logic for determining check-in/check-out eligibility
+  // New function to mark flagged attendance
+  const markFlaggedAttendance = async (action: "checkin" | "checkout") => {
+    // Validate that we have coordinates
+    if (!coordinates) {
+      setError("Location not available. Please enable location access.");
+      toast.error("Location not available", {
+        description: "Please enable location access.",
+      });
+      return;
+    }
+
+    // Validate branch selection
+    if (!selectedBranchId) {
+      setError("Please select a branch before proceeding.");
+      return;
+    }
+
+    setActionLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      // Mark attendance as flagged regardless of location
+      // Use the same coordinates that were used for UI distance calculation
+      const response =
+        action === "checkin"
+          ? await attendanceAPI.checkin(coordinates.lat, coordinates.lng, selectedBranchId)
+          : await attendanceAPI.checkout(coordinates.lat, coordinates.lng, selectedBranchId);
+
+      if (response.success) {
+        setMessage(
+          action === "checkin"
+            ? "Flagged check-in recorded successfully!"
+            : "Flagged check-out recorded successfully!"
+        );
+        toast.success(
+          action === "checkin"
+            ? "Flagged check-in recorded"
+            : "Flagged check-out recorded",
+          {
+            description:
+              action === "checkin"
+                ? "Your flagged check-in has been recorded successfully."
+                : "Your flagged check-out has been recorded successfully.",
+          }
+        );
+        // Refresh today's status after successful action
+        // Add a small delay to ensure database is updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchTodayStatus();
+        // Also refresh recent attendance to show the latest record
+        // Removed as per optimization requirements - attendance only fetched on explicit user action
+        setShowGeofenceWarning(false);
+              
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setMessage("");
+        }, 5000);
+      } else {
+        const errorMessage = response.message || `${action} failed`;
+        setError(errorMessage);
+        // If backend says already checked in/out, refresh the UI to show current state
+        if (errorMessage?.includes("Already checked")) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await fetchTodayStatus();
+        }
+        toast.error(
+          action === "checkin" ? "Check-in failed" : "Check-out failed",
+          {
+            description: errorMessage || "Please try again.",
+          }
+        );
+      }
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      const errorMessage = error.response?.data?.message || `${action} failed`;
+      setError(errorMessage);
+      // If backend says already checked in/out, refresh the UI to show current state
+      if (errorMessage?.includes("Already checked")) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchTodayStatus();
+      }
+      toast.error(
+        action === "checkin" ? "Check-in failed" : "Check-out failed",
+        {
+          description: errorMessage || "Please try again.",
+        }
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };  // Improved logic for determining check-in/check-out eligibility
   // Ensure button states are strictly based on backend data
   const canCheckin = todayStatus?.attendance ? !todayStatus.attendance.checkInTime : true;
   const canCheckout = todayStatus?.attendance 
@@ -498,7 +595,7 @@ export default function Dashboard() {
     : false;
     
   // Ensure buttons are properly disabled when data is loading or unavailable
-  const isDataLoading = todayStatus === null && !error;
+  const isDataLoading = (todayStatus === null && !error) || branchesLoading;
     
   // Enhanced button state logic with better visual feedback
   const getCheckInButtonClass = () => {
@@ -568,199 +665,259 @@ export default function Dashboard() {
           <p className="text-muted-foreground">Welcome back, {user?.name}!</p>
         </div>
         <Button variant="outline" onClick={handleRefresh} disabled={refreshing} className="bg-orange-500 hover:bg-orange-600">
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
+          {refreshing ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Refreshing...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </>
+          )}
         </Button>
       </div>
 
-      {/* Rate Limit Error Message */}
-      {rateLimitError && (
-        <Alert variant="destructive" className="alert-modern">
-          <AlertDescription>
-            Too many requests sent to the server. Please wait a moment and try
-            again. You may need to refresh the page after a minute.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Birthday Banner */}
       {showBirthdayBanner && birthdayMessage && (
-        <Alert className="bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0">
-          <Cake className="h-4 w-4" />
+        <Alert className="alert-modern bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
           <AlertDescription className="flex items-center justify-between">
-            <span>{birthdayMessage}</span>
-            <button 
+            <div className="flex items-center">
+              <span className="mr-2">🎉</span>
+              <span>{birthdayMessage}</span>
+              <span className="ml-2">🥳🎂</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
               onClick={hideBirthdayBanner}
-              className="ml-4 text-white hover:text-gray-200"
-              aria-label="Close banner"
+              className="text-white hover:bg-white/20"
             >
-              ×
-            </button>
+              Dismiss
+            </Button>
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="card-modern">
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <div className="rounded-full bg-primary/10 p-2 mr-3">
-                <Timer className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Today's Status</p>
-                <p className="font-bold">
-                  {todayStatus?.attendance ? (
-                    todayStatus.attendance.checkOutTime ? (
-                      <span className="text-green-500">Checked Out</span>
-                    ) : todayStatus.attendance.checkInTime ? (
-                      <span className="text-blue-500">Checked In</span>
-                    ) : (
-                      <span>Not Marked</span>
-                    )
-                  ) : (
-                    "Not Marked"
-                  )}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="card-modern">
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <div className="rounded-full bg-primary/10 p-2 mr-3">
-                <Navigation className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Location</p>
-                <p className="font-bold">
-                  {geoLoading ? "Loading..." : 
-                   geoError ? "Error" : 
-                   latitude && longitude ? "Available" : "Not Available"}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {message && (
+        <Alert className="alert-modern">
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      )}
 
-      {/* Location Status */}
+      {error && !showGeofenceWarning && (
+        <Alert variant="destructive" className="alert-modern">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Branch Selection moved to main dashboard area */}
+      {branches.length > 0 && (
+        <Card className="card-modern">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <MapPin className="w-5 h-5 mr-2" />
+              Select Branch
+            </CardTitle>
+            <CardDescription>
+              Please select your branch before checking in or out
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="dashboard-branch">Branch Location</Label>
+                <Select 
+                  value={selectedBranchId} 
+                  onValueChange={(value) => {
+                    setSelectedBranchId(value);
+                    // Recalculate distance when branch changes
+                    if (coordinates && branches.length > 0) {
+                      const selectedBranch = branches.find(b => b._id === value);
+                      if (selectedBranch) {
+                        const distance = calculateDistance(
+                          coordinates.lat,
+                          coordinates.lng,
+                          selectedBranch.location.lat,
+                          selectedBranch.location.lng
+                        );
+                      
+                        setDistanceInfo({
+                          distance: Math.round(distance),
+                          branchName: selectedBranch.name,
+                          allowedRadius: selectedBranch.radius ?? 50,
+                          isWithinGeofence: distance <= (selectedBranch.radius ?? 50)
+                        });
+                      }
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch._id} value={branch._id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Distance Information in Main Dashboard */}
+              {selectedBranchId && distanceInfo && (
+                <div className={`p-3 rounded-lg border ${
+                  distanceInfo.isWithinGeofence 
+                    ? "bg-green-50 border-green-200" 
+                    : "bg-amber-50 border-amber-200"
+                }`}>
+                  <div className="flex items-start">
+                    <Navigation className={`w-4 h-4 mt-0.5 mr-2 flex-shrink-0 ${
+                      distanceInfo.isWithinGeofence 
+                        ? "text-green-500" 
+                        : "text-amber-500"
+                    }`} />
+                    <div>
+                      <p className={`font-medium ${
+                        distanceInfo.isWithinGeofence 
+                          ? "text-green-800" 
+                          : "text-amber-800"
+                      }`}>
+                        Distance Information
+                      </p>
+                      {distanceInfo.isWithinGeofence ? (
+                        <div className="mt-2 flex items-center text-green-600">
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          <span className="font-medium">You are inside geofence of your selected branch 😁</span>
+                        </div>
+                      ) : (
+                        <div className="mt-2">
+                          <div className="flex items-center text-amber-600">
+                            <AlertTriangle className="w-4 h-4 mr-1" />
+                            <span className="font-medium">
+                              You are at {distanceInfo.distance} meters away from the branch you selected 😒
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-700 mt-1">
+                            If you are already inside the geofence, try to refresh to exact location 😊
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!selectedBranchId && (
+                <p className="text-sm text-amber-600">
+                  ⚠️ Please select a branch before checking in or out
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="card-modern">
         <CardHeader>
           <CardTitle className="flex items-center">
-            <MapPin className="w-5 h-5 mr-2" />
-            Location Status
+            <CalendarIcon className="w-5 h-5 mr-2" />
+            Today's Attendance
           </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {geoLoading ? (
-            <div className="flex items-center text-muted-foreground">
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Getting your location...
-            </div>
-          ) : geoError ? (
-            <Alert variant="destructive" className="alert-modern">
-              <AlertDescription>{geoError}</AlertDescription>
-            </Alert>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              <p>Latitude: {latitude?.toFixed(6)}</p>
-              <p>Longitude: {longitude?.toFixed(6)}</p>
-              <p className="mt-2 text-green-500">✓ Location access granted</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Today's Status */}
-      <Card className="card-modern">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Clock className="w-5 h-5 mr-2" />
-              Today's Attendance
-            </div>
-            <Button variant="outline" size="sm" onClick={fetchTodayStatus} disabled={refreshing}>
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </CardTitle>
-          <CardDescription>
-            {format(new Date(), "EEEE, MMMM d, yyyy")}
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {message && (
-            <Alert className="alert-modern bg-green-50 border-green-200">
-              <AlertDescription className="text-green-700 font-medium">
-                {message}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {error && !showGeofenceWarning && (
-            <Alert variant="destructive" className="alert-modern">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {todayStatus && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span>Status:</span>
-                {todayStatus.attendance ? (
-                  getStatusBadge(todayStatus.attendance.status)
-                ) : (
-                  <Badge variant="secondary">No Record</Badge>
-                )}
-              </div>
-              
-              {/* Visual indicator for checkout status */}
-              {todayStatus?.attendance?.checkOutTime && (
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                  <span className="font-medium">Checkout Status:</span>
-                  <Badge variant="default" className="bg-green-500 text-green-50">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Completed
-                  </Badge>
-                </div>
-              )}
-              {todayStatus.attendance?.checkInTime && (
-                <div className="flex items-center justify-between">
-                  <span>Check-in:</span>
-                  <span className="font-mono">
-                    {format(
-                      new Date(todayStatus.attendance.checkInTime),
-                      "HH:mm:ss"
-                    )}
-                  </span>
-                </div>
-              )}
-
-              {todayStatus.attendance?.checkOutTime && (
-                <div className="flex items-center justify-between">
-                  <span>Check-out:</span>
-                  <span className="font-mono">
-                    {format(
-                      new Date(todayStatus.attendance.checkOutTime),
-                      "HH:mm:ss"
-                    )}
-                  </span>
-                </div>
-              )}
-
-              {todayStatus.attendance &&
-                todayStatus.attendance.workingHours > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span>Working Hours:</span>
-                    <span className="font-mono">
-                      {Math.floor(todayStatus.attendance.workingHours / 60)}h{" "}
-                      {todayStatus.attendance.workingHours % 60}m
-                    </span>
-                  </div>
-                )}
+          {geoLoading || gettingLocation ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="mt-2 text-sm text-muted-foreground">
+                {geoLoading ? "Getting your location..." : "Preparing attendance..."}
+              </p>
             </div>
+          ) : (geoError && !coordinates) ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <MapPin className="w-8 h-8 text-destructive mx-auto" />
+              <p className="mt-2 text-sm text-destructive">
+                Location access denied
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Please enable location access in your browser settings
+              </p>
+            </div>
+          ) : (
+            <>
+              {!todayStatus ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Loading attendance status...
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Status:</span>
+                    {getStatusBadge(todayStatus.attendance?.status || "absent")}
+                  </div>
+
+                  {todayStatus.attendance?.checkInTime && (
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Check-in Status:</span>
+                      <Badge variant="default" className="bg-green-500 text-green-50">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Completed
+                      </Badge>
+                    </div>
+                  )}
+
+                  {todayStatus.attendance?.checkOutTime && (
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Checkout Status:</span>
+                      <Badge variant="default" className="bg-green-500 text-green-50">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Completed
+                      </Badge>
+                    </div>
+                  )}
+
+                  {todayStatus.attendance?.checkInTime && (
+                    <div className="flex items-center justify-between">
+                      <span>Check-in:</span>
+                      <span className="font-mono">
+                        {format(
+                          new Date(todayStatus.attendance.checkInTime),
+                          "HH:mm:ss"
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {todayStatus.attendance?.checkOutTime && (
+                    <div className="flex items-center justify-between">
+                      <span>Check-out:</span>
+                      <span className="font-mono">
+                        {format(
+                          new Date(todayStatus.attendance.checkOutTime),
+                          "HH:mm:ss"
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {todayStatus.attendance &&
+                    todayStatus.attendance.workingHours > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span>Working Hours:</span>
+                        <span className="font-mono">
+                          {Math.floor(todayStatus.attendance.workingHours / 60)}h{" "}
+                          {todayStatus.attendance.workingHours % 60}m
+                        </span>
+                      </div>
+                    )}
+                </div>
+              )}
+            </>
           )}
 
           <Separator />
@@ -771,38 +928,54 @@ export default function Dashboard() {
               disabled={
                 !canCheckin ||
                 actionLoading ||
-                geoError !== null ||
-                !isWithinOfficeHours() ||
-                isDataLoading
+                (!!geoError && !coordinates) ||
+                !isWithinAttendanceWindow() || // Changed from isWithinOfficeHours()
+                isDataLoading ||
+                !selectedBranchId ||
+                gettingLocation
               }
               className={getCheckInButtonClass()}
             >
-              {(actionLoading && pendingAction === "checkin") || isDataLoading ? (
+              {(actionLoading && pendingAction === "checkin") || gettingLocation || isDataLoading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : null}
-              {isDataLoading ? "Loading..." : "Check In"}
+              {gettingLocation ? "Getting Location..." : isDataLoading ? "Loading..." : "Check In"}
             </Button>
 
             <Button
               onClick={() => prepareAttendanceAction("checkout")}
-              disabled={!canCheckout || actionLoading || geoError !== null || isDataLoading}
+              disabled={
+                !canCheckout || 
+                actionLoading || 
+                (!!geoError && !coordinates) || 
+                !isWithinAttendanceWindow() || // Changed from isWithinOfficeHours()
+                isDataLoading || 
+                !selectedBranchId ||
+                gettingLocation
+              }
               className={getCheckOutButtonClass()}
             >
-              {(actionLoading && pendingAction === "checkout") || isDataLoading ? (
+              {(actionLoading && pendingAction === "checkout") || gettingLocation || isDataLoading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : null}
-              {isDataLoading ? "Loading..." : "Check Out"}
+              {gettingLocation ? "Getting Location..." : isDataLoading ? "Loading..." : "Check Out"}
             </Button>
           </div>
-          {!isWithinOfficeHours() && (
+          {!isWithinFairOfficeHours() && isWithinAttendanceWindow() && (
             <p className="text-sm text-amber-500 text-center">
-              ⚠️ Outside office hours (9:00 AM - 8:00 PM)
+              ⚠️ Outside fair office hours (9:00 AM - 8:00 PM)
             </p>
           )}
+          {!isWithinAttendanceWindow() && (
+            <p className="text-sm text-red-500 text-center">
+              ⚠️ Outside attendance window (12:01 AM - 11:59 PM)
+            </p>
+          )}
+
         </CardContent>
       </Card>
 
-      {/* Attendance Confirmation Dialog */}
+      {/* Simplified Attendance Confirmation Dialog - Branch selection removed */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
         <DialogContent className="sm:max-w-[425px] card-modern">
           <DialogHeader>
@@ -847,6 +1020,48 @@ export default function Dashboard() {
               </div>
             )}
 
+            {selectedBranchId && (
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <span className="text-sm font-medium">Selected Branch</span>
+                </div>
+                <div className="text-sm pl-6">
+                  <p>{branches.find(b => b._id === selectedBranchId)?.name}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Distance Information in Confirmation Dialog */}
+            {distanceInfo && (
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start">
+                  <Navigation className="w-4 h-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-blue-800">Distance Information</p>
+                    {distanceInfo.isWithinGeofence ? (
+                      <div className="mt-2 flex items-center text-green-600">
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        <span className="font-medium">You are inside geofence of your selected branch 😁</span>
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <div className="flex items-center text-amber-600">
+                          <AlertTriangle className="w-4 h-4 mr-1" />
+                          <span className="font-medium">
+                            You are at {distanceInfo.distance} meters away from the branch you selected 😒
+                          </span>
+                        </div>
+                        <p className="text-xs text-amber-700 mt-1">
+                          If you are already inside the geofence, try to refresh to exact location 😊
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-md bg-yellow-900/50 p-3">
               <p className="text-sm text-yellow-500">
                 <strong>Important:</strong> By confirming, you agree that your
@@ -884,8 +1099,10 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Geofence Warning Dialog */}
-      <Dialog open={showGeofenceWarning} onOpenChange={setShowGeofenceWarning}>
+      {/* Simplified Geofence Warning Dialog - Branch selection removed */}
+      <Dialog open={showGeofenceWarning} onOpenChange={(open) => {
+        setShowGeofenceWarning(open);
+      }}>
         <DialogContent className="sm:max-w-[425px] card-modern">
           <DialogHeader>
             <DialogTitle>Geofence Restriction</DialogTitle>
@@ -903,17 +1120,48 @@ export default function Dashboard() {
                   </p>
                   <p className="text-sm text-orange-500">
                     Your attendance will be marked as "Outside Duty" and flagged
-                    for manager review. Are you sure you want to proceed?
+                    for manager review. Are you sure you want to proceed? 😒
                   </p>
+                  {selectedBranchId && (
+                    <p className="text-sm text-orange-500">
+                      Selected Branch: {branches.find(b => b._id === selectedBranchId)?.name}
+                    </p>
+                  )}
                 </div>
               </AlertDescription>
             </Alert>
           )}
 
+          {distanceInfo && (
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="flex items-start">
+                <Navigation className="w-4 h-4 text-amber-500 mt-0.5 mr-2 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-800">Distance Information</p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    You are <span className="font-bold">{distanceInfo.distance} meters</span> away from {distanceInfo.branchName}
+                  </p>
+                
+                  <div className="mt-2 flex items-center text-amber-600">
+                    <AlertTriangle className="w-4 h-4 mr-1" />
+                    <span className="font-medium">
+                      You are at {distanceInfo.distance} meters away from the branch you selected 😒
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-700 mt-1">
+                    If you are already inside the geofence, try to refresh to exact location 😊
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
-              onClick={() => setShowGeofenceWarning(false)}
+              onClick={() => {
+                setShowGeofenceWarning(false);
+              }}
               disabled={actionLoading}
               className="btn-secondary"
             >
@@ -932,7 +1180,7 @@ export default function Dashboard() {
               ) : error && error.includes("holiday") ? (
                 "Mark Holiday Attendance"
               ) : (
-                "Mark Flagged Attendance"
+                "Mark Flagged Attendance 😒"
               )}
             </Button>
           </DialogFooter>

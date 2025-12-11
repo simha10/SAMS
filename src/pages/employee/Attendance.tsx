@@ -414,6 +414,18 @@ export default function Attendance() {
                                 h {selectedAttendance.workingHours % 60}m
                               </span>
                             )}
+                          {selectedAttendance &&
+                            selectedAttendance.checkInBranchName && (
+                              <span>
+                                Check-in Branch: {selectedAttendance.checkInBranchName}
+                              </span>
+                            )}
+                          {selectedAttendance &&
+                            selectedAttendance.checkOutBranchName && (
+                              <span>
+                                Check-out Branch: {selectedAttendance.checkOutBranchName}
+                              </span>
+                            )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -435,7 +447,9 @@ export default function Attendance() {
                           <span className="font-medium">
                             Flagged Reason:
                           </span>{" "}
-                          {selectedAttendance.flaggedReason}
+                          {typeof selectedAttendance.flaggedReason === 'object' 
+                            ? selectedAttendance.flaggedReason.message || JSON.stringify(selectedAttendance.flaggedReason)
+                            : selectedAttendance.flaggedReason}
                         </div>
                       )}
                   </CardContent>
