@@ -42,10 +42,6 @@ cron.schedule('59 23 * * *', async () => {
     
     for (const attendance of attendanceRecords) {
       try {
-        // Set auto checkout time to 9:00 PM
-        const autoCheckoutTime = new Date();
-        autoCheckoutTime.setHours(21, 0, 0, 0); // 9:00 PM
-        
         // Safeguard 2: Manager Approval Protection - Skip if already approved by manager
         // Only skip if the record is flagged with a manager approval reason
         if (attendance.flagged && attendance.flaggedReason && 
@@ -65,8 +61,7 @@ cron.schedule('59 23 * * *', async () => {
         // Calculate working hours in minutes
         if (attendance.checkInTime) {
           const checkInTime = new Date(attendance.checkInTime);
-          const checkOutTime = new Date(attendance.checkOutTime);
-          const diffMs = checkOutTime - checkInTime;
+          const diffMs = autoCheckoutTime - checkInTime;
           attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
         }
         
