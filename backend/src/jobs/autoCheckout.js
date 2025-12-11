@@ -3,21 +3,33 @@ const Attendance = require('../models/Attendance');
 const { redisClient } = require('../config/redis');
 const logger = require('../config/logger');
 
-// Auto checkout at 11:59 PM IST (59 18 * * * in UTC)
-cron.schedule('59 18 * * *', async () => {
+// Auto checkout at 11:59 PM IST
+// Cron expression: "At 59 minutes past hour 23 (11 PM) in Asia/Kolkata timezone"
+// This will run at 11:59 PM IST regardless of server timezone
+cron.schedule('59 23 * * *', async () => {
   try {
     logger.info('Running auto checkout job...');
     
-    // Get today's date
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    // Get today's date in IST
+    const now = new Date();
+    // Convert to IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+    const istNow = new Date(now.getTime() + istOffset);
     
-    // Find all users who have checked in but not checked out today
+    // Get today's date in IST (midnight)
+    const todayIST = new Date(istNow);
+    todayIST.setHours(0, 0, 0, 0);
+    
+    // Get tomorrow's date in IST
+    const tomorrowIST = new Date(todayIST.getTime() + 24 * 60 * 60 * 1000);
+    
+    logger.info(`Checking attendance records for date range: ${todayIST.toISOString()} to ${tomorrowIST.toISOString()}`);
+    
+    // Find all users who have checked in but not checked out today (IST)
     const attendanceRecords = await Attendance.find({
       date: {
-        $gte: today,
-        $lt: tomorrow
+        $gte: todayIST,
+        $lt: tomorrowIST
       },
       checkInTime: { $ne: null },
       checkOutTime: null
@@ -35,14 +47,16 @@ cron.schedule('59 18 * * *', async () => {
           continue;
         }
         
-        // Safeguard 2: Manager Approval Protection - Skip if already approved
-        if (!attendance.flagged && 
-            ['present', 'absent', 'half-day', 'outside-duty', 'on-leave'].includes(attendance.status)) {
-          logger.info(`Skipping user ${attendance.userId} - record already approved`);
+        // Safeguard 2: Manager Approval Protection - Skip if already approved by manager
+        // Only skip if the record is flagged with a manager approval reason
+        if (attendance.flagged && attendance.flaggedReason && 
+            typeof attendance.flaggedReason === 'object' &&
+            attendance.flaggedReason.type === 'manager_approval') {
+          logger.info(`Skipping user ${attendance.userId} - record already approved by manager`);
           continue;
         }
         
-        // Set auto checkout time to 11:59 PM
+        // Set auto checkout time to 11:59 PM IST
         const autoCheckoutTime = new Date(attendance.date);
         autoCheckoutTime.setHours(23, 59, 0, 0); // 11:59 PM
         
@@ -57,9 +71,21 @@ cron.schedule('59 18 * * *', async () => {
           attendance.workingHours = Math.floor(diffMs / 60000); // Convert to minutes
         }
         
-        // Set flagged status and reason for auto-checkout
-        attendance.flagged = true;
-        attendance.flaggedReason = 'Auto-checkout applied — needs manager verification';
+        // Remove flagged status and update status based on working hours
+        attendance.flagged = false;
+        attendance.flaggedReason = null;
+        
+        // Update status based on working hours:
+        // - Less than 5 hours (300 minutes) = Half Day
+        // - 5 hours or more = Present
+        // - 0 hours = Absent (though this shouldn't happen with auto-checkout)
+        if (attendance.workingHours >= 300) {
+          attendance.status = 'present';
+        } else if (attendance.workingHours > 0 && attendance.workingHours < 300) {
+          attendance.status = 'half-day';
+        } else {
+          attendance.status = 'absent';
+        }
         
         // Save the updated attendance record
         await attendance.save();
@@ -91,7 +117,7 @@ cron.schedule('59 18 * * *', async () => {
           logger.error(`Error invalidating cache for user ${attendance.userId}:`, cacheError);
         }
         
-        logger.info(`Auto checked out user ${attendance.userId} at ${attendance.checkOutTime}`);
+        logger.info(`Auto checked out user ${attendance.userId} at ${attendance.checkOutTime} with status ${attendance.status}`);
       } catch (error) {
         logger.error(`Error auto-checking out user ${attendance.userId}:`, error);
       }
@@ -102,6 +128,8 @@ cron.schedule('59 18 * * *', async () => {
   } catch (error) {
     logger.error('Auto checkout job error:', error);
   }
+}, {
+  timezone: "Asia/Kolkata" // Explicitly set timezone to IST
 });
 
 logger.info('Auto checkout cron job initialized with updated schedule and logic');

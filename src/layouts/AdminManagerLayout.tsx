@@ -5,11 +5,19 @@ import { authAPI } from "@/services/api";
 import { CollapsibleSidebar } from "@/components/ui/collapsible-sidebar";
 import { toast } from "@/components/ui/sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import AnnouncementModal from "@/components/AnnouncementModal";
+import { useAnnouncementModal } from "@/hooks/useAnnouncementModal";
 
 export default function AdminManagerLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { logout, user } = useAuthStore();
   const navigate = useNavigate();
+  const { showModal, latestAnnouncement, checkForNewAnnouncements, closeModal } = useAnnouncementModal();
+
+  // Check for new announcements when the app loads
+  useEffect(() => {
+    checkForNewAnnouncements();
+  }, []);
 
   // Load collapsed state from localStorage
   useEffect(() => {
@@ -52,6 +60,13 @@ export default function AdminManagerLayout() {
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
+      {/* Announcement Modal */}
+      <AnnouncementModal
+        isOpen={showModal}
+        onClose={closeModal}
+        announcement={latestAnnouncement}
+      />
+      
       {/* Fixed sidebar - always on left */}
       <div className="fixed left-0 top-0 h-full z-50">
         <CollapsibleSidebar

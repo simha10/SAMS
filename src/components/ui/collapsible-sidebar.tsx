@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   PlusCircle,
   MapPin,
+  Bell, // Add this import
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -68,6 +69,12 @@ const sidebarItems: SidebarItem[] = [
     title: "Profile",
     href: "/manager/profile",
     icon: <User className="h-4 w-4" />,
+  },
+  {
+    title: "Announcements",
+    href: "/manager/announcements",
+    icon: <Bell className="h-4 w-4" />,
+    roles: ["manager", "director"], // Allow both managers and directors
   },
 ];
 
@@ -248,10 +255,10 @@ function SidebarContent({
             <li key={item.href}>
               <Link
                 to={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300 border border-transparent ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300 border ${
                   isActive(item.href) || isSubItemActive(item)
                     ? "bg-primary text-primary-foreground shadow-md border-blue-400"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-primary hover:shadow-sm hover:border-blue-400"
+                    : "text-sidebar-foreground border-transparent hover:border-orange-500"
                 }`}
                 onClick={() => {
                   if (onClose) onClose();
@@ -267,10 +274,10 @@ function SidebarContent({
                     <li key={subItem.href}>
                       <Link
                         to={subItem.href}
-                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-all duration-300 border border-transparent ${
+                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-all duration-300 border ${
                           isActive(subItem.href)
                             ? "bg-primary/20 text-primary font-semibold border-blue-400"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-primary hover:border-blue-400"
+                            : "text-sidebar-foreground border-transparent hover:border-orange-500"
                         }`}
                         onClick={() => {
                           if (onClose) onClose();
@@ -291,9 +298,9 @@ function SidebarContent({
       <div className="p-4 border-t border-sidebar-border mt-auto">
         <Button
           variant="outline"
-          className={`w-full justify-start gap-3 transition-all duration-300 border border-transparent hover:border-blue-400 ${
+          className={`w-full justify-start gap-3 transition-all duration-300 border ${
             collapsed ? "px-3" : "px-4"
-          } bg-sidebar-accent text-sidebar-foreground hover:bg-primary hover:text-primary-foreground hover:shadow-md border-sidebar-border`}
+          } bg-sidebar-accent text-sidebar-foreground hover:border-orange-500 border-sidebar-border`}
           onClick={() => {
             logout();
             if (onClose) onClose();

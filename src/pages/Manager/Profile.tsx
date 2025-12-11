@@ -12,21 +12,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuthStore } from "@/stores/authStore";
-import { Loader2, User, BadgeCheck } from "lucide-react";
-import type { User as FullUser } from "@/types";
+import { Loader2, User as UserIcon, BadgeCheck } from "lucide-react";
+import type { User } from "@/types"; // Import User type from types
 import { authAPI } from "@/services/api";
 // Import profile cache utilities
 import { saveProfileToCache, loadProfileFromCache } from "@/utils/profileCache";
 
 export default function ManagerProfile() {
   const { user, setUser, logout } = useAuthStore();
-  const navigate = useNavigate();
-  const fullUser = user as FullUser | null;
+  const navigate = useNavigate(); // Initialize the navigate function
+  const fullUser = user as User | null; // Cast to the imported User type
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [dob, setDob] = useState(""); // Add DOB state
+  const [mobile, setMobile] = useState(""); // Add mobile state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [success, setSuccess] = useState(""); // This should be a function
+
+  // Helper function to format date for input field
+  const formatDateForInput = (dateString?: string): string => {
+    if (!dateString) return "";
+    try {
+      // Create a Date object from the dateString
+      const date = new Date(dateString);
+      // Check if the date is valid
+      if (isNaN(date.getTime())) return "";
+      // Format as YYYY-MM-DD for input[type="date"]
+      return date.toISOString().split('T')[0];
+    } catch {
+      return "";
+    }
+  };
 
   // Load cached profile data immediately on component mount
   // Only fetch from API if no cache exists
@@ -37,6 +54,8 @@ export default function ManagerProfile() {
       console.log("Loaded profile data from cache");
       setName(cachedProfile.name || "");
       setEmail(cachedProfile.email || "");
+      setDob(formatDateForInput(cachedProfile.dob)); // Set DOB from cache
+      setMobile(cachedProfile.mobile || ""); // Set mobile from cache
       // Update the user in the store with cached data
       if (cachedProfile._id) {
         setUser(cachedProfile);
@@ -54,6 +73,8 @@ export default function ManagerProfile() {
             // Update form fields
             setName(response.data.user.name || "");
             setEmail(response.data.user.email || "");
+            setDob(formatDateForInput(response.data.user.dob)); // Set DOB from API
+            setMobile(response.data.user.mobile || ""); // Set mobile from API
           }
         } catch (error) {
           console.error("Failed to fetch profile data:", error);
@@ -78,12 +99,15 @@ export default function ManagerProfile() {
     setSuccess("");
 
     try {
-      const response = await authAPI.updateProfile({ name, email });
+      const response = await authAPI.updateProfile({ name, email, dob, mobile }); // Include DOB and mobile in update
       if (response.success && response.data?.user) {
         setUser(response.data.user);
         setSuccess("Profile updated successfully!");
         // Save updated profile to cache
         saveProfileToCache(response.data.user);
+        // Update DOB and mobile state
+        setDob(formatDateForInput(response.data.user.dob));
+        setMobile(response.data.user.mobile || "");
       } else {
         setError("Failed to update profile");
       }
@@ -231,6 +255,28 @@ export default function ManagerProfile() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dob">Date of Birth</Label>
+                  <Input
+                    id="dob"
+                    type="date"
+                    value={dob || ""}
+                    onChange={(e) => setDob(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mobile">Mobile Number</Label>
+                  <Input
+                    id="mobile"
+                    type="tel"
+                    value={mobile || ""}
+                    onChange={(e) => setMobile(e.target.value)}
+                    placeholder="Enter your mobile number"
+                  />
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-2">
                 <Button onClick={handleUpdateProfile} disabled={loading} className="w-full sm:w-auto">
                   {loading ? (
@@ -353,7 +399,7 @@ export default function ManagerProfile() {
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative">
                   <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="w-12 h-12 text-primary" />
+                    <UserIcon className="w-12 h-12 text-primary" />
                   </div>
                 </div>
                 <div className="text-center">
@@ -372,6 +418,20 @@ export default function ManagerProfile() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Employee ID</span>
                   <span className="font-medium">{fullUser?.empId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Date of Birth</span>
+                  <span className="font-medium">
+                    {fullUser?.dob 
+                      ? new Date(fullUser.dob).toLocaleDateString() 
+                      : "Not provided"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Mobile Number</span>
+                  <span className="font-medium">
+                    {fullUser?.mobile || "Not provided"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Status</span>

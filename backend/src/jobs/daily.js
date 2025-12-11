@@ -65,18 +65,26 @@ cron.schedule('0 11 * * *', async () => {
       existingAttendance.map(att => att.userId.toString())
     );
 
-    // Mark absentees
+    // Mark absentees and create records for employees on leave
     const absentees = [];
+    const leavees = [];
+    
     for (const employee of employees) {
       const employeeId = employee._id.toString();
 
-      // Skip if employee is on approved leave
-      if (employeesOnLeave.has(employeeId)) {
+      // Skip if employee already has attendance record
+      if (employeesWithAttendance.has(employeeId)) {
         continue;
       }
 
-      // Skip if employee already has attendance record
-      if (employeesWithAttendance.has(employeeId)) {
+      // If employee is on approved leave, mark as on-leave
+      if (employeesOnLeave.has(employeeId)) {
+        const attendanceRecord = await Attendance.create({
+          userId: employee._id,
+          date: today,
+          status: 'on-leave'
+        });
+        leavees.push(employee);
         continue;
       }
 
@@ -90,14 +98,17 @@ cron.schedule('0 11 * * *', async () => {
       // If today is a holiday, flag the record
       if (isHoliday) {
         attendanceRecord.flagged = true;
-        attendanceRecord.flaggedReason = isTodaySunday ? 'Sunday holiday' : 'Declared holiday';
+        attendanceRecord.flaggedReason = {
+          type: 'other',
+          message: isTodaySunday ? 'Sunday holiday' : 'Declared holiday'
+        };
         await attendanceRecord.save();
       }
 
       absentees.push(employee);
     }
 
-    logger.info(`Marked ${absentees.length} employees as absent for ${today}`);
+    logger.info(`Marked ${absentees.length} employees as absent and ${leavees.length} employees as on leave for ${today}`);
 
   } catch (error) {
     logger.error('Daily absentee marking job error:', error);
@@ -152,6 +163,7 @@ cron.schedule('30 18 * * *', async () => {
         total: teamMembers.length,
         present: 0,
         absent: 0,
+        onLeave: 0,
         flagged: 0
       };
 
@@ -160,6 +172,8 @@ cron.schedule('30 18 * * *', async () => {
           summaryData.present = item.count;
         } else if (item._id === 'absent') {
           summaryData.absent = item.count;
+        } else if (item._id === 'on-leave') {
+          summaryData.onLeave = item.count;
         }
       });
 
@@ -173,7 +187,7 @@ cron.schedule('30 18 * * *', async () => {
       summaryData.flagged = flaggedCount;
 
       // Ensure all team members are accounted for
-      const totalRecorded = summaryData.present + summaryData.absent;
+      const totalRecorded = summaryData.present + summaryData.absent + summaryData.onLeave;
       if (totalRecorded < summaryData.total) {
         summaryData.absent += (summaryData.total - totalRecorded);
       }

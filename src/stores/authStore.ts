@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { clearAttendanceCache } from '@/utils/attendanceCache';
+import { clearProfileCache } from '@/utils/profileCache';
+import { useAttendanceStore } from '@/stores/attendanceStore';
 
 interface User {
   _id: string;
@@ -9,6 +12,7 @@ interface User {
   role: 'employee' | 'manager' | 'director';
   managerId?: string;
   dob?: string; // Added DOB field
+  mobile?: string; // Add mobile field
   officeLocation: {
     lat: number;
     lng: number;
@@ -24,11 +28,13 @@ interface AuthState {
   logout: () => void;
   setLoading: (loading: boolean) => void;
   setUser: (user: User | null) => void;
+  // Add a method to validate current user session
+  validateCurrentUser: (currentUser: User | null) => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
@@ -49,13 +55,22 @@ export const useAuthStore = create<AuthState>()(
         // Also clear any other potential auth storage
         localStorage.removeItem('token');
         sessionStorage.removeItem('token');
+        // Clear attendance cache
+        clearAttendanceCache();
+        // Clear profile cache
+        clearProfileCache();
+        // Clear attendance store
+        useAttendanceStore.getState().clearTodayAttendance();
         // Clear all cookies
         document.cookie.split(";").forEach((c) => {
           document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
         });
-        set({ user: null, isAuthenticated: false });
-        console.log("Auth store updated:", { user: null, isAuthenticated: false });
-        console.log("=== END AUTH STORE LOGOUT ===");
+        // Force a small delay to ensure cookies are cleared
+        setTimeout(() => {
+          set({ user: null, isAuthenticated: false });
+          console.log("Auth store updated:", { user: null, isAuthenticated: false });
+          console.log("=== END AUTH STORE LOGOUT ===");
+        }, 50);
       },
       setLoading: (loading: boolean) => {
         console.log("=== AUTH STORE SET LOADING ===");
@@ -72,6 +87,24 @@ export const useAuthStore = create<AuthState>()(
         console.log("Auth store updated:", { user });
         console.log("=== END AUTH STORE SET USER ===");
       },
+      // Method to validate if the current user data is still valid
+      validateCurrentUser: (currentUser: User | null): boolean => {
+        // If there's no current user, it's not valid
+        if (!currentUser) {
+          return false;
+        }
+        
+        // Get the current state
+        const state = get();
+        
+        // If there's no user in state, it's not valid
+        if (!state.user) {
+          return false;
+        }
+        
+        // Compare user IDs to ensure they match
+        return state.user._id === currentUser._id;
+      }
     }),
     {
       name: 'auth-storage',

@@ -13,7 +13,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { authAPI } from "@/services/api";
-import type { ApiResponse } from "@/types";
+import type { ApiResponse, User } from "@/types"; // Import User type from types
 // Added Dialog components for confirmation
 import {
   Dialog,
@@ -44,6 +44,7 @@ const formatDateForInput = (dateString?: string): string => {
 
 export default function Profile() {
   const { user, setUser } = useAuthStore();
+  const fullUser = user as User | null; // Cast to the imported User type
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   // Access DOB and format it for the date input
@@ -54,6 +55,7 @@ export default function Profile() {
     }
     return "";
   });
+  const [mobile, setMobile] = useState(user?.mobile || ""); // Add mobile state
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -84,6 +86,7 @@ export default function Profile() {
       setName(cachedProfile.name || "");
       setEmail(cachedProfile.email || "");
       setDob(formatDateForInput(cachedProfile.dob));
+      setMobile(cachedProfile.mobile || ""); // Set mobile from cache
       // Update the user in the store with cached data
       if (cachedProfile._id) {
         setUser(cachedProfile);
@@ -111,12 +114,13 @@ export default function Profile() {
   // Update form state when user data changes (from API response)
   // But only if it's not already set from cache
   useEffect(() => {
-    if (user && !name && !email && !dob) {
+    if (user && !name && !email && !dob && !mobile) { // Include mobile in check
       setName(user.name || "");
       setEmail(user.email || "");
       setDob(formatDateForInput(user.dob));
+      setMobile(user.mobile || ""); // Set mobile from user data
     }
-  }, [user, name, email, dob]);
+  }, [user, name, email, dob, mobile]);
 
   // Handle profile update submission with confirmation
   const handleSubmit = async (e: React.FormEvent) => {
@@ -132,7 +136,7 @@ export default function Profile() {
     setShowProfileConfirm(false);
 
     try {
-      const response = await authAPI.updateProfile({ name, email, dob });
+      const response = await authAPI.updateProfile({ name, email, dob, mobile }); // Include mobile in update
       if (response.success) {
         setMessage(response.message || "Profile updated successfully");
         // Update the user in the store
@@ -140,6 +144,7 @@ export default function Profile() {
           setUser(response.data.user);
           // Also update the DOB state with the formatted value
           setDob(formatDateForInput(response.data.user.dob));
+          setMobile(response.data.user.mobile || ""); // Update mobile state
           // Save updated profile to cache
           saveProfileToCache(response.data.user);
         }
@@ -243,7 +248,7 @@ export default function Profile() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="empId" className="text-white">Employee ID</Label>
-                <Input id="empId" value={user?.empId || ""} disabled />
+                <Input id="empId" value={fullUser?.empId || ""} disabled />
               </div>
 
               <div className="space-y-2">
@@ -276,8 +281,19 @@ export default function Profile() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="mobile" className="text-white">Mobile Number</Label>
+                <Input
+                  id="mobile"
+                  type="tel"
+                  value={mobile || ""}
+                  onChange={(e) => setMobile(e.target.value)}
+                  placeholder="Enter your mobile number"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="role" className="text-white">Role</Label>
-                <Input id="role" value={user?.role || ""} disabled />
+                <Input id="role" value={fullUser?.role || ""} disabled />
               </div>
             </div>
 

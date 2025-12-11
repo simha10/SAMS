@@ -26,17 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Loader2,
-  Users,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Pencil,
-  Trash2,
-} from "lucide-react";
-import { managerAPI } from "@/services/api";
 import { format } from "date-fns";
+import { Loader2, Users, CheckCircle, XCircle, AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { managerAPI } from "@/services/api";
 import { toast } from "@/components/ui/sonner";
 import { EditEmployeeModal } from "@/components/EditEmployeeModal";
 import { DeleteEmployeeModal } from "@/components/DeleteEmployeeModal";
@@ -48,6 +40,11 @@ interface TeamMember {
     empId: string;
     name: string;
     email: string;
+    dob?: string;
+    mobile?: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
   };
   attendance: {
     status: string;
@@ -66,6 +63,9 @@ interface TeamAttendanceData {
     present: number;
     absent: number;
     flagged: number;
+    onLeave: number;
+    halfDay: number;
+    outsideDuty: number;
   };
 }
 
@@ -198,14 +198,16 @@ export default function ManagerAttendance() {
         name: teamMember.employee.name,
         email: teamMember.employee.email,
         role: "employee",
-        isActive: true,
+        isActive: teamMember.employee.isActive,
+        dob: teamMember.employee.dob || "",
+        mobile: teamMember.employee.mobile || "",
         officeLocation: {
           lat: 0,
           lng: 0,
           radius: 50
         },
-        createdAt: "",
-        updatedAt: ""
+        createdAt: teamMember.employee.createdAt,
+        updatedAt: teamMember.employee.updatedAt
       };
       
       setEditingEmployee(user);
@@ -227,14 +229,16 @@ export default function ManagerAttendance() {
         name: teamMember.employee.name,
         email: teamMember.employee.email,
         role: "employee",
-        isActive: true,
+        isActive: teamMember.employee.isActive,
+        dob: teamMember.employee.dob || "",
+        mobile: teamMember.employee.mobile || "",
         officeLocation: {
           lat: 0,
           lng: 0,
           radius: 50
         },
-        createdAt: "",
-        updatedAt: ""
+        createdAt: teamMember.employee.createdAt,
+        updatedAt: teamMember.employee.updatedAt
       };
       
       setDeletingEmployee(user);
@@ -360,7 +364,7 @@ export default function ManagerAttendance() {
 
       {/* Summary Cards */}
       {teamAttendance && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Team</CardTitle>
@@ -398,6 +402,51 @@ export default function ManagerAttendance() {
               </div>
               <div className="text-xs text-muted-foreground">
                 Not checked in
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">On Leave</CardTitle>
+              <Users className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {teamAttendance.summary.onLeave}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Approved leaves
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Half Day</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {teamAttendance.summary.halfDay}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Half-day attendance
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Outside Duty</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">
+                {teamAttendance.summary.outsideDuty}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Outside duty
               </div>
             </CardContent>
           </Card>

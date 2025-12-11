@@ -216,7 +216,7 @@ export default function ApplyLeave() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 p-4">
+    <div className="max-w-full mx-auto space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-bold">Apply for Leave</h1>
         <p className="text-muted-foreground">Submit your leave application</p>

@@ -29,7 +29,6 @@ import { toast } from "@/components/ui/sonner";
 export default function AttendanceApprovals() {
   const [flaggedRecords, setFlaggedRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
@@ -43,7 +42,7 @@ export default function AttendanceApprovals() {
   });
 
   // Removed auto-fetch on component mount as per optimization requirements
-  // Data will only be fetched when user explicitly clicks the Refresh button or applies filters
+  // Data will only be fetched when user explicitly clicks the Apply Filters button
 
   const fetchFlaggedAttendance = async () => {
     setLoading(true);
@@ -69,29 +68,7 @@ export default function AttendanceApprovals() {
     }
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setError("");
-    try {
-      const response = await managerAPI.getFlaggedAttendance(
-        dateRange.from,
-        dateRange.to
-      );
-      if (response.success && response.data) {
-        setFlaggedRecords(response.data.flaggedRecords);
-      } else {
-        setFlaggedRecords([]);
-      }
-    } catch (err: unknown) {
-      setError("Failed to refresh flagged attendance records.");
-      toast.error("Failed to refresh flagged attendance records", {
-        description: "Could not load attendance records. Please try again.",
-      });
-      setFlaggedRecords([]);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  // ... existing code ...
 
   const handleAttendanceAction = async (
     id: string,
@@ -115,11 +92,18 @@ export default function AttendanceApprovals() {
         // Clear message after 3 seconds
         setTimeout(() => setMessage(""), 3000);
       }
-    } catch (err: unknown) {
+    } catch (err: any) {
       setError("Failed to update attendance record");
-      toast.error("Failed to update attendance record", {
-        description: "Please try again.",
-      });
+      // Check if it's a permission error
+      if (err.response?.status === 403) {
+        toast.error("Permission denied", {
+          description: err.response.data?.message || "You don't have permission to update this attendance record.",
+        });
+      } else {
+        toast.error("Failed to update attendance record", {
+          description: "Please try again.",
+        });
+      }
     }
   };
 
@@ -238,19 +222,8 @@ export default function AttendanceApprovals() {
                 }
               />
             </div>
-            <div className="flex items-end space-x-2">
+            <div className="flex items-end">
               <Button onClick={fetchFlaggedAttendance}>Apply Filters</Button>
-              <Button 
-                variant="outline" 
-                onClick={handleRefresh}
-                disabled={loading || refreshing}
-                className="flex items-center btn-secondary bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-              >
-                {refreshing ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : null}
-                Refresh
-              </Button>
             </div>
           </div>
         </CardContent>
@@ -294,10 +267,10 @@ export default function AttendanceApprovals() {
                           : "N/A"}
                       </p>
                       <div className="mt-2 space-y-1">
-                        <p className="text-sm">
+                        <div className="text-sm">
                           <strong>Status:</strong>{" "}
                           {getStatusBadge(record.status, record.flagged)}
-                        </p>
+                        </div>
                         {record.checkInTime && (
                           <p className="text-sm">
                             <strong>Check-in:</strong>{" "}
@@ -319,13 +292,16 @@ export default function AttendanceApprovals() {
                             </p>
                           )}
                         {record.flaggedReason && (
-                          <p className="text-sm text-yellow-600">
+                          <div className="text-sm text-yellow-600">
                             <strong>Flagged Reason:</strong>{" "}
-                            {record.flaggedReason}
-                          </p>
+                            {typeof record.flaggedReason === 'object' 
+                              ? record.flaggedReason.message || JSON.stringify(record.flaggedReason)
+                              : record.flaggedReason}
+                          </div>
                         )}
                         {record.checkOutTime &&
                           record.flaggedReason &&
+                          typeof record.flaggedReason === 'string' &&
                           record.flaggedReason.includes("Auto checkout") && (
                             <p className="text-sm text-blue-600">
                               <strong>Auto Checkout:</strong> This record was
@@ -386,8 +362,7 @@ export default function AttendanceApprovals() {
                 onChange={(e) => setCheckOutTime(e.target.value)}
               />
               <p className="text-sm text-gray-500">
-                Leave blank to keep current checkout time. For auto-checked
-                records, you can set the actual checkout time here.
+                Enter time in 24-hour format (e.g., 19:00 for 7:00 PM). Leave blank to keep current checkout time.
               </p>
             </div>
             <div className="space-y-2">

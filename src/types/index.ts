@@ -7,6 +7,7 @@ export interface User {
   role: 'employee' | 'manager' | 'director';
   managerId?: string;
   dob?: string; // Add DOB field
+  mobile?: string; // Add mobile number field
   officeLocation: {
     lat: number;
     lng: number;
@@ -32,10 +33,21 @@ export interface AttendanceRecord {
     checkIn?: number;
     checkOut?: number;
   };
+  // New branch selection fields
+  checkInBranch?: string;
+  checkInBranchName?: string;
+  checkInBranchDistance?: number;
+  checkOutBranch?: string;
+  checkOutBranchName?: string;
+  checkOutBranchDistance?: number;
   status: 'present' | 'absent' | 'half-day' | 'on-leave' | 'outside-duty';
   workingHours: number;
   flagged: boolean;
-  flaggedReason?: string;
+  flaggedReason?: string | {
+    type: string;
+    distance?: number;
+    message: string;
+  };
   isHalfDay?: boolean;
   halfDayType?: 'morning' | 'afternoon';
   createdAt: string;
@@ -43,7 +55,11 @@ export interface AttendanceRecord {
 }
 
 export interface FlaggedAttendanceRecord extends AttendanceRecord {
-  flaggedReason: string;
+  flaggedReason: string | {
+    type: string;
+    distance?: number;
+    message: string;
+  };
 }
 
 // Activity types
@@ -97,6 +113,7 @@ export interface RegisterData {
   role: 'employee' | 'manager' | 'director';
   managerId?: string;
   dob?: string; // Add DOB field
+  mobile?: string; // Add mobile field
   officeLocation?: {
     lat: number;
     lng: number;
@@ -137,6 +154,20 @@ export interface Branch {
     lng: number;
   };
   radius?: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Announcement interface
+export interface Announcement {
+  _id: string;
+  heading: string;
+  description: string;
+  createdBy: {
+    name: string;
+    empId: string;
+  };
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
