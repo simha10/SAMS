@@ -140,8 +140,10 @@ async function checkin(req, res) {
     // Debug logging for time evaluation
     console.log('=== ATTENDANCE CHECK-IN DEBUG ===');
     console.log('Check-in time (ISO):', attendance.checkInTime.toISOString());
-    console.log('Check-in time (local):', attendance.checkInTime.toString());
-    console.log('Check-in hour:', attendance.checkInTime.getHours());
+    console.log('Check-in time (UTC):', attendance.checkInTime.toUTCString());
+    console.log('Check-in time (IST):', new Date(attendance.checkInTime.getTime() + (5.5 * 60 * 60 * 1000)).toString());
+    console.log('Check-in hour (UTC):', attendance.checkInTime.getUTCHours());
+    console.log('Check-in hour (IST):', new Date(attendance.checkInTime.getTime() + (5.5 * 60 * 60 * 1000)).getHours());
     console.log('Check-in minute:', attendance.checkInTime.getMinutes());
     
     // Check if within office hours
@@ -150,8 +152,8 @@ async function checkin(req, res) {
     const isWithinOfficeHrs = isWithinOfficeHours(new Date(attendance.checkInTime));
     const isWithinAllowedWindow = isWithinAllowedAttendanceWindow(new Date(attendance.checkInTime));
     
-    console.log('Is within office hours (9 AM - 8 PM):', isWithinOfficeHrs);
-    console.log('Is within allowed window (12:01 AM - 11:59 PM):', isWithinAllowedWindow);
+    console.log('Is within office hours (9 AM - 8 PM IST):', isWithinOfficeHrs);
+    console.log('Is within allowed window (12:01 AM - 11:59 PM IST):', isWithinAllowedWindow);
     console.log('=== END ATTENDANCE CHECK-IN DEBUG ===');
 
     // Determine status based on location, time, and holiday
@@ -168,7 +170,7 @@ async function checkin(req, res) {
         message: 'Working on holiday'
       };
     }
-    // Priority 2 - Sunday (duplicate check - removing one)
+    // Priority 2 - Sunday (removed duplicate check)
     else if (!isWithinOfficeHrs) {
       flagged = true;
       flaggedReason = {
@@ -299,8 +301,10 @@ async function checkout(req, res) {
     // Debug logging for time evaluation
     console.log('=== ATTENDANCE CHECK-OUT DEBUG ===');
     console.log('Check-out time (ISO):', attendance.checkOutTime.toISOString());
-    console.log('Check-out time (local):', attendance.checkOutTime.toString());
-    console.log('Check-out hour:', attendance.checkOutTime.getHours());
+    console.log('Check-out time (UTC):', attendance.checkOutTime.toUTCString());
+    console.log('Check-out time (IST):', new Date(attendance.checkOutTime.getTime() + (5.5 * 60 * 60 * 1000)).toString());
+    console.log('Check-out hour (UTC):', attendance.checkOutTime.getUTCHours());
+    console.log('Check-out hour (IST):', new Date(attendance.checkOutTime.getTime() + (5.5 * 60 * 60 * 1000)).getHours());
     console.log('Check-out minute:', attendance.checkOutTime.getMinutes());
 
     // Check if within allowed radius
@@ -341,7 +345,7 @@ async function checkout(req, res) {
       
       // Priority 3 - Outside Fair Hours (9:00 AM - 8:00 PM)
       const isWithinOfficeHrs = isWithinOfficeHours(new Date(attendance.checkOutTime));
-      console.log('Is check-out within office hours (9 AM - 8 PM):', isWithinOfficeHrs);
+      console.log('Is check-out within office hours (9 AM - 8 PM IST):', isWithinOfficeHrs);
       
       if (!isWithinOfficeHrs) {
         attendance.flagged = true;

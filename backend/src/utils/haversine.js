@@ -64,23 +64,38 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Check if time is within office hours (9 AM to 8 PM)
+ * Convert UTC date to IST (Indian Standard Time)
+ * @param {Date} date - UTC date to convert
+ * @returns {Date} Date in IST
+ */
+function toIST(date) {
+  // India is UTC+5:30
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+  return new Date(date.getTime() + istOffset);
+}
+
+/**
+ * Check if time is within office hours (9 AM to 8 PM) in IST
  * @param {Date} date - Date to check (defaults to now)
  * @returns {boolean}
  */
 function isWithinOfficeHours(date = new Date()) {
-  const hour = date.getHours();
-  return hour >= 9 && hour < 20; // 9 AM to 8 PM
+  // Convert to IST for comparison
+  const istDate = toIST(date);
+  const hour = istDate.getHours();
+  return hour >= 9 && hour < 20; // 9 AM to 8 PM IST
 }
 
 /**
- * Check if time is within allowed attendance window (12:01 AM to 11:59 PM)
+ * Check if time is within allowed attendance window (12:01 AM to 11:59 PM) in IST
  * @param {Date} date - Date to check (defaults to now)
  * @returns {boolean}
  */
 function isWithinAllowedAttendanceWindow(date = new Date()) {
-  const hour = date.getHours();
-  return hour >= 0 && hour < 24; // 12:01 AM to 11:59 PM
+  // Convert to IST for comparison
+  const istDate = toIST(date);
+  const hour = istDate.getHours();
+  return hour >= 0 && hour < 24; // 12:01 AM to 11:59 PM IST
 }
 
 /**
