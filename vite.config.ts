@@ -5,6 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Base path for production - important for SPA routing
+  base: '/',
+  
   plugins: [
     react(),
     VitePWA({
@@ -88,5 +91,28 @@ export default defineConfig({
   server: {
     host: true, // This allows external connections
     port: 5173,
-  }
+  },
+  build: {
+    // Generate manifest for better asset management
+    manifest: true,
+    // Ensure relative paths are used
+    rollupOptions: {
+      output: {
+        assetFileNames: (assetInfo) => {
+          if (!assetInfo.name) {
+            return 'assets/[name]-[hash][extname]';
+          }
+          let extType = assetInfo.name.split('.').pop();
+          if (extType && /png|jpe?g|svg|gif|tiff|bmp|ico/i.test(extType)) {
+            extType = 'img';
+          } else if (extType && /woff|woff2/.test(extType)) {
+            extType = 'fonts';
+          }
+          return `assets/${extType}/[name]-[hash][extname]`;
+        },
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+      },
+    },
+  },
 })
