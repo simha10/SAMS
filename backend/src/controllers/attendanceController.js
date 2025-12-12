@@ -2,7 +2,7 @@ const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
 const Holiday = require('../models/Holiday');
-const { haversine, isWithinOfficeHours, formatWorkingHours } = require('../utils/haversine');
+const { haversine, isWithinOfficeHours, isWithinAllowedAttendanceWindow, formatWorkingHours } = require('../utils/haversine');
 const { findNearestBranch } = require('./branchController');
 const mongoose = require('mongoose');
 
@@ -164,7 +164,7 @@ async function checkin(req, res) {
       };
     }
     // Priority 3 - Outside Fair Hours (9:00 AM - 8:00 PM)
-    else if (!isFairOfficeHours(new Date(attendance.checkInTime))) {
+    else if (!isWithinOfficeHours(new Date(attendance.checkInTime))) {
       flagged = true;
       flaggedReason = {
         type: 'other',
@@ -328,7 +328,7 @@ async function checkout(req, res) {
       // Note: We don't re-check for Sundays here as it was already checked at check-in
       
       // Priority 3 - Outside Fair Hours (9:00 AM - 8:00 PM)
-      if (!isFairOfficeHours(new Date(attendance.checkOutTime))) {
+      if (!isWithinOfficeHours(new Date(attendance.checkOutTime))) {
         attendance.flagged = true;
         attendance.flaggedReason = {
           type: 'other',

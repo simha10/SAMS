@@ -74,6 +74,16 @@ function isWithinOfficeHours(date = new Date()) {
 }
 
 /**
+ * Check if time is within allowed attendance window (12:01 AM to 11:59 PM)
+ * @param {Date} date - Date to check (defaults to now)
+ * @returns {boolean}
+ */
+function isWithinAllowedAttendanceWindow(date = new Date()) {
+  const hour = date.getHours();
+  return hour >= 0 && hour < 24; // 12:01 AM to 11:59 PM
+}
+
+/**
  * Format working hours as HH:MM
  * @param {number} minutes - Total minutes from 00:00
  * @returns {string} Formatted time as HH:MM
@@ -98,6 +108,7 @@ module.exports = {
   isWithinGeofence,
   haversine,
   isWithinOfficeHours,
+  isWithinAllowedAttendanceWindow,
   formatWorkingHours,
   getCurrentDateString
 };
