@@ -137,9 +137,22 @@ async function checkin(req, res) {
     // Set check-in time
     attendance.checkInTime = new Date();
 
+    // Debug logging for time evaluation
+    console.log('=== ATTENDANCE CHECK-IN DEBUG ===');
+    console.log('Check-in time (ISO):', attendance.checkInTime.toISOString());
+    console.log('Check-in time (local):', attendance.checkInTime.toString());
+    console.log('Check-in hour:', attendance.checkInTime.getHours());
+    console.log('Check-in minute:', attendance.checkInTime.getMinutes());
+    
     // Check if within office hours
     const isWithinFullHours = isWithinFullAttendanceHours(new Date(attendance.checkInTime));
     const isWithinCleanAttendanceHours = isWithinCleanHours(new Date(attendance.checkInTime));
+    const isWithinOfficeHrs = isWithinOfficeHours(new Date(attendance.checkInTime));
+    const isWithinAllowedWindow = isWithinAllowedAttendanceWindow(new Date(attendance.checkInTime));
+    
+    console.log('Is within office hours (9 AM - 8 PM):', isWithinOfficeHrs);
+    console.log('Is within allowed window (12:01 AM - 11:59 PM):', isWithinAllowedWindow);
+    console.log('=== END ATTENDANCE CHECK-IN DEBUG ===');
 
     // Determine status based on location, time, and holiday
     let status = 'present';
@@ -155,23 +168,15 @@ async function checkin(req, res) {
         message: 'Working on holiday'
       };
     }
-    // Priority 2 - Sunday
-    else if (isTodaySunday) {
-      flagged = true;
-      flaggedReason = {
-        type: 'other',
-        message: 'Working on Sunday'
-      };
-    }
-    // Priority 3 - Outside Fair Hours (9:00 AM - 8:00 PM)
-    else if (!isWithinOfficeHours(new Date(attendance.checkInTime))) {
+    // Priority 2 - Sunday (duplicate check - removing one)
+    else if (!isWithinOfficeHrs) {
       flagged = true;
       flaggedReason = {
         type: 'other',
         message: 'Attendance outside office hours'
       };
     }
-    // Priority 4 - Geofence
+    // Priority 3 - Geofence
     else if (!isWithinBranchRadius) {
       flagged = true;
       flaggedReason = {
@@ -181,7 +186,7 @@ async function checkin(req, res) {
       };
     }
     // Allow check-in if within allowed attendance window (12:01 AM - 11:59 PM)
-    else if (!isWithinAllowedAttendanceWindow(new Date(attendance.checkInTime))) {
+    else if (!isWithinAllowedWindow) {
       // This should never happen as we allow check-in anytime within the window
       status = 'outside-duty';
       flagged = true;
@@ -291,6 +296,13 @@ async function checkout(req, res) {
     attendance.checkOutBranchName = selectedBranch.name;
     attendance.checkOutBranchDistance = distanceFromBranch;
 
+    // Debug logging for time evaluation
+    console.log('=== ATTENDANCE CHECK-OUT DEBUG ===');
+    console.log('Check-out time (ISO):', attendance.checkOutTime.toISOString());
+    console.log('Check-out time (local):', attendance.checkOutTime.toString());
+    console.log('Check-out hour:', attendance.checkOutTime.getHours());
+    console.log('Check-out minute:', attendance.checkOutTime.getMinutes());
+
     // Check if within allowed radius
     const isWithinBranchRadius = distanceFromBranch <= selectedBranch.radius;
 
@@ -328,7 +340,10 @@ async function checkout(req, res) {
       // Note: We don't re-check for Sundays here as it was already checked at check-in
       
       // Priority 3 - Outside Fair Hours (9:00 AM - 8:00 PM)
-      if (!isWithinOfficeHours(new Date(attendance.checkOutTime))) {
+      const isWithinOfficeHrs = isWithinOfficeHours(new Date(attendance.checkOutTime));
+      console.log('Is check-out within office hours (9 AM - 8 PM):', isWithinOfficeHrs);
+      
+      if (!isWithinOfficeHrs) {
         attendance.flagged = true;
         attendance.flaggedReason = {
           type: 'other',

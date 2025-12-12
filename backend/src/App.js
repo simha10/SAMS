@@ -131,7 +131,11 @@ app.use(cookieParser());
 app.use(mongoSanitize());
 app.use(xss());
 
-// Static files
+// Static files - Serve frontend build files
+// This should be before API routes but after middleware
+app.use(express.static(path.join(__dirname, '..', '..', 'dist')));
+
+// Static files for reports
 app.use('/reports', express.static(path.join(__dirname, '..', 'reports')));
 
 // Log route registration
@@ -165,6 +169,21 @@ app.get('/health', (req, res) => {
     message: 'Server is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// Serve frontend routes (SPA fallback)
+// This should be after API routes but before error handler
+app.get('*', (req, res) => {
+  // Don't serve index.html for API routes
+  if (req.url.startsWith('/api/')) {
+    return res.status(404).json({
+      success: false,
+      message: 'Route not found'
+    });
+  }
+  
+  // Serve the frontend app for all non-API routes
+  res.sendFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
 });
 
 // Error handling middleware
@@ -208,21 +227,6 @@ app.use((err, req, res, next) => {
     message: err.message || 'Internal Server Error'
   });
   console.error('=== END ERROR ===');
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-  console.log("=== 404 NOT FOUND ===");
-  console.log("URL:", req.url);
-  console.log("Method:", req.method);
-  console.log("IP:", req.ip);
-  console.log("Timestamp:", new Date().toISOString());
-  console.log("=== END 404 NOT FOUND ===");
-
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
 });
 
 module.exports = app;
