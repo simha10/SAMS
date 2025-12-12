@@ -367,7 +367,7 @@ async function checkout(req, res) {
     }
 
     // Check full attendance hours only if user is within geofence and not already flagged for geofence issues
-    if (isWithinBranchRadius && !isWithinFullHours &&
+    if (isWithinBranchRadius && !isWithinAllowedAttendanceWindow(new Date(attendance.checkOutTime)) &&
       (!attendance.flagged || !attendance.flaggedReason || !attendance.flaggedReason.includes('geofence'))) {
       attendance.status = 'outside-duty';
       attendance.flagged = true;
