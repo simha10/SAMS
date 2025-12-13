@@ -620,6 +620,15 @@ export const reportAPI = {
       const response = await api.post('/reports/stream', reportData, {
         responseType: 'blob'
       });
+      
+      // Check if the response is actually an error (JSON) despite requesting blob
+      if (response.headers['content-type'] && response.headers['content-type'].includes('application/json')) {
+        // Parse the blob as JSON to get the error message
+        const text = await response.data.text();
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.message || 'Failed to generate report');
+      }
+      
       return response.data;
     } catch (error: any) {
       console.error("Stream report error:", error);

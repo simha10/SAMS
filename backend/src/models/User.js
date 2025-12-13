@@ -36,8 +36,6 @@ const userSchema = new mongoose.Schema({
   mobile: {
     type: String
   },
-  // Note: officeLocation has been removed as part of multi-branch system implementation
-  // New multi-branch system uses Branch model instead
   isActive: {
     type: Boolean,
     default: true

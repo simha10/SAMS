@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,15 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
-import { authAPI, branchAPI } from "@/services/api";
+import { authAPI } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
-import type { RegisterData, Branch } from "@/types";
+import type { RegisterData } from "@/types";
 
 export default function AddEmployee() {
   const { user } = useAuthStore();
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
-  const [branchesLoading, setBranchesLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -30,32 +28,10 @@ export default function AddEmployee() {
     password: "",
     confirmPassword: "",
     dob: "",
-    branchId: ""
+    mobile: ""
   });
 
-  // Fetch branches for selection
-  const fetchBranches = async () => {
-    // Both managers and directors can fetch branches
-    if (user?.role !== "manager" && user?.role !== "director") return;
-    
-    setBranchesLoading(true);
-    try {
-      const response = await branchAPI.getBranches();
-      if (response.success) {
-        setBranches(response.data.branches);
-      }
-    } catch (err) {
-      console.error("Failed to fetch branches:", err);
-    } finally {
-      setBranchesLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchBranches();
-  }, [user?.role]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -69,13 +45,15 @@ export default function AddEmployee() {
     setError("");
     setSuccess("");
 
-    // Validate form
+    // Validate form - now including DOB and mobile as required fields
     if (
       !formData.empId ||
       !formData.name ||
       !formData.email ||
       !formData.password ||
-      !formData.confirmPassword
+      !formData.confirmPassword ||
+      !formData.dob ||
+      !formData.mobile
     ) {
       setError("All fields are required");
       setLoading(false);
@@ -95,7 +73,7 @@ export default function AddEmployee() {
     }
 
     try {
-      // Prepare registration data
+      // Prepare registration data - now including DOB and mobile
       const registerData: RegisterData = {
         empId: formData.empId,
         name: formData.name,
@@ -103,6 +81,8 @@ export default function AddEmployee() {
         password: formData.password,
         role: 'employee',
         managerId: user?._id,
+        dob: formData.dob,
+        mobile: formData.mobile
       };
 
       const response = await authAPI.register(registerData);
@@ -117,7 +97,7 @@ export default function AddEmployee() {
           password: "",
           confirmPassword: "",
           dob: "",
-          branchId: ""
+          mobile: ""
         });
       } else {
         setError(response.message || "Failed to add employee");
@@ -195,12 +175,23 @@ export default function AddEmployee() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="dob">Date of Birth</Label>
+                <Label htmlFor="dob">Date of Birth *</Label>
                 <Input
                   id="dob"
                   type="date"
                   value={formData.dob}
                   onChange={handleChange}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mobile">Mobile Number *</Label>
+                <Input
+                  id="mobile"
+                  type="tel"
+                  value={formData.mobile}
+                  onChange={handleChange}
+                  placeholder="Enter mobile number"
                 />
               </div>
 
@@ -225,33 +216,6 @@ export default function AddEmployee() {
                   placeholder="Confirm password"
                 />
               </div>
-
-              {(user?.role === "manager" || user?.role === "director") && (
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="branchId">Assign Branch</Label>
-                  {branchesLoading ? (
-                    <div className="flex items-center justify-center p-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    </div>
-                  ) : (
-                    <select
-                      id="branchId"
-                      value={formData.branchId}
-                      onChange={handleChange}
-                      className="w-full p-2 border rounded-md bg-background text-foreground"
-                    >
-                      <option value="">Select a branch (optional)</option>
-                      {branches
-                        .filter(branch => branch.isActive)
-                        .map((branch) => (
-                          <option key={branch._id} value={branch._id}>
-                            {branch.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </div>
-              )}
             </div>
 
             <div className="flex justify-end">
@@ -278,17 +242,9 @@ export default function AddEmployee() {
             <li>Employee ID must be unique across the system</li>
             <li>Email address must be unique across the system</li>
             <li>Password must be at least 6 characters long</li>
-            {(user?.role === "manager" || user?.role === "director") && (
-              <>
-                <li>
-                  Managers and Directors can assign employees to specific branches (optional)
-                </li>
-                <li>
-                  Date of Birth is used for birthday notifications
-                </li>
-              </>
-            )}
-
+            <li>
+              Date of Birth is used for birthday notifications
+            </li>
           </ul>
         </CardContent>
       </Card>

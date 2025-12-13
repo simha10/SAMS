@@ -1,0 +1,57 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up phase"
+    - duration: 120
+      arrivalRate: 10
+      name: "Load test phase"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer test-token" # This would be replaced with a real token in practice
+
+scenarios:
+  - name: "Stream Attendance Report (Small Dataset)"
+    flow:
+      - post:
+          url: "/api/reports/stream"
+          json:
+            type: "attendance"
+            format: "csv"
+            startDate: "2023-01-01"
+            endDate: "2023-01-31"
+            filters: {}
+
+  - name: "Stream Attendance Report (Medium Dataset)"
+    flow:
+      - post:
+          url: "/api/reports/stream"
+          json:
+            type: "attendance"
+            format: "csv"
+            startDate: "2023-01-01"
+            endDate: "2023-03-31"
+            filters: {}
+
+  - name: "Stream Combined Report"
+    flow:
+      - post:
+          url: "/api/reports/stream"
+          json:
+            type: "combined"
+            format: "csv"
+            startDate: "2023-01-01"
+            endDate: "2023-01-31"
+            filters: {}
+
+  - name: "Preview Report"
+    flow:
+      - post:
+          url: "/api/reports/preview"
+          json:
+            type: "attendance"
+            startDate: "2023-01-01"
+            endDate: "2023-01-15"
+            filters: {}

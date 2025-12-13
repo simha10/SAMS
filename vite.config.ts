@@ -89,7 +89,7 @@ export default defineConfig({
     },
   },
   server: {
-    host: true, // This allows external connections
+    host: '127.0.0.1', // Restrict to localhost only to mitigate esbuild vulnerability
     port: 5173,
   },
   build: {

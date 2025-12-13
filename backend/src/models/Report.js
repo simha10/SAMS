@@ -12,7 +12,7 @@ const reportSchema = new mongoose.Schema({
   },
   format: {
     type: String,
-    enum: ['csv', 'xlsx'],
+    enum: ['csv'], // Removed 'xlsx' since we're removing that option due to security vulnerabilities
     default: 'csv'
   },
   startDate: {

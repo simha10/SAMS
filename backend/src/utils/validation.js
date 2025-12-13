@@ -1,49 +1,71 @@
 const { z } = require('zod');
 
-// Auth validation schemas
-const registerSchema = z.object({
-  empId: z.string().min(1, 'Employee ID is required'),
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  role: z.enum(['employee', 'manager', 'director']),
-  managerId: z.string().optional(),
-  officeLocation: z.object({
-    lat: z.number().min(-90).max(90),
-    lng: z.number().min(-180).max(180),
-    radius: z.number().min(1).max(1000)
+// Schema for report generation requests
+const reportRequestSchema = z.object({
+  type: z.enum(['attendance', 'leave', 'summary', 'combined']),
+  format: z.enum(['csv', 'pdf']).default('csv'), // Removed 'xlsx' due to security vulnerabilities
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  filters: z.object({
+    employeeId: z.string().optional()
   }).optional()
 });
 
-const loginSchema = z.object({
-  empId: z.string().min(1, 'Employee ID is required'),
-  password: z.string().min(1, 'Password is required')
+// Schema for date range validation
+const dateRangeSchema = z.object({
+  startDate: z.date(),
+  endDate: z.date()
+}).refine(data => data.endDate >= data.startDate, {
+  message: "End date must be after start date",
+  path: ["endDate"]
+}).refine(data => {
+  // Calculate the difference in days
+  const timeDiff = Math.abs(data.endDate.getTime() - data.startDate.getTime());
+  const diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+  return diffDays <= 31; // Limit to 31 days
+}, {
+  message: "Date range cannot exceed 31 days",
+  path: ["endDate"]
 });
 
-// Attendance validation schemas
-const checkinSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180)
-});
+// Function to sanitize strings and prevent prototype pollution
+function sanitizeInput(input) {
+  if (typeof input !== 'object' || input === null) {
+    return input;
+  }
 
-const attendanceQuerySchema = z.object({
-  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
-});
+  // Prevent prototype pollution
+  const sanitized = {};
+  for (const [key, value] of Object.entries(input)) {
+    // Skip dangerous keys
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
+    
+    // Recursively sanitize nested objects
+    if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeInput(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  
+  return sanitized;
+}
 
-// Leave request validation
-const leaveRequestSchema = z.object({
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  reason: z.string().optional(),
-  type: z.enum(['sick', 'personal', 'vacation', 'emergency'])
-});
+// Function to prevent formula injection in Excel cells
+function sanitizeExcelCell(value) {
+  if (typeof value === 'string' && 
+      (value.startsWith('=') || value.startsWith('+') || value.startsWith('-') || value.startsWith('@'))) {
+    // Prefix with single quote to treat as text
+    return "'" + value;
+  }
+  return value;
+}
 
 module.exports = {
-  registerSchema,
-  loginSchema,
-  checkinSchema,
-  attendanceQuerySchema,
-  leaveRequestSchema
+  reportRequestSchema,
+  dateRangeSchema,
+  sanitizeInput,
+  sanitizeExcelCell
 };

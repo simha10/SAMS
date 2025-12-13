@@ -1,7 +1,8 @@
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
-const { createDetailedAttendanceExcel, convertDetailedAttendanceToCSV } = require('../utils/detailedAttendanceReport');
+const { generateDetailedAttendanceReportData, convertDetailedAttendanceToCSV } = require('../utils/detailedAttendanceReport');
+const { createExcelStream, createExcelStreamWriter, addWorksheetToWorkbook, finalizeWorkbook } = require('../utils/excelStreaming');
 
 // Helper function to get team query based on user role
 function getTeamQuery(userId, userRole) {
@@ -82,24 +83,14 @@ async function generateDetailedAttendanceReport(req, res) {
             query.userId = { $in: teamMemberIds };
         }
 
-        // Get attendance records with populated user and branch data
-        const attendanceRecords = await Attendance.find(query)
-            .sort({ date: 1 })
-            .populate('userId', 'empId name')
-            .populate('branch', 'name location radius');
+        // For CSV format, use existing approach
+        if (format === 'csv') {
+            // Get attendance records with populated user and branch data
+            const attendanceRecords = await Attendance.find(query)
+                .sort({ date: 1 })
+                .populate('userId', 'empId name')
+                .populate('branch', 'name location radius');
 
-        // Generate report based on format
-        if (format === 'xlsx') {
-            // Generate Excel report
-            const workbook = await createDetailedAttendanceExcel(attendanceRecords);
-            const buffer = await workbook.xlsx.writeBuffer();
-
-            // Set headers for Excel download
-            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.setHeader('Content-Disposition', 'attachment; filename="detailed_attendance_report.xlsx"');
-
-            return res.send(buffer);
-        } else {
             // Generate CSV report
             const csvData = convertDetailedAttendanceToCSV(attendanceRecords);
 
@@ -108,6 +99,33 @@ async function generateDetailedAttendanceReport(req, res) {
             res.setHeader('Content-Disposition', 'attachment; filename="detailed_attendance_report.csv"');
 
             return res.send(csvData);
+        } else {
+            // For XLSX format, use streaming approach
+            
+            // Set headers for Excel download
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', 'attachment; filename="detailed_attendance_report.xlsx"');
+            
+            // Create streaming workbook
+            const workbook = await createExcelStreamWriter(res, 'detailed_attendance_report.xlsx');
+            
+            // Get attendance records with populated user and branch data
+            const attendanceRecords = await Attendance.find(query)
+                .sort({ date: 1 })
+                .populate('userId', 'empId name')
+                .populate('branch', 'name location radius');
+
+            // Generate report data
+            const reportData = generateDetailedAttendanceReportData(attendanceRecords);
+            
+            // Get headers from the first row
+            const headers = reportData.length > 0 ? Object.keys(reportData[0]) : [];
+            
+            // Add worksheet with data
+            await addWorksheetToWorkbook(workbook, 'Detailed Attendance', headers, reportData);
+            
+            // Finalize workbook
+            await finalizeWorkbook(workbook);
         }
     } catch (error) {
         console.error('Generate detailed attendance report error:', error);

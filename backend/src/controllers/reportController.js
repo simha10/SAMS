@@ -3,18 +3,42 @@ const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const User = require('../models/User');
 const { generateAttendanceReportData, generateLeaveReportData,
-  generateSummaryReportData, convertToCSV, createMultiSheetExcel, workbookToBuffer } = require('../utils/excel');
+  generateSummaryReportData, convertToCSV } = require('../utils/excel');
+const { createMultiSheetExcel, workbookToBuffer } = require('../utils/excel');
+const { createExcelStream, createExcelStreamWriter, addWorksheetToWorkbook, finalizeWorkbook } = require('../utils/excelStreaming');
+const { reportRequestSchema, dateRangeSchema, sanitizeInput } = require('../utils/validation');
 
 // Generate report - streamlined to work without file storage
 async function generateReport(req, res) {
   try {
-    const { title, type, format = 'csv', startDate, endDate, filters = {} } = req.body;
+    // Sanitize input to prevent prototype pollution
+    const sanitizedBody = sanitizeInput(req.body);
+    const { title, type, format = 'csv', startDate, endDate, filters = {} } = sanitizedBody;
     const userId = req.user._id;
 
     // Validate dates
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999); // Ensure end date is inclusive
+    
+    // SYSTEM_ATTENDANCE_START_DATE validation
+    const SYSTEM_ATTENDANCE_START_DATE = new Date('2025-12-03');
+    
+    // Check if start date is before system attendance start date
+    if (start < SYSTEM_ATTENDANCE_START_DATE) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reports can only be generated from 03-Dec-2025 onwards.'
+      });
+    }
+    
+    // Check if end date is before system attendance start date
+    if (end < SYSTEM_ATTENDANCE_START_DATE) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reports can only be generated from 03-Dec-2025 onwards.'
+      });
+    }
 
     if (end < start) {
       return res.status(400).json({
@@ -31,7 +55,7 @@ async function generateReport(req, res) {
       data: {
         title,
         type,
-        format: format === 'xlsx' ? 'xlsx' : 'csv',
+        format: format === 'xlsx' ? 'xlsx' : format === 'pdf' ? 'pdf' : 'csv',
         startDate: start,
         endDate: end,
         filters
@@ -46,60 +70,66 @@ async function generateReport(req, res) {
 // Preview report - keep this functionality but without file storage
 async function previewReport(req, res) {
   try {
-    const { type, startDate, endDate, filters = {} } = req.body;
-
-    // Log incoming data for debugging
-    console.log("=== PREVIEW REPORT REQUEST DATA ===");
-    console.log("Type:", type);
-    console.log("Start Date:", startDate);
-    console.log("End Date:", endDate);
-    console.log("Filters:", filters);
-
-    // Validate required fields
-    if (!type) {
+    // Sanitize input to prevent prototype pollution
+    const sanitizedBody = sanitizeInput(req.body);
+    
+    // Validate request body with Zod
+    const validationResult = reportRequestSchema.safeParse(sanitizedBody);
+    if (!validationResult.success) {
       return res.status(400).json({
         success: false,
-        message: 'Report type is required'
+        message: 'Invalid request parameters',
+        errors: validationResult.error.errors
       });
     }
 
-    if (!startDate) {
+    const { type, startDate, endDate, filters = {} } = validationResult.data;
+
+    // Additional date validation
+    const dateValidation = dateRangeSchema.safeParse({
+      startDate: new Date(startDate),
+      endDate: new Date(endDate)
+    });
+    
+    if (!dateValidation.success) {
       return res.status(400).json({
         success: false,
-        message: 'Start date is required'
+        message: 'Invalid date range',
+        errors: dateValidation.error.errors
       });
     }
 
-    if (!endDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date is required'
-      });
-    }
-
-    // Validate dates
+    // Validate that date range is not too large (prevent resource exhaustion)
     const start = new Date(startDate);
     const end = new Date(endDate);
-
-    // Check if dates are valid
-    if (isNaN(start.getTime())) {
+    
+    // SYSTEM_ATTENDANCE_START_DATE validation
+    const SYSTEM_ATTENDANCE_START_DATE = new Date('2025-12-03');
+    
+    // Check if start date is before system attendance start date
+    if (start < SYSTEM_ATTENDANCE_START_DATE) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid start date format'
+        message: 'Reports can only be generated from 03-Dec-2025 onwards.'
       });
     }
-
-    if (isNaN(end.getTime())) {
+    
+    // Check if end date is before system attendance start date
+    if (end < SYSTEM_ATTENDANCE_START_DATE) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid end date format'
+        message: 'Reports can only be generated from 03-Dec-2025 onwards.'
       });
     }
-
-    if (end < start) {
+    
+    const timeDiff = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    
+    // Limit to 31 days as per requirements
+    if (diffDays > 31) {
       return res.status(400).json({
         success: false,
-        message: 'End date must be after start date'
+        message: 'Date range too large for preview. Maximum 31 days allowed.'
       });
     }
 
@@ -109,26 +139,26 @@ async function previewReport(req, res) {
     // Generate preview data (limited to 10 records)
     switch (type) {
       case 'attendance':
-        reportData = await generateAttendanceReport(req, start, end, filters, 10);
+        reportData = await generateAttendanceReport(req, start, end, filters);
         // Format for preview
         reportData = generateAttendanceReportData(reportData, startDate, endDate);
         recordCount = reportData.length;
         break;
       case 'leave':
-        reportData = await generateLeaveReport(req, start, end, filters, 10);
+        reportData = await generateLeaveReport(req, start, end, filters);
         reportData = generateLeaveReportData(reportData);
         recordCount = reportData.length;
         break;
       case 'summary':
-        reportData = await generateSummaryReport(req, start, end, filters, 10);
+        reportData = await generateSummaryReport(req, start, end, filters);
         reportData = generateSummaryReportData(reportData);
         recordCount = reportData.length;
         break;
       case 'combined':
         // For combined reports, we'll create a preview with data from all three report types
-        const attendanceData = await generateAttendanceReport(req, start, end, filters, 5);
-        const leaveData = await generateLeaveReport(req, start, end, filters, 5);
-        const summaryData = await generateSummaryReport(req, start, end, filters, 5);
+        const attendanceData = await generateAttendanceReport(req, start, end, filters);
+        const leaveData = await generateLeaveReport(req, start, end, filters);
+        const summaryData = await generateSummaryReport(req, start, end, filters);
 
         // Format the data for preview
         const formattedAttendanceData = generateAttendanceReportData(attendanceData, startDate, endDate);
@@ -137,9 +167,9 @@ async function previewReport(req, res) {
 
         // Combine the data for preview
         reportData = {
-          attendance: formattedAttendanceData.slice(0, 3), // Limit to 3 records for preview
-          leave: formattedLeaveData.slice(0, 3),
-          summary: formattedSummaryData.slice(0, 3)
+          attendance: formattedAttendanceData, // Show all attendance data for preview
+          leave: formattedLeaveData, // Show all leave records for preview
+          summary: formattedSummaryData // Show all summary records for preview
         };
 
         recordCount = reportData.attendance.length + reportData.leave.length + reportData.summary.length;
@@ -232,15 +262,21 @@ function getTeamQuery(userId, userRole) {
   }
 }
 
-// Helper function to generate attendance report data
-async function generateAttendanceReport(req, start, end, filters, limit = 0) {
+// Helper function to generate attendance report data with pagination
+async function generateAttendanceReport(req, start, end, filters, limit = 0, page = 1) {
   // Ensure end date is inclusive by setting it to end of day
   const endDate = new Date(end);
   endDate.setHours(23, 59, 59, 999);
 
+  // SYSTEM_ATTENDANCE_START_DATE validation
+  const SYSTEM_ATTENDANCE_START_DATE = new Date('2025-12-03');
+  
+  // Adjust start date to be no earlier than system start date
+  const adjustedStart = start < SYSTEM_ATTENDANCE_START_DATE ? SYSTEM_ATTENDANCE_START_DATE : start;
+
   const query = {
     date: {
-      $gte: start,
+      $gte: adjustedStart,
       $lte: endDate
     }
   };
@@ -261,81 +297,32 @@ async function generateAttendanceReport(req, start, end, filters, limit = 0) {
     query.userId = { $in: teamMemberIds };
   }
 
-  const options = { sort: { date: 1 } }; // Sort by date ascending for proper day mapping
-  if (limit > 0) {
-    options.limit = limit;
-  }
+  const options = { 
+    sort: { date: 1 },
+    limit: limit > 0 ? limit : 1000, // Default limit to prevent memory issues
+    skip: (page - 1) * (limit > 0 ? limit : 1000)
+  };
 
-  // Get all attendance records for the date range
+  // Get attendance records for the date range with pagination
   const attendanceRecords = await Attendance.find(query, null, options)
     .populate('userId', 'empId name');
 
-  // Calculate total days in the range
-  const totalDaysInRange = Math.ceil((endDate - start) / (1000 * 60 * 60 * 24)) + 1;
-
-  // For each user, ensure they have records for all days in the range
-  // This is needed to properly calculate totals
-  const userRecordsMap = {};
-
-  // Group existing records by user
-  attendanceRecords.forEach(record => {
-    const userId = record.userId._id.toString();
-    if (!userRecordsMap[userId]) {
-      userRecordsMap[userId] = [];
-    }
-    userRecordsMap[userId].push(record);
-  });
-
-  // Get all relevant users to ensure they appear in the report even if they have no records
-  let allRelevantUsers = [];
-  if (filters.employeeId) {
-    const user = await User.findOne({ empId: filters.employeeId });
-    if (user) {
-      allRelevantUsers = [user];
-    }
-  } else if (req.user.role === 'manager' || req.user.role === 'director') {
-    // If manager or director, get team query based on role
-    const teamQuery = getTeamQuery(req.user._id, req.user.role);
-    allRelevantUsers = await User.find(teamQuery);
-  } else {
-    // For admin, get all active users
-    allRelevantUsers = await User.find({ isActive: true });
-  }
-
-  // Add missing users to the map with empty arrays
-  allRelevantUsers.forEach(user => {
-    const userId = user._id.toString();
-    if (!userRecordsMap[userId]) {
-      userRecordsMap[userId] = [];
-    }
-  });
-
-  // Flatten the map back to a single array with proper total days
-  const enhancedAttendanceRecords = [];
-  for (const [userId, records] of Object.entries(userRecordsMap)) {
-    // Add all existing records
-    enhancedAttendanceRecords.push(...records);
-
-    // If a user has no records, we still want them in the report
-    // The formatting function will handle users with no records
-    if (records.length === 0) {
-      // Find the user object
-      const user = allRelevantUsers.find(u => u._id.toString() === userId);
-      if (user) {
-        // We don't need to add dummy records, the formatting function handles this
-      }
-    }
-  }
-
-  return enhancedAttendanceRecords;
+  // For large reports, we need to process data in chunks
+  return attendanceRecords;
 }
 
 // Helper function to generate leave report data
 async function generateLeaveReport(req, start, end, filters, limit = 0) {
+  // SYSTEM_ATTENDANCE_START_DATE validation
+  const SYSTEM_ATTENDANCE_START_DATE = new Date('2025-12-03');
+  
+  // Adjust start date to be no earlier than system start date
+  const adjustedStart = start < SYSTEM_ATTENDANCE_START_DATE ? SYSTEM_ATTENDANCE_START_DATE : start;
+  
   // Filter by approved date instead of start date
   const query = {
     approvedAt: {
-      $gte: start,
+      $gte: adjustedStart,
       $lte: end
     },
     status: 'approved' // Only include approved leave requests
@@ -368,14 +355,20 @@ async function generateLeaveReport(req, start, end, filters, limit = 0) {
 
 // Helper function to generate summary report data
 async function generateSummaryReport(req, start, end, filters, limit = 0) {
+  // SYSTEM_ATTENDANCE_START_DATE validation
+  const SYSTEM_ATTENDANCE_START_DATE = new Date('2025-12-03');
+  
+  // Adjust start date to be no earlier than system start date
+  const adjustedStart = start < SYSTEM_ATTENDANCE_START_DATE ? SYSTEM_ATTENDANCE_START_DATE : start;
+  
   // Calculate the total number of days in the date range
   const endDate = new Date(end);
   endDate.setHours(23, 59, 59, 999);
-  const totalDaysInRange = Math.ceil((endDate - start) / (1000 * 60 * 60 * 24)) + 1;
+  const totalDaysInRange = Math.ceil((endDate - adjustedStart) / (1000 * 60 * 60 * 24)) + 1;
 
   const query = {
     date: {
-      $gte: start,
+      $gte: adjustedStart,
       $lte: endDate
     }
   };
@@ -475,16 +468,16 @@ async function generateSummaryReport(req, start, end, filters, limit = 0) {
 
   // Calculate attendance rate
   const summaryData = Object.values(userSummary).map(user => {
-    // For the summary report, we want to show the total days in range
-    // But the current logic counts actual records
-    // Let's adjust this to be more accurate
-
+    // Direct counting: Total Days = Present + Absent + Half + Leave + OD
+    const totalDays = user.presentDays + user.absentDays + user.halfDays + user.leaveDays + user.outsideDutyDays;
+    
+    // Calculate attendance rate based on actual worked days
     const totalWorkingDays = user.presentDays + user.halfDays * 0.5 + user.outsideDutyDays;
-    const attendanceRate = totalDaysInRange > 0 ? (totalWorkingDays / totalDaysInRange) * 100 : 0;
+    const attendanceRate = totalDays > 0 ? (totalWorkingDays / totalDays) * 100 : 0;
 
     return {
       ...user,
-      totalDays: totalDaysInRange, // Show the actual range total, not just record count
+      totalDays: totalDays, // Use direct sum instead of date range
       attendanceRate
     };
   });
@@ -503,99 +496,99 @@ async function generateSummaryReport(req, start, end, filters, limit = 0) {
 // Stream report directly to client without storing
 async function streamReport(req, res) {
   try {
-    const { type, format = 'csv', startDate, endDate, filters = {} } = req.body;
-
-    // Validate required fields
-    if (!type) {
+    // Sanitize input to prevent prototype pollution
+    const sanitizedBody = sanitizeInput(req.body);
+    
+    // Validate request body with Zod
+    const validationResult = reportRequestSchema.safeParse(sanitizedBody);
+    if (!validationResult.success) {
       return res.status(400).json({
         success: false,
-        message: 'Report type is required'
+        message: 'Invalid request parameters',
+        errors: validationResult.error.errors
       });
     }
 
-    if (!startDate) {
+    const { type, format = 'csv', startDate, endDate, filters = {} } = validationResult.data;
+
+    // Additional date validation
+    const dateValidation = dateRangeSchema.safeParse({
+      startDate: new Date(startDate),
+      endDate: new Date(endDate)
+    });
+    
+    if (!dateValidation.success) {
       return res.status(400).json({
         success: false,
-        message: 'Start date is required'
+        message: 'Invalid date range',
+        errors: dateValidation.error.errors
       });
     }
 
-    if (!endDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date is required'
-      });
-    }
-
-    // Validate dates
+    // Validate that date range is not too large (prevent resource exhaustion)
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999); // Ensure end date is inclusive
-
-    // Check if dates are valid
-    if (isNaN(start.getTime())) {
+    
+    // SYSTEM_ATTENDANCE_START_DATE validation
+    const SYSTEM_ATTENDANCE_START_DATE = new Date('2025-12-03');
+    
+    // Check if start date is before system attendance start date
+    if (start < SYSTEM_ATTENDANCE_START_DATE) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid start date format'
+        message: 'Reports can only be generated from 03-Dec-2025 onwards.'
+      });
+    }
+    
+    // Check if end date is before system attendance start date
+    if (end < SYSTEM_ATTENDANCE_START_DATE) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reports can only be generated from 03-Dec-2025 onwards.'
+      });
+    }
+    
+    const timeDiff = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    
+    // Limit to 31 days as per requirements
+    if (diffDays > 31) {
+      return res.status(400).json({
+        success: false,
+        message: 'Date range too large. Maximum 31 days allowed.'
       });
     }
 
-    if (isNaN(end.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid end date format'
-      });
-    }
+    // For CSV format, we can still use the existing approach
+    if (format === 'csv') {
+      let reportData = [];
 
-    if (end < start) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date must be after start date'
-      });
-    }
+      // Generate full report data
+      switch (type) {
+        case 'attendance':
+          reportData = await generateAttendanceReport(req, start, end, filters);
+          reportData = generateAttendanceReportData(reportData, startDate, endDate);
+          break;
+        case 'leave':
+          reportData = await generateLeaveReport(req, start, end, filters);
+          reportData = generateLeaveReportData(reportData);
+          break;
+        case 'summary':
+          reportData = await generateSummaryReport(req, start, end, filters);
+          reportData = generateSummaryReportData(reportData);
+          break;
+        case 'combined':
+          // For combined reports, generate data for all three report types
+          const attendanceData = await generateAttendanceReport(req, start, end, filters);
+          const leaveData = await generateLeaveReport(req, start, end, filters);
+          const summaryData = await generateSummaryReport(req, start, end, filters);
 
-    let reportData = [];
+          // Format the data
+          const formattedAttendanceData = generateAttendanceReportData(attendanceData, startDate, endDate);
+          const formattedLeaveData = generateLeaveReportData(leaveData);
+          const formattedSummaryData = generateSummaryReportData(summaryData);
 
-    // Generate full report data
-    switch (type) {
-      case 'attendance':
-        reportData = await generateAttendanceReport(req, start, end, filters);
-        reportData = generateAttendanceReportData(reportData, startDate, endDate);
-        break;
-      case 'leave':
-        reportData = await generateLeaveReport(req, start, end, filters);
-        reportData = generateLeaveReportData(reportData);
-        break;
-      case 'summary':
-        reportData = await generateSummaryReport(req, start, end, filters);
-        reportData = generateSummaryReportData(reportData);
-        break;
-      case 'combined':
-        // For combined reports, generate data for all three report types
-        const attendanceData = await generateAttendanceReport(req, start, end, filters);
-        const leaveData = await generateLeaveReport(req, start, end, filters);
-        const summaryData = await generateSummaryReport(req, start, end, filters);
-
-        // Format the data
-        const formattedAttendanceData = generateAttendanceReportData(attendanceData, startDate, endDate);
-        const formattedLeaveData = generateLeaveReportData(leaveData);
-        const formattedSummaryData = generateSummaryReportData(summaryData);
-
-        // Create a multi-sheet Excel workbook
-        if (format === 'xlsx') {
-          const sheetsData = {
-            'Attendance': formattedAttendanceData,
-            'Leave': formattedLeaveData,
-            'Summary': formattedSummaryData
-          };
-
-          const workbook = await createMultiSheetExcel(sheetsData);
-          const buffer = await workbookToBuffer(workbook);
-
-          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-          res.setHeader('Content-Disposition', `attachment; filename=combined_report_${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx`);
-          return res.send(buffer);
-        } else {
           // For CSV format, concatenate all data with headers
           let csvContent = '';
           csvContent += '=== ATTENDANCE REPORT ===\n';
@@ -608,33 +601,177 @@ async function streamReport(req, res) {
           res.setHeader('Content-Type', 'text/csv');
           res.setHeader('Content-Disposition', `attachment; filename=combined_report_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
           return res.send(csvContent);
-        }
-      default:
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid report type. Valid types are: attendance, leave, summary, combined'
-        });
-    }
+        default:
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid report type. Valid types are: attendance, leave, summary, combined'
+          });
+      }
 
-    // Handle single report types
-    if (format === 'xlsx' && type !== 'combined') {
-      // Create Excel workbook for single sheet
-      const sheetsData = {};
-      sheetsData[type.charAt(0).toUpperCase() + type.slice(1)] = reportData;
-
-      const workbook = await createMultiSheetExcel(sheetsData);
-      const buffer = await workbookToBuffer(workbook);
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=${type}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx`);
-      return res.send(buffer);
-    } else {
       // Convert to CSV for single report types
       const csvContent = convertToCSV(reportData);
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=${type}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
       return res.send(csvContent);
+    }
+    
+    // For XLSX format, use streaming approach
+    if (format === 'xlsx') {
+      switch (type) {
+        case 'attendance':
+          // Generate attendance data
+          const attendanceRecords = await generateAttendanceReport(req, start, end, filters);
+          const formattedAttendanceData = generateAttendanceReportData(attendanceRecords, startDate, endDate);
+          
+          // Get headers from the first row
+          const attendanceHeaders = formattedAttendanceData.length > 0 ? Object.keys(formattedAttendanceData[0]) : [];
+          
+          // Create streaming Excel
+          await createExcelStream(
+            res,
+            `${type}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx`,
+            'Attendance',
+            attendanceHeaders,
+            formattedAttendanceData
+          );
+          break;
+          
+        case 'leave':
+          // Generate leave data
+          const leaveRecords = await generateLeaveReport(req, start, end, filters);
+          const formattedLeaveData = generateLeaveReportData(leaveRecords);
+          
+          // Get headers from the first row
+          const leaveHeaders = formattedLeaveData.length > 0 ? Object.keys(formattedLeaveData[0]) : [];
+          
+          // Create streaming Excel
+          await createExcelStream(
+            res,
+            `${type}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx`,
+            'Leave',
+            leaveHeaders,
+            formattedLeaveData
+          );
+          break;
+          
+        case 'summary':
+          // Generate summary data
+          const summaryRecords = await generateSummaryReport(req, start, end, filters);
+          const formattedSummaryData = generateSummaryReportData(summaryRecords);
+          
+          // Get headers from the first row
+          const summaryHeaders = formattedSummaryData.length > 0 ? Object.keys(formattedSummaryData[0]) : [];
+          
+          // Create streaming Excel
+          await createExcelStream(
+            res,
+            `${type}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx`,
+            'Summary',
+            summaryHeaders,
+            formattedSummaryData
+          );
+          break;
+          
+        case 'combined':
+          // For combined reports, we need to create a multi-sheet workbook
+          // Since we're streaming, we'll create separate sheets one by one
+          
+          // Set headers for Excel download
+          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          res.setHeader('Content-Disposition', `attachment; filename=combined_report_${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx`);
+          
+          // Create streaming workbook
+          const workbook = await createExcelStreamWriter(res, `combined_report_${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx`);
+          
+          // Add attendance sheet
+          const attendanceData = await generateAttendanceReport(req, start, end, filters);
+          const formattedAttendance = generateAttendanceReportData(attendanceData, startDate, endDate);
+          const attendanceHdrs = formattedAttendance.length > 0 ? Object.keys(formattedAttendance[0]) : [];
+          await addWorksheetToWorkbook(workbook, 'Attendance', attendanceHdrs, formattedAttendance);
+          
+          // Add leave sheet
+          const leaveData = await generateLeaveReport(req, start, end, filters);
+          const formattedLeave = generateLeaveReportData(leaveData);
+          const leaveHdrs = formattedLeave.length > 0 ? Object.keys(formattedLeave[0]) : [];
+          await addWorksheetToWorkbook(workbook, 'Leave', leaveHdrs, formattedLeave);
+          
+          // Add summary sheet
+          const summaryData = await generateSummaryReport(req, start, end, filters);
+          const formattedSummary = generateSummaryReportData(summaryData);
+          const summaryHdrs = formattedSummary.length > 0 ? Object.keys(formattedSummary[0]) : [];
+          await addWorksheetToWorkbook(workbook, 'Summary', summaryHdrs, formattedSummary);
+          
+          // Finalize workbook
+          await finalizeWorkbook(workbook);
+          break;
+          
+        default:
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid report type. Valid types are: attendance, leave, summary, combined'
+          });
+      }
+    }
+    
+    // For PDF format, generate HTML and convert to PDF
+    if (format === 'pdf') {
+      try {
+        const { generateReportPDF } = require('../utils/pdfGenerator');
+        let pdfBuffer;
+        
+        switch (type) {
+          case 'attendance':
+            const attendanceRecords = await generateAttendanceReport(req, start, end, filters);
+            const formattedAttendanceData = generateAttendanceReportData(attendanceRecords, startDate, endDate);
+            pdfBuffer = await generateReportPDF(type, formattedAttendanceData, startDate, endDate, filters);
+            break;
+          case 'leave':
+            const leaveRecords = await generateLeaveReport(req, start, end, filters);
+            const formattedLeaveData = generateLeaveReportData(leaveRecords);
+            pdfBuffer = await generateReportPDF(type, formattedLeaveData, startDate, endDate, filters);
+            break;
+          case 'summary':
+            const summaryRecords = await generateSummaryReport(req, start, end, filters);
+            const formattedSummaryData = generateSummaryReportData(summaryRecords);
+            pdfBuffer = await generateReportPDF(type, formattedSummaryData, startDate, endDate, filters);
+            break;
+          case 'combined':
+            // For combined reports, generate data for all three report types
+            const combinedAttendanceData = await generateAttendanceReport(req, start, end, filters);
+            const combinedLeaveData = await generateLeaveReport(req, start, end, filters);
+            const combinedSummaryData = await generateSummaryReport(req, start, end, filters);
+
+            // Format the data
+            const formattedCombinedAttendanceData = generateAttendanceReportData(combinedAttendanceData, startDate, endDate);
+            const formattedCombinedLeaveData = generateLeaveReportData(combinedLeaveData);
+            const formattedCombinedSummaryData = generateSummaryReportData(combinedSummaryData);
+            
+            const combinedData = {
+              attendance: formattedCombinedAttendanceData,
+              leave: formattedCombinedLeaveData,
+              summary: formattedCombinedSummaryData
+            };
+            
+            pdfBuffer = await generateReportPDF(type, combinedData, startDate, endDate, filters);
+            break;
+          default:
+            return res.status(400).json({
+              success: false,
+              message: 'Invalid report type for PDF generation'
+            });
+        }
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=${type}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.pdf`);
+        return res.end(pdfBuffer);
+      } catch (error) {
+        console.error('PDF generation error:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to generate PDF report'
+        });
+      }
     }
   } catch (error) {
     console.error('Stream report error:', error);
