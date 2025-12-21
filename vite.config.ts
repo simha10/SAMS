@@ -13,7 +13,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true
+        enabled: false, // Disable service worker in development
+        type: 'module',
+        suppressWarnings: true,
+        navigateFallback: undefined // Disable navigate fallback in development
       },
       manifest: {
         name: 'LRMC Staff Attendance System',
@@ -37,17 +40,28 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
+        // More aggressive cache busting
+        clientsClaim: false, // Don't claim clients immediately
+        skipWaiting: false, // Don't skip waiting
         // Exclude dynamic APIs from caching
-        runtimeCaching: [
+        // Disable runtime caching in development to prevent double refresh
+        runtimeCaching: process.env.NODE_ENV === 'development' ? [] : [
+          {
+            urlPattern: /^http.*\/api\/auth\/.*$/,
+            handler: 'NetworkOnly', // Never cache auth endpoints
+            options: {
+              cacheName: 'auth-endpoints',
+            },
+          },
           {
             urlPattern: /^http.*\/api\/attendance\/today/,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'attendance-today',
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 5,
               expiration: {
                 maxEntries: 1,
-                maxAgeSeconds: 30, // 30 seconds
+                maxAgeSeconds: 10, // 10 seconds
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -59,10 +73,10 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'attendance-me',
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 5,
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 30, // 30 seconds
+                maxAgeSeconds: 10, // 10 seconds
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -72,10 +86,28 @@ export default defineConfig({
           {
             urlPattern: /^http.*\/api\/attendance\/checkin/,
             handler: 'NetworkOnly',
+            options: {
+              cacheName: 'attendance-checkin',
+            },
           },
           {
             urlPattern: /^http.*\/api\/attendance\/checkout/,
             handler: 'NetworkOnly',
+            options: {
+              cacheName: 'attendance-checkout',
+            },
+          },
+          {
+            urlPattern: /^http.*\/api\/.*$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-responses',
+              networkTimeoutSeconds: 5,
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 30, // 30 seconds
+              },
+            },
           },
         ],
       },
@@ -89,8 +121,9 @@ export default defineConfig({
     },
   },
   server: {
-    host: '127.0.0.1', // Restrict to localhost only to mitigate esbuild vulnerability
+    host: '0.0.0.0', // Allow connections from any IP address
     port: 5173,
+    strictPort: false, // Allow fallback to another port if 5173 is busy
   },
   build: {
     // Generate manifest for better asset management

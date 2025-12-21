@@ -52,6 +52,7 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
+      'http://localhost:5174',
       'http://192.168.18.210:5173',// Network IP
       'http://192.168.18.168:5174',
       'https://sams-frontend-sq6o.onrender.com', //frontend URL
@@ -70,7 +71,8 @@ const corsOptions = {
     }
   },
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
 
 app.use(cors(corsOptions));

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { refreshTokenIfNeeded } = require('../utils/tokenUtils');
 
 // Protect routes - require authentication
 async function protect(req, res, next) {
@@ -57,6 +58,9 @@ async function protect(req, res, next) {
       });
     }
     
+    // Refresh token if needed (seamless refresh)
+    refreshTokenIfNeeded(req, res, req.user, decoded);
+    
     console.log("Authentication successful for user:", req.user.empId, req.user.name);
     console.log("=== END AUTH PROTECT MIDDLEWARE ===");
     next();
@@ -76,10 +80,31 @@ async function protect(req, res, next) {
     }
     
     console.error('=== END AUTHENTICATION ERROR ===');
+    
+    // For expired tokens, provide a more specific message
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Session expired. Please log in again.',
+        code: 'TOKEN_EXPIRED'
+      });
+    } 
+    
+    // For invalid tokens, provide a more specific message
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid session. Please log in again.',
+        code: 'TOKEN_INVALID'
+      });
+    }
+    
+    // Generic error response
     res.status(401).json({ 
       success: false, 
-      message: 'Not authorized, token failed. Please log out and log in again.' 
-      });
+      message: 'Authentication failed. Please log out and log in again.',
+      code: 'AUTH_FAILED'
+    });
   }
 }
 

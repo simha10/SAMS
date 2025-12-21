@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { 
   Card, 
@@ -100,14 +100,192 @@ export default function Dashboard() {
   } | null>(null);
   // New state for better UX
   const [gettingLocation, setGettingLocation] = useState(false);
+  
+  // Ref to prevent concurrent fetch requests
+  const isFetchingRef = useRef(false);
+  
+  // Ref for debounce timeout
+  const distanceCalculationTimeoutRef = useRef<number | null>(null);
+
+  // Define fetchTodayStatus BEFORE any useEffect that uses it
+  const fetchTodayStatus = useCallback(async () => {
+    // Prevent concurrent requests
+    if (isFetchingRef.current) {
+      console.log('Skipping fetchTodayStatus - already fetching');
+      return;
+    }
+    
+    isFetchingRef.current = true;
+    
+    try {
+      const response = await attendanceAPI.getTodayStatus();
+      if (response.success && response.data) {
+        setTodayStatus(response.data);
+        setTodayAttendance(response.data);
+        saveAttendanceToCache(response.data.attendance);
+      } else {
+        setTodayStatus(null);
+        setTodayAttendance(null);
+        localStorage.removeItem('attendance_status_cache');
+      }
+      localStorage.removeItem("rateLimitError");
+    } catch (err: unknown) {
+      console.error("Failed to fetch today status:", err);
+      if (err && typeof err === 'object' && 'response' in err && 
+          err.response && typeof err.response === 'object' && 'status' in err.response && 
+          err.response.status === 429) {
+        toast.error("Too many requests", {
+          description: "Please wait a moment and try again.",
+        });
+      } else {
+        setTodayStatus(null);
+        setTodayAttendance(null);
+        localStorage.removeItem('attendance_status_cache');
+      }
+    } finally {
+      isFetchingRef.current = false;
+    }
+  }, [setTodayAttendance]);
 
   // Clear cache when user changes
   useEffect(() => {
     if (user) {
-      // Clear any existing cache for previous user
       clearAttendanceCache();
     }
   }, [user]);
+
+  // Load cached attendance status immediately on component mount
+  useEffect(() => {
+    const loadInitialAttendanceStatus = async () => {
+      const cachedStatus = loadAttendanceFromCache();
+      if (cachedStatus) {
+        console.log("Loaded attendance status from cache");
+        const todayStatusData = {
+          date: cachedStatus.date,
+          attendance: cachedStatus.attendance
+        };
+        setTodayStatus(todayStatusData);
+        setTodayAttendance(todayStatusData);
+      }
+      
+      try {
+        await fetchTodayStatus();
+      } catch (error) {
+        console.error("Failed to fetch fresh attendance status:", error);
+      }
+    };
+    
+    if (user) {
+      loadInitialAttendanceStatus();
+    }
+  }, [user, fetchTodayStatus]);
+
+  // Detect date changes and automatically refresh attendance status
+  useEffect(() => {
+    const checkDateChange = () => {
+      const today = new Date().toISOString().split('T')[0];
+      const cachedStatus = loadAttendanceFromCache();
+      
+      if (cachedStatus && cachedStatus.date !== today) {
+        console.log("Date changed, clearing cache and refreshing attendance status");
+        localStorage.removeItem('attendance_status_cache');
+        setTodayAttendance(null);
+        fetchTodayStatus();
+      }
+    };
+
+    checkDateChange();
+    const intervalId = setInterval(checkDateChange, 60000);
+    return () => clearInterval(intervalId);
+  }, [user, fetchTodayStatus]);
+
+  // Removed auto-fetch on component mount as per optimization requirements
+  // Data will only be fetched when user explicitly clicks refresh button
+
+  // Remove auto-fetch useEffect and replace with manual refresh
+  // Optimized to only fetch essential data (today's attendance status)
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchTodayStatus();
+      // Clear rate limit error flag on success
+      localStorage.removeItem("rateLimitError");
+    } catch (err) {
+      console.error("Failed to refresh data:", err);
+      // Check if it's a rate limit error
+      if (err && typeof err === 'object' && 'response' in err && 
+          err.response && typeof err.response === 'object' && 'status' in err.response && 
+          err.response.status === 429) {
+        toast.error("Too many requests", {
+          description: "Please wait a moment and try again.",
+        });
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Debounced distance calculation to prevent excessive updates
+  const debouncedDistanceCalculation = useCallback((
+    lat: number, 
+    lng: number, 
+    branchId: string
+  ) => {
+    // Clear any existing timeout
+    if (distanceCalculationTimeoutRef.current) {
+      clearTimeout(distanceCalculationTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounced execution
+    distanceCalculationTimeoutRef.current = setTimeout(() => {
+      if (branches.length > 0) {
+        const selectedBranch = branches.find(b => b._id === branchId);
+        if (selectedBranch) {
+          const distance = calculateDistance(
+            lat,
+            lng,
+            selectedBranch.location.lat,
+            selectedBranch.location.lng
+          );
+          
+          setDistanceInfo({
+            distance: Math.round(distance),
+            branchName: selectedBranch.name,
+            allowedRadius: selectedBranch.radius ?? 50,
+            isWithinGeofence: distance <= (selectedBranch.radius ?? 50)
+          });
+          
+          setCoordinates({
+            lat,
+            lng
+          });
+        }
+      }
+    }, 1000); // 1 second debounce
+  }, [branches]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (distanceCalculationTimeoutRef.current) {
+        clearTimeout(distanceCalculationTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Update the useEffect for distance calculation
+  useEffect(() => {
+    if (latitude && longitude && selectedBranchId && branches.length > 0) {
+      debouncedDistanceCalculation(latitude, longitude, selectedBranchId);
+    }
+  }, [latitude, longitude, selectedBranchId, branches, debouncedDistanceCalculation]);
+  // Clear general error when we have valid coordinates
+  // This handles the case where geolocation watcher had an error but we successfully got coordinates
+  useEffect(() => {
+    if (coordinates && error === "Failed to get current location") {
+      setError("");
+    }
+  }, [coordinates, error]);
 
   // Log branch errors for debugging
   useEffect(() => {
@@ -117,33 +295,47 @@ export default function Dashboard() {
   }, [branchesError]);
 
   // Automatically calculate distance when location or branch selection changes
-  // Use the continuous geolocation watcher data for UI updates
   useEffect(() => {
-    if (latitude && longitude && selectedBranchId && branches.length > 0) {
-      const selectedBranch = branches.find(b => b._id === selectedBranchId);
-      if (selectedBranch) {
-        const distance = calculateDistance(
-          latitude,
-          longitude,
-          selectedBranch.location.lat,
-          selectedBranch.location.lng
-        );
-      
-        setDistanceInfo({
-          distance: Math.round(distance),
-          branchName: selectedBranch.name,
-          allowedRadius: selectedBranch.radius ?? 50,
-          isWithinGeofence: distance <= (selectedBranch.radius ?? 50)
-        });
-        
-        // Store the coordinates for use in check-in/check-out
-        setCoordinates({
-          lat: latitude,
-          lng: longitude
-        });
-      }
+    // Clear any existing timeout
+    if (distanceCalculationTimeoutRef.current) {
+      clearTimeout(distanceCalculationTimeoutRef.current);
     }
+    
+    if (latitude && longitude && selectedBranchId && branches.length > 0) {
+      // Debounce the calculation by 1 second
+      distanceCalculationTimeoutRef.current = setTimeout(() => {
+        const selectedBranch = branches.find(b => b._id === selectedBranchId);
+        if (selectedBranch) {
+          const distance = calculateDistance(
+            latitude,
+            longitude,
+            selectedBranch.location.lat,
+            selectedBranch.location.lng
+          );
+          
+          setDistanceInfo({
+            distance: Math.round(distance),
+            branchName: selectedBranch.name,
+            allowedRadius: selectedBranch.radius ?? 50,
+            isWithinGeofence: distance <= (selectedBranch.radius ?? 50)
+          });
+          
+          setCoordinates({
+            lat: latitude,
+            lng: longitude
+          });
+        }
+      }, 1000); // 1 second debounce
+    }
+    
+    // Cleanup function
+    return () => {
+      if (distanceCalculationTimeoutRef.current) {
+        clearTimeout(distanceCalculationTimeoutRef.current);
+      }
+    };
   }, [latitude, longitude, selectedBranchId, branches]);
+
   // Clear general error when we have valid coordinates
   // This handles the case where geolocation watcher had an error but we successfully got coordinates
   useEffect(() => {
@@ -179,7 +371,7 @@ export default function Dashboard() {
     };
     
     loadInitialAttendanceStatus();
-  }, [user]); // Add user as dependency so it re-runs when user changes
+  }, [user, fetchTodayStatus]); // Add user and fetchTodayStatus as dependencies
 
   // Detect date changes and automatically refresh attendance status
   useEffect(() => {
@@ -206,73 +398,10 @@ export default function Dashboard() {
     const intervalId = setInterval(checkDateChange, 60000);
 
     return () => clearInterval(intervalId);
-  }, [user]); // Add user as dependency
+  }, [user, fetchTodayStatus]); // Add user and fetchTodayStatus as dependencies
 
-  // Removed auto-fetch on component mount as per optimization requirements
-  // Data will only be fetched when user explicitly clicks refresh button
-
-  // Remove auto-fetch useEffect and replace with manual refresh
+  // Removed auto-fetch useEffect and replace with manual refresh
   // Optimized to only fetch essential data (today's attendance status)
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await fetchTodayStatus();
-      // Clear rate limit error flag on success
-      localStorage.removeItem("rateLimitError");
-    } catch (err) {
-      console.error("Failed to refresh data:", err);
-      // Check if it's a rate limit error
-      if (err && typeof err === 'object' && 'response' in err && 
-          err.response && typeof err.response === 'object' && 'status' in err.response && 
-          err.response.status === 429) {
-        toast.error("Too many requests", {
-          description: "Please wait a moment and try again.",
-        });
-      }
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const fetchTodayStatus = async () => {
-    try {
-      const response = await attendanceAPI.getTodayStatus();
-      if (response.success && response.data) {
-        setTodayStatus(response.data);
-        // Sync with attendance store
-        setTodayAttendance(response.data);
-        // Save to cache for immediate load on next visit
-        saveAttendanceToCache(response.data.attendance);
-      } else {
-        // If response is not successful, clear the current status
-        setTodayStatus(null);
-        // Clear attendance store as well
-        setTodayAttendance(null);
-        // Clear cache as well
-        localStorage.removeItem('attendance_status_cache');
-      }
-      // Clear rate limit error flag on success
-      localStorage.removeItem("rateLimitError");
-    } catch (err: unknown) {
-      console.error("Failed to fetch today status:", err);
-      // Check if it's a rate limit error
-      if (err && typeof err === 'object' && 'response' in err && 
-          err.response && typeof err.response === 'object' && 'status' in err.response && 
-          err.response.status === 429) {
-        toast.error("Too many requests", {
-          description: "Please wait a moment and try again.",
-        });
-      } else {
-        // For other errors, clear the current status to avoid showing stale data
-        setTodayStatus(null);
-        // Clear attendance store as well
-        setTodayAttendance(null);
-        // Clear cache as well
-        localStorage.removeItem('attendance_status_cache');
-      }
-    }
-  };
-
   const prepareAttendanceAction = async (action: "checkin" | "checkout") => {
     // Clear any previous messages when starting a new action
     setMessage("");
@@ -664,19 +793,6 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back, {user?.name}!</p>
         </div>
-        <Button variant="outline" onClick={handleRefresh} disabled={refreshing} className="bg-orange-500 hover:bg-orange-600">
-          {refreshing ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Refreshing...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </>
-          )}
-        </Button>
       </div>
 
       {/* Birthday Banner */}

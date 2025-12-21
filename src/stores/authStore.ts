@@ -46,9 +46,25 @@ export const useAuthStore = create<AuthState>()(
         console.log("Auth store updated:", { user, isAuthenticated: true });
         console.log("=== END AUTH STORE LOGIN ===");
       },
-      logout: () => {
+      logout: async () => {
         console.log("=== AUTH STORE LOGOUT ===");
         console.log("Timestamp:", new Date().toISOString());
+        
+        try {
+          // Call backend logout endpoint to clear server-side cookies
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+          
+          console.log("Backend logout response:", response.status);
+        } catch (error) {
+          console.error("Backend logout error:", error);
+        }
+        
         // Clear all auth-related storage
         localStorage.removeItem('auth-storage');
         sessionStorage.removeItem('auth-storage');
@@ -65,12 +81,11 @@ export const useAuthStore = create<AuthState>()(
         document.cookie.split(";").forEach((c) => {
           document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
         });
-        // Force a small delay to ensure cookies are cleared
-        setTimeout(() => {
-          set({ user: null, isAuthenticated: false });
-          console.log("Auth store updated:", { user: null, isAuthenticated: false });
-          console.log("=== END AUTH STORE LOGOUT ===");
-        }, 50);
+        
+        // Update state immediately
+        set({ user: null, isAuthenticated: false });
+        console.log("Auth store updated:", { user: null, isAuthenticated: false });
+        console.log("=== END AUTH STORE LOGOUT ===");
       },
       setLoading: (loading: boolean) => {
         console.log("=== AUTH STORE SET LOADING ===");

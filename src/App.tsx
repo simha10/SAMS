@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { ThemeProvider } from "next-themes";
 
 // Lazy load components for better performance
@@ -122,39 +122,58 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => {
   const { isAuthenticated, user, login, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
+  const hasValidatedRef = useRef(false);
 
-  // Silent token validation on app load
+  // Silent token validation on app load - only once
   useEffect(() => {
+    // Prevent multiple validations
+    if (hasValidatedRef.current) return;
+    
     const validateToken = async () => {
+      hasValidatedRef.current = true;
+      
       try {
-        // If user is already authenticated, no need to validate
-        if (isAuthenticated && user) {
+        // Only validate if we have user data in localStorage
+        const authStorage = localStorage.getItem('auth-storage');
+        if (!authStorage) {
           setIsLoading(false);
           return;
         }
 
-        // Check if we're in a PWA context
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-        
-        // Try to validate existing token
-        const response = await authAPI.validateToken();
-        if (response.success && response.data?.user) {
-          login(response.data.user);
-        } else if (isStandalone) {
-          // In PWA mode, if validation fails, we still want to show the app
-          console.log("PWA mode: proceeding without authentication");
+        if (isAuthenticated && user) {
+          console.log("Validating existing user session...");
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          
+          try {
+            const response = await authAPI.validateToken();
+            clearTimeout(timeoutId);
+            
+            if (response.success && response.data?.user) {
+              login(response.data.user);
+            } else {
+              console.log("Token validation failed, logging out user");
+              logout();
+            }
+          } catch (error: any) {
+            clearTimeout(timeoutId);
+            if (error.name !== 'AbortError') {
+              console.error("Token validation error:", error);
+              logout();
+            }
+          }
         }
       } catch (error) {
         console.error("Token validation error:", error);
-        // Clear invalid token
-        localStorage.removeItem("token");
+        logout();
       } finally {
         setIsLoading(false);
       }
     };
 
     validateToken();
-  }, [isAuthenticated, login, user]);
+  }, []); // Empty dependency array - only run once on mount
 
   if (isLoading) {
     return (

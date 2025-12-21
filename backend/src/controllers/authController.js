@@ -1,19 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-
-// Generate JWT token with 7-day expiry for all environments
-const generateToken = (user) => {
-  return jwt.sign(
-    {
-      id: user._id,
-      role: user.role,
-      empId: user.empId
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' } // Consistent 7-day expiry
-  );
-};
+const { generateToken, getCookieOptions } = require('../utils/tokenUtils');
 
 // Login user
 async function login(req, res) {
@@ -56,29 +44,14 @@ async function login(req, res) {
       });
     }
 
-    // Generate token with 7-day expiry
+    // Generate token with extended expiry
     const token = generateToken(user);
 
-    // Set cookie with 7-day expiration (consistent for all users)
-    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+    // Configure cookie options using utility function
+    const cookieOptions = getCookieOptions();
 
-    // Configure cookie options
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // true in production
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-origin in production
-      maxAge: maxAge,
-      path: '/', // Explicitly set path to ensure cookie is sent to all routes
-      // Add domain only if explicitly set in environment variables
-      ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
-    };
-
-    // Add domain option for production
-    if (process.env.NODE_ENV === 'production') {
-      // Don't set domain for Render deployment as it can cause issues
-      // The cookie will be set for the current domain automatically
-      console.log('Setting production cookie options');
-    }
+    // No explicit domain setting to avoid cross-origin issues
+    // Domain will be set automatically by the browser
 
     res.cookie('token', token, cookieOptions);
 
@@ -116,9 +89,7 @@ async function logout(req, res) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/',
-      // Add domain only if explicitly set in environment variables
-      ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
+      path: '/'
     });
     
     // Also clear any legacy cookies that might exist

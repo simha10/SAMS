@@ -117,6 +117,12 @@ api.interceptors.response.use(
         // Clear auth state
         localStorage.removeItem('auth-storage');
         sessionStorage.removeItem('auth-storage');
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        // Clear all cookies
+        document.cookie.split(";").forEach((c) => {
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
         // Redirect to login after a small delay to allow error handling
         setTimeout(() => {
           window.location.href = '/login';
@@ -156,7 +162,11 @@ export const authAPI = {
 
   logout: async (): Promise<ApiResponse> => {
     try {
-      const response = await api.post('/auth/logout');
+      const response = await api.post('/auth/logout', {}, {
+        // Add timeout and ensure credentials are sent
+        timeout: 5000,
+        withCredentials: true
+      });
       // Clear local storage and cookies on logout
       localStorage.removeItem('auth-storage');
       sessionStorage.removeItem('auth-storage');
@@ -172,10 +182,23 @@ export const authAPI = {
       });
       return response.data;
     } catch (error) {
-      toast.error("Logout failed", {
-        description: "Could not log out. Please try again.",
+      console.error('Logout API error:', error);
+      // Even if the API call fails, we still want to clear local state
+      // Clear local storage and cookies on logout
+      localStorage.removeItem('auth-storage');
+      sessionStorage.removeItem('auth-storage');
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('rateLimitError');
+      // Clear all cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
-      throw error;
+      toast.success("Logged out", {
+        description: "You have been successfully logged out.",
+      });
+      // Don't throw error to ensure user is logged out locally even if server fails
+      return { success: true, message: 'Logged out successfully' };
     }
   },
 
@@ -187,9 +210,21 @@ export const authAPI = {
   // Endpoint for validating token and getting user info
   validateToken: async (): Promise<ApiResponse<{ user: User }>> => {
     try {
-      const response = await api.get('/auth/profile');
+      // Add a timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await api.get('/auth/profile', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // Handle timeout specifically
+      if (error.name === 'AbortError') {
+        throw new Error('Token validation timed out');
+      }
       throw error;
     }
   },

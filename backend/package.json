@@ -12,6 +12,8 @@
     "fix-passwords": "node scripts/fixUserPasswords.js",
     "bulk-checkout": "node scripts/bulkCheckout.js",
     "diagnose-attendance": "node scripts/diagnoseAttendance.js",
+    "clear-auth-cache": "node scripts/clear-redis-sessions.js",
+    "test-persistent-login": "node scripts/test-persistent-login.js",
     "start:dev": "concurrently \"npm run redis\" \"npm run dev\"",
     "redis": "redis-server",
     "test:redis": "node scripts/test-redis.js"
