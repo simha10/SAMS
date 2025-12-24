@@ -3,11 +3,14 @@ const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const { isWithinOfficeHours, haversine } = require('../utils/haversine');
 const logger = require('../config/logger');
+const { redisClient } = require('../config/redis');
 
-// Auto checkout at 11:59 PM IST
-// Cron expression: "At 59 minutes past hour 23 (11 PM) in Asia/Kolkata timezone"
-// This will run at 11:59 PM IST regardless of server timezone
-cron.schedule('59 23 * * *', async () => {
+// Start auto checkout cron job
+function startAutoCheckoutJob() {
+  // Auto checkout at 11:59 PM IST
+  // Cron expression: "At 59 minutes past hour 23 (11 PM) in Asia/Kolkata timezone"
+  // This will run at 11:59 PM IST regardless of server timezone
+  cron.schedule('59 23 * * *', async () => {
   try {
     logger.info('Running auto checkout job...');
     
@@ -122,8 +125,13 @@ cron.schedule('59 23 * * *', async () => {
   } catch (error) {
     logger.error('Auto checkout job error:', error);
   }
-}, {
-  timezone: "Asia/Kolkata" // Explicitly set timezone to IST
-});
+  }, {
+    timezone: "Asia/Kolkata" // Explicitly set timezone to IST
+  });
 
-logger.info('Auto checkout cron job initialized');
+  logger.info('Auto checkout cron job initialized');
+}
+
+module.exports = {
+  startAutoCheckoutJob
+};

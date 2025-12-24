@@ -62,12 +62,16 @@ async function runBirthdayNotifications() {
     }
 }
 
-// Send birthday notifications at 8:00 AM daily
-cron.schedule('0 8 * * *', runBirthdayNotifications);
+// Start birthday notifications cron job
+function startBirthdayNotificationsJob() {
+  // Send birthday notifications at 8:00 AM daily
+  cron.schedule('0 8 * * *', runBirthdayNotifications);
 
-logger.info('Birthday notification cron job initialized');
+  logger.info('Birthday notification cron job initialized');
+}
 
 // Export the function for testing
 module.exports = {
-    runBirthdayNotifications
+    runBirthdayNotifications,
+    startBirthdayNotificationsJob
 };

@@ -10,15 +10,15 @@ This is the backend API for the Geo-Fence Attendance Management System (SAMS) v2
 - **Comprehensive Leave Management**: Full support for various leave types with approval workflows
 - **Robust Reporting Engine**: Detailed attendance reports with CSV/Excel export capabilities
 - **Automated Business Processes**: Daily attendance processing and birthday notifications
-- **Enhanced Dashboard UI**: Improved Manager/Director interface with role-specific layouts
+- **Enhanced Dashboard API**: Improved Manager/Director dashboard endpoints with role-specific data
 - **Real-time Notifications**: Telegram/Brevo integration for flagged attendance alerts
 - **Admin Analytics**: Company-wide insights and user management
 - **Flexible Absent Handling**: Users marked absent can check in later and update their status
 - **Enterprise-Grade Security**: JWT authentication with HTTP-only cookies and bcrypt password hashing
 - **Enhanced Holiday Management**: Automatic Sunday holidays and custom holiday declarations
 - **Birthday Notification System**: Daily birthday alerts with celebration banners
-- **Advanced Flagged Attendance**: Detailed reasons with distance reporting
-- **Persistent Login Sessions**: "Remember Me" functionality for extended sessions
+- **Advanced Flagged Attendance**: Detailed reasons with precise distance reporting
+- **Persistent Login Sessions**: 90-day token expiration with automatic refresh
 - **Industrial-Grade Rate Limiting**: Redis-based distributed rate limiting for scalability
 - **Distributed Caching**: Redis caching for improved performance
 - **Database Connection Pooling**: Optimized database connections for better resource utilization
@@ -28,7 +28,7 @@ This is the backend API for the Geo-Fence Attendance Management System (SAMS) v2
 
 - **Node.js with Express.js**: High-performance backend framework
 - **MongoDB with Mongoose**: NoSQL database with ODM for data modeling
-- **JWT for authentication**: Secure token-based authentication
+- **JWT for authentication**: Secure token-based authentication (90-day expiration with auto-refresh)
 - **bcrypt for password hashing**: Industry-standard password encryption
 - **ExcelJS for report generation**: Professional CSV/Excel report exports
 - **node-cron for scheduled jobs**: Automated daily attendance processing
@@ -41,26 +41,26 @@ This is the backend API for the Geo-Fence Attendance Management System (SAMS) v2
 
 ## Setup
 
-1. Install dependencies:
+1. **Install dependencies:**
 
    ```bash
    npm install
    ```
 
-2. Install Redis:
+2. **Install Redis:**
    - **On macOS**: `brew install redis`
    - **On Ubuntu/Debian**: `sudo apt-get install redis-server`
    - **Using Docker**: `docker run -d -p 6379:6379 redis`
 
-3. Create a `.env` file based on `.env.example`:
+3. **Create a `.env` file based on `.env.example`:**
 
    ```bash
    cp .env.example .env
    ```
 
-4. Update the environment variables in `.env` with your configurations, including Redis settings.
+4. **Update the environment variables in `.env` with your configurations, including Redis settings.**
 
-5. Start the development server with Redis:
+5. **Start the development server with Redis:**
    ```bash
    npm run start:dev
    ```
@@ -93,7 +93,7 @@ This version introduces significant enhancements and new features:
 - **Improved Attendance Rules**: Updated time thresholds and flexible attendance marking
 - **Advanced Holiday Management**: Automatic Sunday holidays and custom holiday declarations
 - **Detailed Reporting**: Enhanced CSV/Excel reports with branch and distance information
-- **Persistent Login Sessions**: "Remember Me" functionality for extended sessions
+- **Persistent Login Sessions**: 90-day token expiration with automatic refresh (seamless user experience)
 
 ### Technical Improvements
 
@@ -101,6 +101,7 @@ This version introduces significant enhancements and new features:
 - **Better Performance**: Optimized queries and caching mechanisms
 - **Scalable Architecture**: Ready for horizontal scaling with Redis
 - **Zero-Cost Deployment**: Still compatible with free tiers of cloud services
+- **Token Management**: Centralized token utilities for consistent token handling
 
 See [New Features Documentation](../DOCS/NEW_FEATURES.md) for detailed information.
 
@@ -130,21 +131,25 @@ REDIS_PASSWORD=
 
 **Note**: The modern REDIS_URL approach is recommended for production deployments as it's the standard used by all major Redis providers.
 
+**Important**: Redis is used **only** for rate limiting and caching. It does NOT store session data. Sessions are stateless using JWT tokens in HTTP-only cookies.
+
+**Verification**: This has been verified and confirmed - Redis is correctly used only for rate limiting counters, not for session storage.
+
 ## Testing
 
 1. Make sure MongoDB is running or set the `MONGO_URI` environment variable in your `.env` file.
 
-2. Run all tests:
+2. **Run all tests:**
    ```bash
    npm test
    ```
 
-3. Run tests in watch mode:
+3. **Run tests in watch mode:**
    ```bash
    npm run test:watch
    ```
 
-4. Test Redis configuration:
+4. **Test Redis configuration:**
    ```bash
    npm run test:redis
    ```
@@ -162,8 +167,8 @@ The test files will automatically use the `MONGO_URI` from your `.env` file, or 
 
 ### Attendance
 
-- `POST /api/attendance/checkin` - Check in with location
-- `POST /api/attendance/checkout` - Check out with location
+- `POST /api/attendance/checkin` - Check in with location and branch
+- `POST /api/attendance/checkout` - Check out with location and branch
 - `GET /api/attendance/me` - Get personal attendance history
 - `GET /api/attendance/today` - Get today's attendance status
 - `GET /api/attendance/team` - Get team attendance (manager only)
@@ -183,6 +188,8 @@ The test files will automatically use the `MONGO_URI` from your `.env` file, or 
 - `GET /api/manager/team/flagged` - Get flagged records
 - `GET /api/manager/team/leaves` - Get team leave requests
 - `PUT /api/manager/leaves/:id` - Approve/reject leave request
+- `GET /api/manager/dashboard/stats` - Get dashboard statistics
+- `GET /api/manager/team/members` - Get team members with profile data
 
 ### Reports
 
@@ -213,6 +220,24 @@ The test files will automatically use the `MONGO_URI` from your `.env` file, or 
 ## Environment Variables
 
 See `.env.example` for all required environment variables, including Redis configuration.
+
+### Required Variables
+
+- `MONGO_URI` - MongoDB connection string
+- `JWT_SECRET` - Secret key for JWT token signing
+- `PORT` - Server port (default: 5000)
+- `FRONTEND_URL` - Frontend URL for CORS
+- `REDIS_URL` - Redis connection URL (or use REDIS_HOST/PORT)
+
+### Optional Variables
+
+- `BCRYPT_SALT_ROUNDS` - Password hashing rounds (default: 10)
+- `OFFICE_DEFAULT_LAT` - Default office latitude
+- `OFFICE_DEFAULT_LNG` - Default office longitude
+- `OFFICE_DEFAULT_RADIUS` - Default geofence radius in meters
+- `ADMIN_INIT_EMAIL` - Initial admin email
+- `ADMIN_INIT_PASSWORD` - Initial admin password
+- `RUN_CRON` - Controls cron execution (`true` to run cron jobs; set `true` on Render, `false` on Cloud Run`)
 
 ## New Features Implementation Status
 
@@ -245,16 +270,17 @@ See `.env.example` for all required environment variables, including Redis confi
 - Distance included in CSV/Excel reports and manager dashboard
 
 ### ✅ Persistent Login Sessions
-- Added "Remember Me" functionality for extended session duration
-- Users can choose between 24-hour (default) or 30-day sessions
-- Backend supports the rememberMe parameter in login requests
-- Cookie expiration time dynamically adjusted based on user preference
+- 90-day token expiration for extended sessions
+- Automatic token refresh when token is older than 30 days
+- Seamless user experience with no forced logouts
+- Token utilities centralized in `src/utils/tokenUtils.js`
 
 ### ✅ Industrial-Grade Rate Limiting
 - Implemented Redis-based distributed rate limiting
 - Per-user rate limiting using JWT user IDs
 - Granular limits based on endpoint sensitivity
 - Sliding window log algorithm for accuracy
+- Fail-open strategy (allows requests if Redis unavailable)
 
 ### ✅ Distributed Caching
 - Redis-based caching for high-traffic endpoints
@@ -281,9 +307,10 @@ See `.env.example` for all required environment variables, including Redis confi
 ### ✅ Security & Reliability
 - **Secure Authentication**: JWT tokens with HTTP-only cookies and bcrypt password hashing
 - **Input Validation**: Zod schemas for request validation
-- **Rate Limiting**: Protection against brute force attacks
+- **Rate Limiting**: Redis-based protection against brute force attacks
 - **CORS Protection**: Whitelist-based cross-origin resource sharing
 - **Data Sanitization**: Protection against NoSQL injection attacks
+- **Token Management**: Centralized token utilities for consistent handling
 
 ### ✅ Database & Infrastructure
 - **Scalable Architecture**: MongoDB with proper indexing for performance
@@ -291,15 +318,46 @@ See `.env.example` for all required environment variables, including Redis confi
 - **Comprehensive Testing**: 35+ unit tests covering all new functionality
 - **Proper Error Handling**: Graceful error responses with detailed logging
 - **Connection Pooling**: Optimized database connections with pooling
+- **Redis Integration**: Distributed rate limiting and caching
 
-### ✅ Recent Database Seeding
-Successfully seeded database with:
-- **2 Branches**: Old Office (26.913662872166825, 80.95341830268484) and New Office (26.914835918849107, 80.94982919387432)
-- **5 Users**: 
-  - Director: LIM Rao (LRMC001)
-  - Manager: Vikhas Gupta (LRMC002)
-  - Employees: Uday Singh (LRMC003), Simhachalam M (LRMC004), Haneef Sd (LRMC005)
-- **All Login Tests Passing**: Verified successful authentication for all users
+## Scripts
+
+### Development
+- `npm run dev` - Start development server with nodemon
+- `npm run start:dev` - Start Redis and backend together
+- `npm start` - Start production server
+
+### Database
+- `npm run init-db` - Initialize database with default users
+- `npm run fix-passwords` - Fix user passwords
+- `npm run bulk-checkout` - Bulk checkout script
+- `npm run diagnose-attendance` - Diagnose attendance issues
+
+### Testing
+- `npm test` - Run all tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:redis` - Test Redis connection
+
+### Utilities
+- `npm run clear-auth-cache` - Clear Redis authentication cache
+- `npm run test-persistent-login` - Test persistent login functionality
+
+## Recent Fixes and Improvements
+
+### Frontend Fixes (v2.0)
+- ✅ Fixed ReferenceError in Dashboard component (function hoisting)
+- ✅ Reduced API calls by ~60% through request deduplication
+- ✅ Fixed service worker double refresh in development
+- ✅ Improved geolocation robustness with progressive fallback
+- ✅ Fixed debounce implementation (custom solution)
+- ✅ Optimized token validation (single validation on app load)
+
+### Backend Status
+- ✅ Token management working correctly (90-day expiration with auto-refresh)
+- ✅ Redis usage verified (only for rate limiting, not sessions)
+- ✅ All core functionality tested and verified
+
+See [Recent Fixes Documentation](../DOCS/RECENT_FIXES.md) for detailed information.
 
 ## Future Improvements
 
@@ -307,11 +365,13 @@ Successfully seeded database with:
 - **Background Jobs**: Move heavy processing to background workers
 - **Pagination**: Implement pagination for large dataset responses
 - **Advanced Caching**: Write-through caching for frequently updated data
+- **Query Optimization**: Further optimize database queries
 
 ### 🛡️ Advanced Security Features
 - **Two-Factor Authentication**: Add 2FA support for enhanced security
 - **Session Management**: Implement session tracking and invalidation
 - **Audit Logging**: Detailed logs for all user actions
+- **Endpoint-Specific Rate Limiting**: Granular rate limiting based on endpoint sensitivity
 
 ### 📊 Enhanced Analytics & Reporting
 - **Real-time Dashboards**: Live attendance monitoring with WebSocket updates
@@ -320,10 +380,10 @@ Successfully seeded database with:
 - **Data Visualization**: Interactive charts and graphs for better data interpretation
 
 ### 🌐 Mobile & Accessibility Improvements
-- **Progressive Web App**: Make the frontend a PWA for mobile device support
+- **Progressive Web App**: Full PWA support for mobile device support
 - **Offline Support**: Cache critical data for offline functionality
 - **Accessibility Compliance**: WCAG 2.1 AA compliance for better accessibility
-- **Mobile-First Design**: Optimize UI for mobile devices
+- **Mobile-First Design**: Optimize API responses for mobile devices
 
 ### 🔄 Process Automation
 - **Intelligent Notifications**: Smart notification system based on user preferences
@@ -332,16 +392,10 @@ Successfully seeded database with:
 - **Workflow Automation**: Automated approval workflows for leaves and other requests
 
 ### 🧪 Advanced Testing & Monitoring
-- **End-to-End Testing**: Implement Cypress or Playwright for frontend testing
+- **End-to-End Testing**: Implement comprehensive API testing
 - **Performance Monitoring**: Add Application Performance Monitoring (APM) tools
 - **Error Tracking**: Integrate Sentry or similar error tracking services
 - **Load Testing**: Regular load testing to ensure scalability
-
-### 🎨 UI/UX Enhancements
-- **Dark Mode**: Implement dark/light theme switching
-- **Customizable Dashboard**: Allow users to customize their dashboard layouts
-- **Improved User Onboarding**: Guided tours and tooltips for new users
-- **Enhanced Data Entry**: Better forms with real-time validation and suggestions
 
 ## Deployment Roadmap
 
@@ -352,11 +406,13 @@ Successfully seeded database with:
 - ✅ Zero-cost deployment ready
 - ✅ Industrial-grade rate limiting and caching implemented
 - ✅ Enhanced dashboard API endpoints
+- ✅ Token management system
 
 ### Phase 2: Short-term Improvements
 - [ ] Add comprehensive error tracking
 - [ ] Enhance security with 2FA
-- [ ] Improve mobile responsiveness
+- [ ] Improve API response times
+- [ ] Add API documentation (Swagger/OpenAPI)
 
 ### Phase 3: Long-term Enhancements
 - [ ] Real-time dashboards with WebSocket

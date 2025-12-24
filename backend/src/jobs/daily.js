@@ -12,8 +12,10 @@ function isSunday(dateString) {
   return date.getDay() === 0;
 }
 
-// Mark absentees at 11:00 AM daily
-cron.schedule('0 11 * * *', async () => {
+// Start daily cron jobs
+function startDailyJob() {
+  // Mark absentees at 11:00 AM daily
+  cron.schedule('0 11 * * *', async () => {
   try {
     logger.info('Running daily absentee marking job...');
 
@@ -113,10 +115,10 @@ cron.schedule('0 11 * * *', async () => {
   } catch (error) {
     logger.error('Daily absentee marking job error:', error);
   }
-});
+  });
 
-// Send daily summary at 6:30 PM
-cron.schedule('30 18 * * *', async () => {
+  // Send daily summary at 6:30 PM
+  cron.schedule('30 18 * * *', async () => {
   try {
     logger.info('Running daily summary job...');
 
@@ -201,6 +203,11 @@ cron.schedule('30 18 * * *', async () => {
   } catch (error) {
     logger.error('Daily summary job error:', error);
   }
-});
+  });
 
-logger.info('Daily cron jobs initialized');
+  logger.info('Daily cron jobs initialized');
+}
+
+module.exports = {
+  startDailyJob
+};

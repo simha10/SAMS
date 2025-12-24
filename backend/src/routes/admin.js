@@ -5,13 +5,13 @@ const {
   updateUser,
   exportAttendance
 } = require('../controllers/adminController');
-const { authMiddleware, adminOnly } = require('../middelwares/auth');
+const { protect, restrictTo } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All admin routes require authentication and admin role
-router.use(authMiddleware);
-router.use(adminOnly);
+// All admin routes require authentication and director role
+router.use(protect);
+router.use(restrictTo('director'));
 
 // Analytics
 router.get('/insights', getInsights);

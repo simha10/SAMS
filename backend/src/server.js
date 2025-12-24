@@ -1,12 +1,11 @@
 const mongoose = require('mongoose');
 const app = require('./App.js');
 const { connectRedis, disconnectRedis } = require('./config/redis');
+const { startCrons } = require('./jobs/startCrons');
 require('dotenv').config();
 
-// Initialize cron jobs
-require('./jobs/daily');
-require('./jobs/autoCheckout');
-require('./jobs/birthdayNotifications');
+// Initialize cron jobs (controlled by RUN_CRON environment variable)
+startCrons();
 
 console.log("=== SERVER STARTUP ===");
 console.log("Environment:", process.env.NODE_ENV || 'development');
