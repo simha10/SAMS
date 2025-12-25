@@ -2,8 +2,10 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Load environment variables only when PLATFORM is not 'gcp'
+if (process.env.PLATFORM !== 'gcp') {
+    dotenv.config({ path: path.resolve(__dirname, '../.env') });
+}
 
 // Import models
 const Attendance = require('../src/models/Attendance');

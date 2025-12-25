@@ -6,14 +6,23 @@
  */
 
 const redis = require('redis');
-require('dotenv').config();
+
+// Load environment variables only when PLATFORM is not 'gcp'
+if (process.env.PLATFORM !== 'gcp') {
+    require('dotenv').config();
+}
 
 async function clearRedisSessions() {
   console.log('=== CLEARING REDIS SESSION DATA ===');
   
-  // Create Redis client
+  // Create Redis client using split configuration (same as main Redis setup)
   const client = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379'
+    username: process.env.REDIS_USERNAME || 'default',
+    password: process.env.REDIS_PASSWORD,
+    socket: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT) || 6379
+    }
   });
   
   try {

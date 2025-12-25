@@ -2,7 +2,11 @@ const mongoose = require('mongoose');
 const app = require('./App.js');
 const { connectRedis, disconnectRedis } = require('./config/redis');
 const { startCrons } = require('./jobs/startCrons');
-require('dotenv').config();
+
+// Load environment variables only when PLATFORM is not 'gcp'
+if (process.env.PLATFORM !== 'gcp') {
+    require('dotenv').config();
+}
 
 // Initialize cron jobs (controlled by RUN_CRON environment variable)
 startCrons();

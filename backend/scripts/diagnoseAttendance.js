@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 
-// Load environment variables
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config();
+// Load environment variables only when PLATFORM is not 'gcp'
+if (process.env.PLATFORM !== 'gcp') {
+    dotenv.config();
 }
 
 // Import models

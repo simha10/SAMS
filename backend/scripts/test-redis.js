@@ -4,16 +4,12 @@ async function testRedis() {
     try {
         console.log('=== REDIS CONFIGURATION TEST ===');
 
-        // Display current configuration approach
-        if (process.env.REDIS_URL) {
-            console.log('🔧 Using REDIS_URL configuration');
-            console.log('🔗 URL:', process.env.REDIS_URL.replace(/:[^:@]+@/, ':***@')); // Hide password
-        } else {
-            console.log('🔧 Using legacy configuration');
-            console.log('🖥️  Host:', process.env.REDIS_HOST || '127.0.0.1');
-            console.log('🔌 Port:', process.env.REDIS_PORT || 6379);
-            console.log('🔐 Password:', process.env.REDIS_PASSWORD ? '***' : 'Not set');
-        }
+        // Display current Redis configuration
+        console.log('🔧 Using split Redis configuration');
+        console.log('🖥️  Host:', process.env.REDIS_HOST || 'NOT SET');
+        console.log('🔌 Port:', process.env.REDIS_PORT || 'NOT SET');
+        console.log('👤 Username:', process.env.REDIS_USERNAME || 'NOT SET');
+        console.log('🔐 Password:', process.env.REDIS_PASSWORD ? '***' : 'NOT SET');
 
         // Connect to Redis
         await connectRedis();
@@ -93,10 +89,7 @@ async function testRedis() {
         console.log('\n🎉 All Redis tests passed!');
         console.log('✅ Redis is properly configured and ready for use');
 
-        if (!process.env.REDIS_URL) {
-            console.log('\n💡 Recommendation: Consider migrating to REDIS_URL for production deployments');
-            console.log('   Set REDIS_URL=redis://default:<password>@<host>:<port> in your environment');
-        }
+        console.log('\n💡 Redis is configured using split environment variables (REDIS_HOST, REDIS_PORT, etc.)');
 
         process.exit(0);
     } catch (error) {

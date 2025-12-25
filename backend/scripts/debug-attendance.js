@@ -1,4 +1,7 @@
-require('dotenv').config();
+// Load environment variables only when PLATFORM is not 'gcp'
+if (process.env.PLATFORM !== 'gcp') {
+    require('dotenv').config();
+}
 const mongoose = require('mongoose');
 const Attendance = require('../src/models/Attendance');
 const User = require('../src/models/User');

@@ -1,4 +1,7 @@
-require('dotenv').config({ path: __dirname + '/../.env' });
+// Load environment variables only when PLATFORM is not 'gcp'
+if (process.env.PLATFORM !== 'gcp') {
+    require('dotenv').config({ path: __dirname + '/../.env' });
+}
 const mongoose = require('mongoose');
 const User = require('../src/models/User');
 

@@ -57,3 +57,5 @@ dev-dist/registerSW.js
 dist/**
 
 TODO.md
+
+GCP_commands.md

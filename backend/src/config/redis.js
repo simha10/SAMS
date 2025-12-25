@@ -1,28 +1,22 @@
 const redis = require('redis');
 const logger = require('./logger');
 
-// Load environment variables directly in this module to ensure they're available
-require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+// Load environment variables only when PLATFORM is not 'gcp'
+if (process.env.PLATFORM !== 'gcp') {
+    require('dotenv').config();
+}
 
 // Build Redis configuration from environment variables
 const getRedisConfig = () => {
-    // Log environment variables for debugging
+    // Log environment variable availability for debugging (without exposing secrets)
     logger.info('Checking Redis configuration:');
-    logger.info(`REDIS_URL: ${process.env.REDIS_URL ? 'SET' : 'NOT SET'}`);
+    logger.info(`PLATFORM: ${process.env.PLATFORM || 'NOT SET'}`);
     logger.info(`REDIS_HOST: ${process.env.REDIS_HOST ? 'SET' : 'NOT SET'}`);
     logger.info(`REDIS_PORT: ${process.env.REDIS_PORT ? 'SET' : 'NOT SET'}`);
     logger.info(`REDIS_USERNAME: ${process.env.REDIS_USERNAME ? 'SET' : 'NOT SET'}`);
     logger.info(`REDIS_PASSWORD: ${process.env.REDIS_PASSWORD ? 'SET' : 'NOT SET'}`);
 
-    // If REDIS_URL is provided, parse it and use modern configuration
-    if (process.env.REDIS_URL) {
-        logger.info('Using REDIS_URL for connection');
-        return {
-            url: process.env.REDIS_URL
-        };
-    }
-
-    // Fallback: Parse individual components if REDIS_URL is not provided
+    // Use only split Redis configuration (no REDIS_URL support)
     if (process.env.REDIS_HOST) {
         logger.info('Using individual Redis configuration parameters');
         return {
