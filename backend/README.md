@@ -105,6 +105,106 @@ This version introduces significant enhancements and new features:
 
 See [New Features Documentation](../DOCS/NEW_FEATURES.md) for detailed information.
 
+## Production Deployment Settings
+
+### Google Cloud Run Deployment
+
+The backend is now fully compatible with Google Cloud Run for containerized deployment:
+
+- **Docker Support**: Production-ready Dockerfile included
+- **Environment Control**: Cron jobs controlled via `RUN_CRON` environment variable
+  - `RUN_CRON=true`: Cron jobs run (for Render deployment)
+  - `RUN_CRON=false`: Cron jobs disabled (for Cloud Run deployment)
+- **Stateless Architecture**: Designed for horizontal scaling
+- **Cloud Build Integration**: Automated CI/CD via cloudbuild.yaml
+- **Artifact Registry**: Images pushed to Google Cloud Artifact Registry
+
+### Required Production Environment Variables
+
+```env
+# Server Configuration
+NODE_ENV=production
+PORT=8080
+
+# Database Configuration
+MONGO_URI=your-mongodb-atlas-connection-string
+
+# Authentication
+JWT_SECRET=your-secure-jwt-secret
+
+# Frontend URL (for CORS)
+FRONTEND_URL=https://your-frontend-domain.com
+
+# Redis Configuration (for rate limiting)
+REDIS_URL=rediss://default:your-password@your-redis-host:port
+
+# Cron Job Control
+RUN_CRON=false  # Set to 'true' for Render, 'false' for Cloud Run
+```
+
+### Docker Deployment
+
+1. **Build the image**:
+   ```bash
+   docker build -t sams-backend .
+   ```
+
+2. **Run with environment variables**:
+   ```bash
+   docker run -p 8080:8080 \\
+     -e NODE_ENV=production \\
+     -e PORT=8080 \\
+     -e MONGO_URI=your-mongo-uri \\
+     -e JWT_SECRET=your-jwt-secret \\
+     -e FRONTEND_URL=your-frontend-url \\
+     -e REDIS_URL=your-redis-url \\
+     -e RUN_CRON=true \\
+     sams-backend
+   ```
+
+### Cloud Run Deployment via gcloud CLI
+
+```bash
+# Deploy to Cloud Run
+gcloud run deploy sams-backend \\
+  --image asia-south1-docker.pkg.dev/your-project-id/sams-backend-repo/sams-backend:latest \\
+  --platform managed \\
+  --region asia-south1 \\
+  --port 8080 \\
+  --set-env-vars NODE_ENV=production,RUN_CRON=false,MONGO_URI=your-mongo-uri,JWT_SECRET=your-jwt-secret,FRONTEND_URL=your-frontend-url,REDIS_URL=your-redis-url
+```
+
+### CI/CD Pipeline
+
+The system includes automated build and deployment configuration:
+
+- **Cloud Build**: Automatically builds Docker images on git pushes
+- **Artifact Registry**: Stores container images securely
+- **Environment-specific cron control**: Prevents duplicate job execution in scaled environments
+
+### Security Best Practices
+
+- **JWT Tokens**: HTTP-only cookies for secure authentication
+- **Rate Limiting**: Redis-based distributed rate limiting
+- **Input Validation**: Comprehensive request validation
+- **CORS Protection**: Whitelist-based cross-origin security
+- **Secure Headers**: Helmet.js for HTTP security headers
+
+### Monitoring and Logging
+
+- **Winston**: Comprehensive application logging
+- **Cron Job Monitoring**: Standardized logging patterns for scheduled tasks
+- **Request Logging**: Detailed request/response logging for debugging
+- **Error Tracking**: Structured error logging with context
+
+### Performance Optimizations
+
+- **Connection Pooling**: Optimized MongoDB connection handling
+- **Redis Caching**: Distributed caching for frequently accessed data
+- **Rate Limiting**: Efficient sliding window algorithm
+- **Optimized Queries**: Indexed database operations
+- **Memory Management**: Proper resource cleanup and garbage collection
+
 ## Redis Configuration
 
 The system now supports both legacy and modern Redis configuration approaches:
