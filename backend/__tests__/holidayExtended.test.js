@@ -6,11 +6,17 @@ describe('Holiday Model Extended Features', () => {
     let user;
 
     beforeAll(async () => {
-        const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/test';
-        await mongoose.connect(mongoUri, {
+        const mongoUri = process.env.MONGO_URI?.trim() || 'mongodb://localhost:27017/test';
+        
+        if (!mongoUri) {
+          throw new Error('MONGO_URI is missing or empty at runtime');
+        }
+        
+        await mongoose
+          .connect(mongoUri, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
-        });
+          });
 
         // Create a test user for createdBy field
         user = new User({

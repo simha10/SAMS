@@ -3,11 +3,17 @@ const User = require('../src/models/User');
 
 describe('User Model Updates', () => {
     beforeAll(async () => {
-        const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/test';
-        await mongoose.connect(mongoUri, {
+        const mongoUri = process.env.MONGO_URI?.trim() || 'mongodb://localhost:27017/test';
+        
+        if (!mongoUri) {
+          throw new Error('MONGO_URI is missing or empty at runtime');
+        }
+        
+        await mongoose
+          .connect(mongoUri, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
-        });
+          });
     });
 
     afterAll(async () => {

@@ -20,14 +20,19 @@ console.log("Frontend URL:", process.env.FRONTEND_URL || 'http://localhost:5173'
 console.log("=== END SERVER STARTUP ===");
 
 // Connect to MongoDB
-console.log(
-  'MONGO_URI starts with:',
-  process.env.MONGO_URI?.slice(0, 15)
-);
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+const mongoUri = process.env.MONGO_URI?.trim();
+
+if (!mongoUri) {
+  throw new Error('MONGO_URI is missing or empty at runtime');
+}
+
+console.log('MONGO_URI starts with:', mongoUri.slice(0, 15));
+
+mongoose
+  .connect(mongoUri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(() => {
     console.log('=== MONGODB CONNECTED ===');
     console.log('MongoDB connected successfully');

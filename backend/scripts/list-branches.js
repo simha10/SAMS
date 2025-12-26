@@ -13,10 +13,17 @@ async function listBranches() {
             throw new Error('MONGO_URI environment variable is not set');
         }
 
-        await mongoose.connect(process.env.MONGO_URI, {
+        const mongoUri = process.env.MONGO_URI?.trim();
+
+        if (!mongoUri) {
+          throw new Error('MONGO_URI is missing or empty at runtime');
+        }
+
+        await mongoose
+          .connect(mongoUri, {
             retryWrites: true,
             w: 'majority',
-        });
+          });
 
         console.log('Connected to MongoDB\n');
 

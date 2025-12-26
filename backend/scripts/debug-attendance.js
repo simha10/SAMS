@@ -7,7 +7,7 @@ const Attendance = require('../src/models/Attendance');
 const User = require('../src/models/User');
 
 // MongoDB connection
-const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/sams';
+const mongoUri = process.env.MONGO_URI?.trim() || 'mongodb://localhost:27017/sams';
 console.log('Connecting to MongoDB:', mongoUri);
 
 async function debugAttendance() {

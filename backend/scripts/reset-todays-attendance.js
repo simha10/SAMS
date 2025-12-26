@@ -14,10 +14,17 @@ const User = require('../src/models/User');
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    const mongoUri = process.env.MONGO_URI?.trim();
+
+    if (!mongoUri) {
+      throw new Error('MONGO_URI is missing or empty at runtime');
+    }
+
+    const conn = await mongoose
+      .connect(mongoUri, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
