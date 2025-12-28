@@ -50,8 +50,7 @@ if (!mongoUri) {
 
   mongoose
     .connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
     })
     .then(() => {
       console.log('=== MONGODB CONNECTED ===');
@@ -61,6 +60,8 @@ if (!mongoUri) {
     .catch((err) => {
       console.error('=== MONGODB CONNECTION ERROR ===');
       console.error('MongoDB connection error:', err);
+      console.error('Error code:', err.code || 'N/A');
+      console.error('Error name:', err.name || 'N/A');
       console.error('=== END MONGODB CONNECTION ERROR ===');
       
       // Don't exit immediately - allow health check to work
