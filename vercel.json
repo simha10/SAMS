@@ -1,8 +1,8 @@
 {
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/((?!assets/|favicon.ico|manifest.webmanifest|robots.txt).*)",
+      "destination": "/index.html"
     }
   ]
 }
