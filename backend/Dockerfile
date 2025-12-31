@@ -10,7 +10,6 @@ RUN npm ci --only=production --no-audit --no-fund
 
 # Copy backend source
 COPY src ./src
-COPY scripts ./scripts
 
 # Cloud Run standard port
 EXPOSE 8080

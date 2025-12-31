@@ -29,7 +29,7 @@ node_modules/
 
 # Ignore .env file in any directory
 .env
-
+.env.production
 # Ignore all .log files in any directory
 **/*.log
 
@@ -60,3 +60,4 @@ TODO.md
 
 GCP_commands.md
 errors.md
+backend/exports

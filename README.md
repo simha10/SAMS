@@ -216,7 +216,25 @@ pnpm run lint
 
 ## 🚀 Deployment
 
-### Backend Deployment (Render)
+### Backend Deployment (Google Cloud Run)
+
+1. Create a Google Cloud Project
+2. Enable required APIs (Cloud Run, Cloud Build, Artifact Registry, Secret Manager)
+3. Set up Secret Manager for sensitive environment variables (MONGO_URI, JWT_SECRET, REDIS_URL, FRONTEND_URL)
+4. Configure Cloud Build with the provided `cloudbuild.yaml`
+5. Deploy using gcloud CLI or Console:
+   ```bash
+   gcloud run deploy sams-backend \
+     --image asia-south1-docker.pkg.dev/your-project-id/sams-backend-repo/sams-backend:latest \
+     --platform managed \
+     --region asia-south1 \
+     --port 8080 \
+     --set-env-vars NODE_ENV=production,RUN_CRON=false \
+     --set-secrets MONGO_URI=MONGO_URI:latest,JWT_SECRET=JWT_SECRET:latest,REDIS_URL=REDIS_URL:latest,FRONTEND_URL=FRONTEND_URL:latest \
+     --allow-unauthenticated
+   ```
+
+### Backend Deployment (Alternative - Render)
 
 1. Create Web Service on Render
 2. Connect GitHub repository
@@ -224,11 +242,7 @@ pnpm run lint
    - Build Command: `cd backend && npm install`
    - Start Command: `cd backend && npm start`
 4. Set Environment Variables in Render dashboard (including Redis URL)
-5. Add Scheduled Job (optional):
-   - Command: `cd backend && node -e "require('./src/jobs/daily.js')"`
-   - Schedule: `0 11 * * *` (11 AM daily)
-
-### Frontend Deployment (Vercel)
+5. Set `RUN_CRON=true` to enable cron jobs on Render
 
 1. Connect GitHub repository to Vercel
 2. Configure Build Settings:
@@ -417,6 +431,7 @@ Comprehensive documentation is available in the `DOCS/` folder:
 - [Performance Optimizations](DOCS/PERFORMANCE.md) - Performance improvements and best practices
 - [Geolocation Implementation](DOCS/GEOLOCATION.md) - Geolocation system details
 - [Troubleshooting Guide](DOCS/TROUBLESHOOTING.md) - Common issues and solutions
+- [GCP Deployment Guide](DOCS/GCP_DEPLOYMENT_GUIDE.md) - Complete guide for deploying to Google Cloud Platform
 
 ## 🗺️ Development Roadmap
 
