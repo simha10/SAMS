@@ -30,6 +30,11 @@ export default defineConfig({
             src: 'public/logo192.png',
             sizes: '192x192',
             type: 'image/png'
+          },
+          {
+            src: 'public/logo512.png',
+            sizes: '512x512',
+            type: 'image/png'
           }
         ],
         start_url: '/',
@@ -47,8 +52,23 @@ export default defineConfig({
         // Disable runtime caching in development to prevent double refresh
         runtimeCaching: process.env.NODE_ENV === 'development' ? [] : [
           {
-            urlPattern: /^http.*\/api\/auth\/.*$/,
-            handler: 'NetworkOnly', // Never cache auth endpoints
+            urlPattern: /^http.*\/api\/auth\/me$/,
+            handler: 'NetworkFirst', // Cache profile validation with short TTL
+            options: {
+              cacheName: 'auth-validation',
+              networkTimeoutSeconds: 5,
+              expiration: {
+                maxEntries: 1,
+                maxAgeSeconds: 30, // 30 seconds for validation
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: /^http.*\/api\/auth\/(?!me).*$/,
+            handler: 'NetworkOnly', // Never cache login/logout endpoints
             options: {
               cacheName: 'auth-endpoints',
             },
@@ -98,14 +118,17 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /^http.*\/api\/.*$/,
+            urlPattern: /^http.*\/api\/(?!auth\/|attendance\/checkin|attendance\/checkout).*$/,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-responses',
               networkTimeoutSeconds: 5,
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 30, // 30 seconds
+                maxAgeSeconds: 60, // 60 seconds for safe reads
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },

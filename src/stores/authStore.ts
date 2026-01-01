@@ -24,9 +24,11 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isOfflineAuthenticated: boolean;
   login: (user: User) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
+  setIsOfflineAuthenticated: (value: boolean) => void;
   setUser: (user: User | null) => void;
   // Add a method to validate current user session
   validateCurrentUser: (currentUser: User | null) => boolean;
@@ -38,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      isOfflineAuthenticated: false,
       login: (user: User) => {
         console.log("=== AUTH STORE LOGIN ===");
         console.log("User:", user);
@@ -102,6 +105,14 @@ export const useAuthStore = create<AuthState>()(
         console.log("Auth store updated:", { user });
         console.log("=== END AUTH STORE SET USER ===");
       },
+      setIsOfflineAuthenticated: (value: boolean) => {
+        console.log("=== AUTH STORE SET OFFLINE AUTHENTICATED ===");
+        console.log("Value:", value);
+        console.log("Timestamp:", new Date().toISOString());
+        set({ isOfflineAuthenticated: value });
+        console.log("Auth store updated:", { isOfflineAuthenticated: value });
+        console.log("=== END AUTH STORE SET OFFLINE AUTHENTICATED ===");
+      },
       // Method to validate if the current user data is still valid
       validateCurrentUser: (currentUser: User | null): boolean => {
         // If there's no current user, it's not valid
@@ -126,7 +137,8 @@ export const useAuthStore = create<AuthState>()(
       storage: createJSONStorage(() => localStorage), // Use localStorage instead of sessionStorage
       partialize: (state) => ({
         user: state.user,
-        isAuthenticated: state.isAuthenticated
+        isAuthenticated: state.isAuthenticated,
+        isOfflineAuthenticated: state.isOfflineAuthenticated
       }),
       onRehydrateStorage: () => {
         console.log("=== AUTH STORE REHYDRATION START ===");

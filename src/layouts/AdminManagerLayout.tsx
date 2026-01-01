@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import { useAnnouncementModal } from "@/hooks/useAnnouncementModal";
+import OfflineIndicator from "@/components/OfflineIndicator";
 
 export default function AdminManagerLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -66,6 +67,9 @@ export default function AdminManagerLayout() {
         onClose={closeModal}
         announcement={latestAnnouncement}
       />
+      
+      {/* Offline Indicator */}
+      <OfflineIndicator />
       
       {/* Fixed sidebar - always on left */}
       <div className="fixed left-0 top-0 h-full z-50">

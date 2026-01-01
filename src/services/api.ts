@@ -111,22 +111,31 @@ api.interceptors.response.use(
       if (loadingTimeout) clearTimeout(loadingTimeout);
       hideLoadingState();
       
-      // If we get a 401 and we're not on the login page, redirect to login
-      // But only if we're not in initialization phase
-      if (!isInitializing && error.response?.status === 401 && window.location.pathname !== '/login') {
-        // Clear auth state
-        localStorage.removeItem('auth-storage');
-        sessionStorage.removeItem('auth-storage');
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
-        // Clear all cookies
-        document.cookie.split(";").forEach((c) => {
-          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-        });
-        // Redirect to login after a small delay to allow error handling
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
+      // Check if this is a network error (no response) or auth error (401/403)
+      if (error.response) {
+        // Server responded with error status
+        const status = error.response.status;
+        
+        // If we get a 401 and we're not on the login page, redirect to login
+        // But only if we're not in initialization phase
+        if (!isInitializing && status === 401 && window.location.pathname !== '/login') {
+          // Clear auth state
+          localStorage.removeItem('auth-storage');
+          sessionStorage.removeItem('auth-storage');
+          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
+          // Clear all cookies
+          document.cookie.split(";").forEach((c) => {
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+          });
+          // Redirect to login after a small delay to allow error handling
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
+        }
+      } else {
+        // Network error (no response), don't redirect
+        console.log('Network error - connection failed:', error.message);
       }
     }
     return Promise.reject(error);
@@ -225,6 +234,38 @@ export const authAPI = {
       if (error.name === 'AbortError') {
         throw new Error('Token validation timed out');
       }
+      throw error;
+    }
+  },
+
+  // Cached version of validateToken to prevent redundant calls
+  validateTokenWithCache: async (cacheDuration: number = 30000): Promise<ApiResponse<{ user: User }>> => { // 30 seconds default
+    const cacheKey = 'token-validation-cache';
+    const cached = sessionStorage.getItem(cacheKey);
+    
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const now = Date.now();
+      
+      if (now - timestamp < cacheDuration) {
+        // Return cached data if still valid
+        return data;
+      }
+    }
+    
+    try {
+      const result = await authAPI.validateToken();
+      
+      // Cache the result
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        data: result,
+        timestamp: Date.now()
+      }));
+      
+      return result;
+    } catch (error) {
+      // If validation fails, clear the cache
+      sessionStorage.removeItem(cacheKey);
       throw error;
     }
   },

@@ -23,6 +23,7 @@ import { usePWA } from "@/hooks/usePWA";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import { useAnnouncementModal } from "@/hooks/useAnnouncementModal";
+import OfflineIndicator from "@/components/OfflineIndicator";
 
 interface SidebarItem {
   title: string;
@@ -146,13 +147,7 @@ export default function EmployeeLayout() {
       )}
 
       {/* Offline Indicator */}
-      {!isOnline && (
-        <Alert variant="destructive" className="rounded-none">
-          <AlertDescription className="text-center">
-            You are currently offline. Some features may not work.
-          </AlertDescription>
-        </Alert>
-      )}
+      <OfflineIndicator />
 
       {/* Mobile header */}
       <header className="md:hidden bg-background border-b border-border sticky top-0 z-40">
