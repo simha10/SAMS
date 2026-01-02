@@ -12,15 +12,13 @@ function isSunday(dateString) {
   return date.getDay() === 0;
 }
 
-// Start daily cron jobs
-function startDailyJob() {
-  // Mark absentees at 11:00 AM daily
-  cron.schedule('0 11 * * *', async () => {
+// Function to mark absentees - exported for cron controller
+async function markAbsenteeLogic() {
   try {
-    logger.info('Running daily absentee marking job...');
-
     const today = getCurrentDateString();
     const todayDate = new Date(today);
+
+    logger.info('Running daily absentee marking job...', { date: today });
 
     // Check if today is Sunday
     const isTodaySunday = isSunday(today);
@@ -112,23 +110,27 @@ function startDailyJob() {
 
     logger.info(`Marked ${absentees.length} employees as absent and ${leavees.length} employees as on leave for ${today}`);
 
+    return { absentees: absentees.length, onLeave: leavees.length };
   } catch (error) {
     logger.error('Daily absentee marking job error:', error);
+    throw error;
   }
-  });
+}
 
-  // Send daily summary at 6:30 PM
-  cron.schedule('30 18 * * *', async () => {
+// Function to send daily summary - exported for cron controller
+async function sendDailySummaryLogic() {
   try {
-    logger.info('Running daily summary job...');
-
     const today = getCurrentDateString();
+
+    logger.info('Running daily summary job...', { date: today });
 
     // Get all managers and directors
     const managers = await User.find({
       role: { $in: ['manager', 'director'] },
       isActive: true
     });
+
+    const summaries = [];
 
     for (const manager of managers) {
       // Get team members for this manager
@@ -196,18 +198,49 @@ function startDailyJob() {
 
       // Log summary instead of sending notification
       logger.info(`Daily summary for manager ${manager.name}:`, summaryData);
+      
+      summaries.push({
+        managerId: manager._id,
+        managerName: manager.name,
+        summary: summaryData
+      });
     }
 
-    logger.info('Daily summary job completed');
+    logger.info('Daily summary job completed', { summariesGenerated: summaries.length });
 
+    return summaries;
   } catch (error) {
     logger.error('Daily summary job error:', error);
+    throw error;
   }
+}
+
+// Start daily cron jobs
+function startDailyJob() {
+  // Mark absentees at 11:00 AM daily
+  cron.schedule('0 11 * * *', async () => {
+    try {
+      await markAbsenteeLogic();
+    } catch (error) {
+      logger.error('Daily absentee marking job error:', error);
+    }
+  });
+
+  // Send daily summary at 6:30 PM
+  cron.schedule('30 18 * * *', async () => {
+    try {
+      await sendDailySummaryLogic();
+    } catch (error) {
+      logger.error('Daily summary job error:', error);
+    }
   });
 
   logger.info('Daily cron jobs initialized');
 }
 
+
 module.exports = {
-  startDailyJob
+  startDailyJob,
+  markAbsenteeLogic,
+  sendDailySummaryLogic
 };

@@ -80,10 +80,9 @@ function toIST(date) {
  * @returns {boolean}
  */
 function isWithinOfficeHours(date = new Date()) {
-  // Convert to IST for comparison
-  const istDate = toIST(date);
-  const hour = istDate.getHours();
-  return hour >= 9 && hour < 20; // 9 AM to 8 PM IST
+  // Get the hour in IST timezone
+  const istHour = parseInt(date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }));
+  return istHour >= 9 && istHour < 20; // 9 AM to 8 PM IST
 }
 
 /**
@@ -122,6 +121,7 @@ module.exports = {
   calculateDistance,
   isWithinGeofence,
   haversine,
+  toIST,
   isWithinOfficeHours,
   isWithinAllowedAttendanceWindow,
   formatWorkingHours,

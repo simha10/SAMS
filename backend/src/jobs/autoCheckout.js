@@ -5,15 +5,9 @@ const { isWithinOfficeHours, haversine } = require('../utils/haversine');
 const logger = require('../config/logger');
 const { redisClient } = require('../config/redis');
 
-// Start auto checkout cron job
-function startAutoCheckoutJob() {
-  // Auto checkout at 11:59 PM IST
-  // Cron expression: "At 59 minutes past hour 23 (11 PM) in Asia/Kolkata timezone"
-  // This will run at 11:59 PM IST regardless of server timezone
-  cron.schedule('59 23 * * *', async () => {
+// Function to auto checkout - exported for cron controller
+async function autoCheckoutLogic() {
   try {
-    logger.info('Running auto checkout job...');
-    
     // Get today's date in IST
     const now = new Date();
     // Convert to IST (UTC+5:30)
@@ -27,7 +21,9 @@ function startAutoCheckoutJob() {
     // Get tomorrow's date in IST
     const tomorrowIST = new Date(todayIST.getTime() + 24 * 60 * 60 * 1000);
     
-    logger.info(`Checking attendance records for date range: ${todayIST.toISOString()} to ${tomorrowIST.toISOString()}`);
+    logger.info('Running auto checkout job...', {
+      dateRange: `${todayIST.toISOString()} to ${tomorrowIST.toISOString()}`
+    });
     
     // Find all users who have checked in but not checked out today (IST)
     const attendanceRecords = await Attendance.find({
@@ -122,6 +118,21 @@ function startAutoCheckoutJob() {
     
     logger.info(`Auto checkout job completed. ${autoCheckoutCount} users auto-checked out.`);
     
+    return { processed: autoCheckoutCount, date: todayIST.toISOString() };
+  } catch (error) {
+    logger.error('Auto checkout job error:', error);
+    throw error;
+  }
+}
+
+// Start auto checkout cron job
+function startAutoCheckoutJob() {
+  // Auto checkout at 11:59 PM IST
+  // Cron expression: "At 59 minutes past hour 23 (11 PM) in Asia/Kolkata timezone"
+  // This will run at 11:59 PM IST regardless of server timezone
+  cron.schedule('59 23 * * *', async () => {
+  try {
+    await autoCheckoutLogic();
   } catch (error) {
     logger.error('Auto checkout job error:', error);
   }
@@ -133,5 +144,6 @@ function startAutoCheckoutJob() {
 }
 
 module.exports = {
-  startAutoCheckoutJob
+  startAutoCheckoutJob,
+  autoCheckoutLogic
 };

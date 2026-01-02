@@ -70,7 +70,7 @@ function startBirthdayNotificationsJob() {
   logger.info('Birthday notification cron job initialized');
 }
 
-// Export the function for testing
+// Export functions for cron controller and testing
 module.exports = {
     runBirthdayNotifications,
     startBirthdayNotificationsJob
