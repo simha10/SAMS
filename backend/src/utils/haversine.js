@@ -114,7 +114,10 @@ function formatWorkingHours(minutes) {
  * @returns {string}
  */
 function getCurrentDateString(date = new Date()) {
-  return date.toISOString().split('T')[0];
+  // Convert to IST (UTC+5:30) and format as YYYY-MM-DD
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+  const istDate = new Date(date.getTime() + istOffset);
+  return istDate.toISOString().split('T')[0];
 }
 
 module.exports = {

@@ -28,6 +28,11 @@ const cronRunSchema = new mongoose.Schema({
   error: {
     type: String,
     default: null
+  },
+  source: { // Track execution source (scheduler | local | test)
+    type: String,
+    enum: ['google-scheduler', 'local-dev', 'test'],
+    default: 'google-scheduler'
   }
 }, {
   timestamps: true

@@ -1,22 +1,9 @@
-const cron = require('node-cron');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
-const LeaveRequest = require('../models/LeaveRequest');
-const Holiday = require('../models/Holiday');
 const { getCurrentDateString } = require('../utils/haversine');
 const logger = require('../config/logger');
 
-// Check if date is a Sunday
-function isSunday(dateString) {
-  const date = new Date(dateString);
-  return date.getDay() === 0;
-}
-
-// Function to mark absentees - exported for cron controller
-// This function has been moved to absentee.logic.js for better separation of concerns
-// Please use require('../jobs/absentee.logic').markAbsenteeLogic instead
-
-// Function to send daily summary - exported for cron controller
+// Function to send daily summary - exported for cron controller and direct testing
 async function sendDailySummaryLogic() {
   try {
     const today = getCurrentDateString();
@@ -107,38 +94,17 @@ async function sendDailySummaryLogic() {
 
     logger.info('Daily summary job completed', { summariesGenerated: summaries.length });
 
-    return summaries;
+    return { 
+      summaries: summaries.length,
+      date: today,
+      details: summaries
+    };
   } catch (error) {
     logger.error('Daily summary job error:', error);
     throw error;
   }
 }
 
-// Start daily cron jobs
-function startDailyJob() {
-  // Mark absentees at 11:00 AM daily
-  cron.schedule('0 11 * * *', async () => {
-    try {
-      await markAbsenteeLogic();
-    } catch (error) {
-      logger.error('Daily absentee marking job error:', error);
-    }
-  });
-
-  // Send daily summary at 6:30 PM
-  cron.schedule('30 18 * * *', async () => {
-    try {
-      await sendDailySummaryLogic();
-    } catch (error) {
-      logger.error('Daily summary job error:', error);
-    }
-  });
-
-  logger.info('Daily cron jobs initialized');
-}
-
-
 module.exports = {
-  startDailyJob,
   sendDailySummaryLogic
 };
