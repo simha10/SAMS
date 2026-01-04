@@ -40,13 +40,29 @@ async function verifyGoogleToken(token) {
     const signingKey = key.getPublicKey();
 
     // Verify the token
-    const decoded = jwt.verify(actualToken, signingKey, {
-      algorithms: ['RS256'],
-      // Add your Cloud Run service URL as audience
-      // Example: 'https://your-service-name-xyz-uc.a.run.app'
-      // This should be configured as an environment variable
-      audience: process.env.CLOUD_RUN_SERVICE_URL
-    });
+    // Extract the origin (protocol + host) from the CLOUD_RUN_SERVICE_URL
+    let expectedAudience = process.env.CLOUD_RUN_SERVICE_URL;
+    let decoded;
+    
+    if (expectedAudience) {
+      try {
+        // Parse the URL to extract just the origin (protocol + host)
+        const url = new URL(expectedAudience);
+        expectedAudience = `${url.protocol}//${url.host}`;
+      } catch (urlError) {
+        logger.warn('Invalid CLOUD_RUN_SERVICE_URL format, using as-is', { CLOUD_RUN_SERVICE_URL: process.env.CLOUD_RUN_SERVICE_URL });
+        // If URL parsing fails, use the original value
+      }
+      
+      decoded = jwt.verify(actualToken, signingKey, {
+        algorithms: ['RS256'],
+        // Use only the origin part of the URL as audience
+        audience: expectedAudience
+      });
+    } else {
+      logger.error('CLOUD_RUN_SERVICE_URL is not set');
+      return null;
+    }
 
     // Verify it's from Google Cloud Scheduler
     if (decoded.iss !== 'https://accounts.google.com' && decoded.iss !== 'accounts.google.com') {
