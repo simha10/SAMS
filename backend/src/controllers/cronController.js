@@ -69,10 +69,21 @@ async function verifyGoogleToken(token) {
       logger.error('Token issuer is not Google', { issuer: decoded.iss });
       return null;
     }
+    
+    // Normalize audience
+    const audiences = Array.isArray(decoded.aud) ? decoded.aud : [decoded.aud];
+    
+    if (!audiences.includes(expectedAudience)) {
+      logger.error('Audience mismatch', { aud: decoded.aud, expectedAudience });
+      return null;
+    }
 
-    // Verify the email is from Google's scheduler service
-    if (decoded.email && !decoded.email.endsWith('@gcp-sa-scheduler.iam.gserviceaccount.com')) {
-      logger.error('Token email is not from Google Cloud Scheduler service', { email: decoded.email });
+    // Accept valid Cloud Scheduler service accounts
+    if (
+      decoded.email &&
+      !decoded.email.endsWith('@gcp-sa-cloudscheduler.iam.gserviceaccount.com')
+    ) {
+      logger.error('Token email is not from Cloud Scheduler', { email: decoded.email });
       return null;
     }
 
